@@ -1,0 +1,60 @@
+[build-system]
+build-backend = 'setuptools.build_meta'
+requires = [
+    'setuptools==64.0.3',
+    'setuptools_scm[toml]>=6.2',
+    'wheel',
+]
+
+[project]
+name = 'figa'
+authors = [
+]
+maintainers = [
+]
+description = 'Map-based systematics simulation package for CMB experiments'
+readme = 'README.md'
+keywords = [
+    'scientific computing',
+]
+classifiers = [
+    'Programming Language :: Python',
+    'Programming Language :: Python :: 3',
+    'Intended Audience :: Science/Research',
+    'Operating System :: OS Independent',
+    'Topic :: Scientific/Engineering',
+]
+requires-python = '>=3.7'
+license = {file = 'LICENSE'}
+dependencies = [
+    'healpy>=0.16.6',
+    'numpy',
+    'scipy',
+]
+dynamic = ['version']
+
+[project.optional-dependencies]
+full = [
+    'camb',
+    'toml',
+]
+
+
+[project.urls]
+# homepage = ''
+# repository = ''
+
+[[tool.mypy.overrides]]
+module = [
+    'mapbasedsyste',
+]
+ignore_missing_imports = true
+
+[tool.setuptools]
+packages = ["mapbasedsyste"]
+
+[tool.setuptools_scm]
+# version_scheme = 'release'
+# fallback_version = '0.0.0'
+# local_scheme = "no-local-version"
+# write_to = "micmac/_version.py"
