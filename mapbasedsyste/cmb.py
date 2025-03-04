@@ -115,6 +115,7 @@ def create_CMB_spin_maps(nside, nstokes, lmax, maps_CMB=None, seed=42):
         $\Tilde{S}_0 = I$
         $\Tilde{S}_2 = \frac{1}{2} (Q + iU)$
         $\Tilde{S}_{-2} = \frac{1}{2} (Q - iU)$
+    either by generating or forming them from existing CMB maps given as argument
 
     Parameters
     ----------
@@ -131,11 +132,17 @@ def create_CMB_spin_maps(nside, nstokes, lmax, maps_CMB=None, seed=42):
 
     Returns
     -------
-    spin_maps: np.ndarray
-        spin maps of shape (n_spin, npix), with n_spin being 1 of nstokes=1 (spin=0), 2 if nstokes=2 (spin=2, -2) and 3 if nstokes=3 (spin=0, 2, -2) ; ordered as with strictly increasing spin e.g. for nstokes=3: [spin=-2, spin=0, spin=2]
+    spin_maps: dictionary of spin maps
+        dictionary of spin maps, each of shape (n_spin, npix), with n_spin being 1 if nstokes=1 (spin=0), 2 if nstokes=2 (spin=2, -2) and 3 if nstokes=3 (spin=0, 2, -2) 
 
     """
     npix = 12*nside**2
+
+    assert maps_CMB is None or maps_CMB.shape == (nstokes, npix), 'The shape of the CMB maps is not correct'
+    assert nstokes in [1, 2, 3], 'The number of Stokes parameters must be 1, 2 or 3'
+    
+
+    spin_dict_maps = dict()
 
     if maps_CMB is not None:
         assert maps_CMB.shape == (nstokes, npix), 'The shape of the CMB maps is not correct'
@@ -144,21 +151,22 @@ def create_CMB_spin_maps(nside, nstokes, lmax, maps_CMB=None, seed=42):
         if nstokes == 2:
             # Q, U
             relevant_indices = np.array([1, 2])
+            idx_polar = np.array([0, 1])
         elif nstokes == 1:
             # I
             relevant_indices = np.array([0])
         else:
             # I, Q, U
             relevant_indices = np.arange(3)
+            idx_polar = np.array([1, 2])
             
         maps_CMB = generate_CMB_map(nside, lmax, seed=seed)[relevant_indices]
 
     if nstokes == 1:
-        return maps_CMB.reshape(1, npix) # [spin=0]
+        spin_dict_maps[0] = maps_CMB # [spin=0]
     
-    else:
-        polarization_contribution = np.array([maps_CMB[1] - 1j * maps_CMB[2], maps_CMB[1] + 1j * maps_CMB[2]])*.5
-        if nstokes == 2:
-            return polarization_contribution # [spin=-2, spin=2]
+    else:        
+        spin_dict_maps[-2] = .5*(maps_CMB[idx_polar[0]] - 1j * maps_CMB[idx_polar[1]]) # [spin=-2]
+        spin_dict_maps[2] = .5*(maps_CMB[idx_polar[0]] + 1j * maps_CMB[idx_polar[1]]) # [spin=2]
         
-        return np.vstack([polarization_contribution[0], maps_CMB[0], polarization_contribution[1]]) # [spin=-2, spin=0, spin=2]
+    return spin_dict_maps
