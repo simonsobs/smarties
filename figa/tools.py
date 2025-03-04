@@ -21,8 +21,8 @@ def get_coupled_spin(reference_spin, available_h_n_spin, available_signal_spins)
         list of available coupled spins, each tuple being the coupled spins $(k-k', k')$
     """
 
-    minimum_spin = np.min(available_h_n_spin + available_signal_spins)
-    maximum_spin = np.max(available_h_n_spin + available_signal_spins)
+    minimum_spin = np.min(list(available_h_n_spin) + list(available_signal_spins))
+    maximum_spin = np.max(list(available_h_n_spin) + list(available_signal_spins))
 
     # all_spins = np.arange(minimum_spin, maximum_spin+1)
     # h_n_spins = np.array(available_h_n_spin)
@@ -32,8 +32,6 @@ def get_coupled_spin(reference_spin, available_h_n_spin, available_signal_spins)
 
     coupled_spin = []
     for spin in range(minimum_spin, maximum_spin+1):
-        if spin not in available_h_n_spin:
-            continue
-        if reference_spin - spin in available_signal_spins and spin in available_signal_spins:
+        if reference_spin - spin in available_h_n_spin and spin in available_signal_spins:
             coupled_spin.append((reference_spin - spin, spin))
     return coupled_spin

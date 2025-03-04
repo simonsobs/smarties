@@ -8,7 +8,7 @@ class SystematicsSimulation(object):
     Class to simulate systematics maps
     """
 
-    def __init__(self, nside, nstokes, lmax, list_spin_output=[2,-2]):
+    def __init__(self, nside, nstokes, lmax, list_spin_output=[-2,2]):
         """
         Initialize the SystematicsSimulation class allowing to simulate systematics maps
 
@@ -24,7 +24,7 @@ class SystematicsSimulation(object):
             list of spins involved in the signal maps only (for CMB only, the spins are -2, 2 with polarization only)
         """
         self.nside = nside
-        assert np.unique(list_spin_output) == np.array(list_spin_output), 'The list of spins must be unique'
+        assert np.unique(list_spin_output).size == np.array(list_spin_output).size, 'The list of spins must be unique'
         if not np.isin(list_spin_output, np.array([0,-2,2])).all():
             raise NotImplemented('The spins involved in the signal maps must be 0, -2 or 2, other spins are not implemented yet')
         if nstokes > 1:
@@ -63,12 +63,14 @@ class SystematicsSimulation(object):
         """
         return create_CMB_spin_maps(self.nside, self.nstokes, self.lmax, seed=seed)
 
-    def compute_total_maps(self, h_n_spin_dict, spin_CMB_maps, spin_systematics_maps, return_Q_U=False):
+    def compute_total_maps(self, mask, h_n_spin_dict, spin_CMB_maps, spin_systematics_maps, return_Q_U=False):
         """
         Compute the total maps from the $h_n$ maps, the spin CMB maps and the spin systematics maps
 
         Parameters
         ----------
+        mask: np.ndarray
+            mask of the maps, the
         h_n_spin_dict: dict
             dictionary of the summed $h_n$ maps, with the keys being the spins and the values the $h_n$ maps
         spin_CMB_maps: dict
@@ -78,9 +80,11 @@ class SystematicsSimulation(object):
         return_Q_U: bool
             if True, return the Q and U maps instead of the spin -2 and 2 maps 
         """
+
+        #TODO: Only perform the inversion on the observed part
         
         # First, form the mapmaking matrix composed of the h_n map
-        mapmaking_matrix = np.zeros((self.npix, self.nstokes, self.nstokes))
+        mapmaking_matrix = np.zeros((self.npix, self.nstokes, self.nstokes), dtype=np.complex128)
         if self.nstokes == 3:
             mapmaking_matrix[:,-3,-2] = 1 # Spin 00
             mapmaking_matrix[:,-3,-1] = .5 * h_n_spin_dict[2] # Spin 20
@@ -94,7 +98,7 @@ class SystematicsSimulation(object):
         # Second, form the data vector composed of (<d_j>, <d_j cos 2\phi_j>, <d_j sin 2\phi_j>)
 
         # Form the total spin maps
-        list_spin_maps = np.unique(list(spin_CMB_maps.keys()) + list(spin_systematics_maps.keys())).sort()
+        list_spin_maps = np.unique(list(spin_CMB_maps.keys()) + list(spin_systematics_maps.keys()))
         for spin in list_spin_maps:
             if spin not in spin_CMB_maps:
                 spin_CMB_maps[spin] = 0
@@ -103,7 +107,7 @@ class SystematicsSimulation(object):
 
         total_spin_maps =  {spin: spin_CMB_maps[spin] + spin_systematics_maps[spin] for spin in list_spin_maps}
         
-        spin_coupled_maps = np.zeros((self.npix, len(self.list_spin_output)))
+        spin_coupled_maps = np.zeros((self.npix, len(self.list_spin_output)), dtype=complex)
         for i, spin in enumerate(self.list_spin_output):
             coupled_spins = get_coupled_spin(spin, h_n_spin_dict.keys(), list_spin_maps)
             
@@ -115,7 +119,7 @@ class SystematicsSimulation(object):
         inverse_mapmaking_matrix = np.linalg.pinv(mapmaking_matrix)
 
         # Finally, compute the final CMB fields
-        final_CMB_fields = np.einsum('pijp,pj->pi', inverse_mapmaking_matrix, spin_coupled_maps)
+        final_CMB_fields = np.einsum('pij,pj->pi', inverse_mapmaking_matrix, spin_coupled_maps)
 
         if return_Q_U:
             final_Q = (final_CMB_fields[:,-2] + final_CMB_fields[:,-1])/2.

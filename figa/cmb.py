@@ -101,7 +101,7 @@ def generate_CMB_map(nside, lmax, seed=42):
     """
 
     # Generating the CMB power spectra
-    all_spectra = generate_power_spectra_CAMB(nside, typeless_bool=False)
+    all_spectra = generate_power_spectra_CAMB(nside, typeless_bool=False).T
 
     # Generating the CMB map
     np.random.seed(seed)

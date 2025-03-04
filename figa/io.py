@@ -26,7 +26,7 @@ def read_h_n_files(name_file, list_spin=[2,4]):
 
     Note:
     """
-    assert np.unique(list_spin) == np.array(list_spin), 'The list of spins must be unique'
+    assert np.unique(list_spin).size == np.array(list_spin).size, 'The list of spins must be unique'
     assert (np.array(list_spin) > 0).all(), 'The spins provided must be positive, their negative counterpart will be computed from the components read'
 
     h_n_spin_dict = dict()
@@ -37,4 +37,5 @@ def read_h_n_files(name_file, list_spin=[2,4]):
         h_n_spin_dict[spin] = cos_spin_h_n + 1j * sin_spin_h_n
         h_n_spin_dict[-spin] = cos_spin_h_n - 1j * sin_spin_h_n
 
+    h_n_spin_dict[0] = 1.
     return h_n_spin_dict
