@@ -46,12 +46,12 @@ full = [
 
 [[tool.mypy.overrides]]
 module = [
-    'mapbasedsyste',
+    'figa',
 ]
 ignore_missing_imports = true
 
 [tool.setuptools]
-packages = ["mapbasedsyste"]
+packages = ["figa"]
 
 [tool.setuptools_scm]
 # version_scheme = 'release'

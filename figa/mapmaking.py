@@ -1,7 +1,7 @@
 import numpy as np
 
-from mapbasedsyste.tools import get_coupled_spin
-from mapbasedsyste.cmb import create_CMB_spin_maps
+from figa.tools import get_coupled_spin
+from figa.cmb import create_CMB_spin_maps
 
 class SystematicsSimulation(object):
     """
