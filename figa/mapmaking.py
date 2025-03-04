@@ -34,10 +34,6 @@ class SystematicsSimulation(object):
         if nstokes == 1:
             raise NotImplemented('The intensity only case is not implemented yet')
         self.lmax = lmax
-        
-    @property
-    def npix(self):
-        return 12*self.nside**2
 
     def get_spin_cmb_maps(self, seed=42):
         """
@@ -70,7 +66,7 @@ class SystematicsSimulation(object):
         Parameters
         ----------
         mask: np.ndarray
-            mask of the maps, the
+            mask of the maps, only the pixels in the observed area will be considered for the inversion
         h_n_spin_dict: dict
             dictionary of the summed $h_n$ maps, with the keys being the spins and the values the $h_n$ maps
         spin_CMB_maps: dict
@@ -81,10 +77,17 @@ class SystematicsSimulation(object):
             if True, return the Q and U maps instead of the spin -2 and 2 maps 
         """
 
-        #TODO: Only perform the inversion on the observed part
-        
+        # Masking the h_n maps, CMB maps and systematics maps
+        observed_pixels_array = mask != 0
+        h_n_spin_dict = {spin: h_n_spin_dict[spin][observed_pixels_array] if np.size(h_n_spin_dict[spin]) == mask.size else h_n_spin_dict[spin] for spin in h_n_spin_dict.keys()}
+        spin_CMB_maps = {spin: spin_CMB_maps[spin][observed_pixels_array] if np.size(spin_CMB_maps[spin]) == mask.size else spin_CMB_maps[spin] for spin in spin_CMB_maps.keys()}
+        spin_systematics_maps = {spin: spin_systematics_maps[spin][observed_pixels_array] if np.size(spin_systematics_maps[spin]) == mask.size else spin_systematics_maps[spin] for spin in spin_systematics_maps.keys() }
+        # TODO: Decide if input maps are masked here, or if the user should provide the masked maps directly
+
+        npix = mask[observed_pixels_array].size
+
         # First, form the mapmaking matrix composed of the h_n map
-        mapmaking_matrix = np.zeros((self.npix, self.nstokes, self.nstokes), dtype=np.complex128)
+        mapmaking_matrix = np.zeros((npix, self.nstokes, self.nstokes), dtype=np.complex128)
         if self.nstokes == 3:
             mapmaking_matrix[:,-3,-2] = 1 # Spin 00
             mapmaking_matrix[:,-3,-1] = .5 * h_n_spin_dict[2] # Spin 20
@@ -107,7 +110,7 @@ class SystematicsSimulation(object):
 
         total_spin_maps =  {spin: spin_CMB_maps[spin] + spin_systematics_maps[spin] for spin in list_spin_maps}
         
-        spin_coupled_maps = np.zeros((self.npix, len(self.list_spin_output)), dtype=complex)
+        spin_coupled_maps = np.zeros((npix, len(self.list_spin_output)), dtype=complex)
         for i, spin in enumerate(self.list_spin_output):
             coupled_spins = get_coupled_spin(spin, h_n_spin_dict.keys(), list_spin_maps)
             
