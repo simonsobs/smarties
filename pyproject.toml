@@ -7,7 +7,7 @@ requires = [
 ]
 
 [project]
-name = 'figa'
+name = 'mapbased_syste'
 authors = [
 ]
 maintainers = [
@@ -46,12 +46,12 @@ full = [
 
 [[tool.mypy.overrides]]
 module = [
-    'figa',
+    'mapbased_syste',
 ]
 ignore_missing_imports = true
 
 [tool.setuptools]
-packages = ["figa"]
+packages = ["mapbased_syste"]
 
 [tool.setuptools_scm]
 # version_scheme = 'release'
