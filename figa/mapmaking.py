@@ -58,6 +58,9 @@ class SystematicsSimulation(object):
         currently the other cases are not implemented for the input spin maps
         """
         return create_CMB_spin_maps(self.nside, self.nstokes, self.lmax, seed=seed)
+    
+    def get_spin_systematics_maps(self):
+        pass
 
     def compute_total_maps(self, mask, h_n_spin_dict, spin_CMB_maps, spin_systematics_maps, return_Q_U=False):
         """
@@ -75,6 +78,11 @@ class SystematicsSimulation(object):
             dictionary of the spin systematics maps, with the keys being the spins and the values the spin systematics maps
         return_Q_U: bool
             if True, return the Q and U maps instead of the spin -2 and 2 maps 
+
+        Returns
+        -------
+        final_CMB_fields: np.ndarray
+            the final CMB fields, with the shape (npix, nstokes) if return_Q_U is False, (npix, 3) otherwise
         """
 
         # Masking the h_n maps, CMB maps and systematics maps
@@ -122,13 +130,13 @@ class SystematicsSimulation(object):
         inverse_mapmaking_matrix = np.linalg.pinv(mapmaking_matrix)
 
         # Finally, compute the final CMB fields
-        final_CMB_fields = np.einsum('pij,pj->pi', inverse_mapmaking_matrix, spin_coupled_maps)
+        final_CMB_fields = np.einsum('pij,pj->ip', inverse_mapmaking_matrix, spin_coupled_maps)
 
         if return_Q_U:
-            final_Q = (final_CMB_fields[:,-2] + final_CMB_fields[:,-1])/2.
-            final_U = 1j*(final_CMB_fields[:,-2] - final_CMB_fields[:,-1])/2.
+            final_Q = (final_CMB_fields[-2,:] + final_CMB_fields[-1,:])/2.
+            final_U = 1j*(final_CMB_fields[-2,:] - final_CMB_fields[-1,:])/2.
             if self.nstokes == 3:
-                final_I = final_CMB_fields[:,-3]
+                final_I = final_CMB_fields[-3,:]
                 return np.vstack([final_I, final_Q, final_U])
             else:
                 return np.vstack([final_Q, final_U])
