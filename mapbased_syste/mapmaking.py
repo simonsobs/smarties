@@ -97,8 +97,8 @@ class SystematicsSimulation(object):
         # First, form the mapmaking matrix composed of the h_n map
         mapmaking_matrix = np.zeros((npix, self.nstokes, self.nstokes), dtype=np.complex128)
         if self.nstokes == 3:
-            mapmaking_matrix[:,-3,-2] = 1 # Spin 00
-            mapmaking_matrix[:,-3,-1] = .5 * h_n_spin_dict[2] # Spin 20
+            mapmaking_matrix[:,-3,-3] = 1 # Spin 00
+            mapmaking_matrix[:,-3,-2] = .5 * h_n_spin_dict[2] # Spin 20
             mapmaking_matrix[:,-3,-1] = .5 * h_n_spin_dict[-2] # Spin -20
         mapmaking_matrix[:,-2,-2] = .5 * h_n_spin_dict[4]
         mapmaking_matrix[:,-2,-1] = 1/4.
