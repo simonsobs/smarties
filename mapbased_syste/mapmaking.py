@@ -36,7 +36,7 @@ class FrameworkSystematics(object):
             raise NotImplemented('The intensity only case is not implemented yet')
         self.lmax = lmax
 
-    def get_spin_cmb_maps(self, seed=42):
+    def get_spin_sky_maps(self, seed=42):
         """
         Get the spin CMB maps which are the following for intensity and polarization:
             * Spin 0: I
@@ -50,8 +50,8 @@ class FrameworkSystematics(object):
 
         Returns
         -------
-        spin_CMB_maps: dictionary of spin CMB maps
-            dictionary of spin CMB maps, each of shape (n_spin, npix), with n_spin being 1 if nstokes=1 (spin=0), 2 if nstokes=2 (spin=-2, 2) and 3 if nstokes=3 (spin=0, -2, 2) 
+        spin_sky_maps: dictionary of spin sky maps (CMB, ...)
+            dictionary of spin sky maps, each of shape (n_spin, npix), with n_spin being 1 if nstokes=1 (spin=0), 2 if nstokes=2 (spin=-2, 2) and 3 if nstokes=3 (spin=0, -2, 2) 
 
         Note
         ----
@@ -67,7 +67,7 @@ class FrameworkSystematics(object):
             self, 
             mask, 
             h_n_spin_dict, 
-            spin_CMB_maps, 
+            spin_sky_maps, 
             spin_systematics_maps, 
             return_Q_U: bool = False,
             return_inverse_mapmaking_matrix: bool = False):
@@ -80,7 +80,7 @@ class FrameworkSystematics(object):
             mask of the maps, only the pixels in the observed area will be considered for the inversion
         h_n_spin_dict: dict
             dictionary of the summed $h_n$ maps, with the keys being the spins and the values the $h_n$ maps
-        spin_CMB_maps: dict
+        spin_sky_maps: dict
             dictionary of the spin CMB maps, with the keys being the spins and the values the spin CMB maps (e.g. if nstokes=3, the keys are 0, -2, 2 and the fields (I, Q-iU, Q+iU))
         spin_systematics_maps: dict
             dictionary of the spin systematics maps, with the keys being the spins and the values the spin systematics maps
@@ -98,7 +98,7 @@ class FrameworkSystematics(object):
         # Masking the h_n maps, CMB maps and systematics maps
         observed_pixels_array = mask != 0
         h_n_spin_dict = {spin: h_n_spin_dict[spin][observed_pixels_array] if np.size(h_n_spin_dict[spin]) == mask.size else h_n_spin_dict[spin] for spin in h_n_spin_dict.keys()}
-        spin_CMB_maps = {spin: spin_CMB_maps[spin][observed_pixels_array] if np.size(spin_CMB_maps[spin]) == mask.size else spin_CMB_maps[spin] for spin in spin_CMB_maps.keys()}
+        spin_sky_maps = {spin: spin_sky_maps[spin][observed_pixels_array] if np.size(spin_sky_maps[spin]) == mask.size else spin_sky_maps[spin] for spin in spin_sky_maps.keys()}
         spin_systematics_maps = {spin: spin_systematics_maps[spin][observed_pixels_array] if np.size(spin_systematics_maps[spin]) == mask.size else spin_systematics_maps[spin] for spin in spin_systematics_maps.keys() }
         # TODO: Decide if input maps are masked here, or if the user should provide the masked maps directly
 
@@ -116,6 +116,7 @@ class FrameworkSystematics(object):
         # Diagonal element /2 to be symmetrized afterwards
         mapmaking_matrix[:,-2,-2] = .5 * 1/4. * h_n_spin_dict[4]
         mapmaking_matrix[:,-1,-1] = .5 * 1/4. * h_n_spin_dict[-4]
+        #TODO: Make it more general for the spins involved in the signal maps
 
         # Off-diagonal element
         mapmaking_matrix[:,-2,-1] = 1/4.
@@ -126,20 +127,23 @@ class FrameworkSystematics(object):
         # Second, form the data vector composed of (<d_j>, <d_j cos 2\phi_j>, <d_j sin 2\phi_j>)
 
         # Form the total spin maps
-        list_spin_maps = np.unique(list(spin_CMB_maps.keys()) + list(spin_systematics_maps.keys()))
+        list_spin_maps = np.unique(list(spin_sky_maps.keys()) + list(spin_systematics_maps.keys()))
         for spin in list_spin_maps:
-            if spin not in spin_CMB_maps:
-                spin_CMB_maps[spin] = 0
+            if spin not in spin_sky_maps:
+                spin_sky_maps[spin] = 0
             if spin not in spin_systematics_maps:
                 spin_systematics_maps[spin] = 0
 
-        total_spin_maps =  {spin: spin_CMB_maps[spin] + spin_systematics_maps[spin] for spin in list_spin_maps}
+        total_spin_maps =  {spin: spin_sky_maps[spin] + spin_systematics_maps[spin] for spin in list_spin_maps}
         
         spin_coupled_maps = np.zeros((npix, len(self.list_spin_output)), dtype=complex)
         factor_dict = {0: 1, -2: .5, 2: .5}
         for i, spin in enumerate(self.list_spin_output):
-            coupled_spins = get_coupled_spin(spin, h_n_spin_dict.keys(), list_spin_maps)
-
+            #TODO: Replace the -spin by something which makes more sense without need of hardcoding this
+            coupled_spins = get_coupled_spin(-spin, h_n_spin_dict.keys(), list_spin_maps)
+            
+            
+            # TODO: Remove print
             print(f'Coupled spins for spin {spin}: {coupled_spins}')
             
             # \sum_{k' = -\infty}^{\infty} h_{k-k'} S_{k'} on all (k-k', k) pairs
