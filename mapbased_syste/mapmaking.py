@@ -1,16 +1,17 @@
 import numpy as np
+from opt_einsum import contract
 
 from mapbased_syste.tools import get_coupled_spin
 from mapbased_syste.cmb import create_CMB_spin_maps
 
-class SystematicsSimulation(object):
+class FrameworkSystematics(object):
     """
     Class to simulate systematics maps
     """
 
     def __init__(self, nside, nstokes, lmax, list_spin_output=[-2,2]):
         """
-        Initialize the SystematicsSimulation class allowing to simulate systematics maps
+        Initialize the FrameworkSystematics class allowing to simulate systematics maps
 
         Parameters
         ----------
@@ -62,7 +63,14 @@ class SystematicsSimulation(object):
     def get_spin_systematics_maps(self):
         pass
 
-    def compute_total_maps(self, mask, h_n_spin_dict, spin_CMB_maps, spin_systematics_maps, return_Q_U=False):
+    def compute_total_maps(
+            self, 
+            mask, 
+            h_n_spin_dict, 
+            spin_CMB_maps, 
+            spin_systematics_maps, 
+            return_Q_U: bool = False,
+            return_inverse_mapmaking_matrix: bool = False):
         """
         Compute the total maps from the $h_n$ maps, the spin CMB maps and the spin systematics maps
 
@@ -77,7 +85,9 @@ class SystematicsSimulation(object):
         spin_systematics_maps: dict
             dictionary of the spin systematics maps, with the keys being the spins and the values the spin systematics maps
         return_Q_U: bool
-            if True, return the Q and U maps instead of the spin -2 and 2 maps 
+            if True, return the Q and U maps instead of the spin -2 and 2 maps, default is False
+        return_inverse_mapmaking_matrix: bool
+            if True, return the inverse of the mapmaking matrix, default is False
 
         Returns
         -------
@@ -97,14 +107,21 @@ class SystematicsSimulation(object):
         # First, form the mapmaking matrix composed of the h_n map
         mapmaking_matrix = np.zeros((npix, self.nstokes, self.nstokes), dtype=np.complex128)
         if self.nstokes == 3:
-            mapmaking_matrix[:,-3,-3] = 1 # Spin 00
+            # Diagonal element /2 to be symmetrized afterwards
+            mapmaking_matrix[:,-3,-3] = .5 * 1 # Spin 00
+
+            # Off-diagonal elements
             mapmaking_matrix[:,-3,-2] = .5 * h_n_spin_dict[2] # Spin 20
             mapmaking_matrix[:,-3,-1] = .5 * h_n_spin_dict[-2] # Spin -20
-        mapmaking_matrix[:,-2,-2] = .5 * h_n_spin_dict[4]
+        # Diagonal element /2 to be symmetrized afterwards
+        mapmaking_matrix[:,-2,-2] = .5 * 1/4. * h_n_spin_dict[4]
+        mapmaking_matrix[:,-1,-1] = .5 * 1/4. * h_n_spin_dict[-4]
+
+        # Off-diagonal element
         mapmaking_matrix[:,-2,-1] = 1/4.
-        mapmaking_matrix[:,-1,-1] = 1/4.*h_n_spin_dict[-4]
         
-        mapmaking_matrix = (mapmaking_matrix + mapmaking_matrix.transpose(0,2,1))/2. # to symmetrize the matrix
+        
+        mapmaking_matrix = (mapmaking_matrix + mapmaking_matrix.transpose(0,2,1)) # to symmetrize the matrix
 
         # Second, form the data vector composed of (<d_j>, <d_j cos 2\phi_j>, <d_j sin 2\phi_j>)
 
@@ -119,26 +136,35 @@ class SystematicsSimulation(object):
         total_spin_maps =  {spin: spin_CMB_maps[spin] + spin_systematics_maps[spin] for spin in list_spin_maps}
         
         spin_coupled_maps = np.zeros((npix, len(self.list_spin_output)), dtype=complex)
+        factor_dict = {0: 1, -2: .5, 2: .5}
         for i, spin in enumerate(self.list_spin_output):
             coupled_spins = get_coupled_spin(spin, h_n_spin_dict.keys(), list_spin_maps)
+
+            print(f'Coupled spins for spin {spin}: {coupled_spins}')
             
             # \sum_{k' = -\infty}^{\infty} h_{k-k'} S_{k'} on all (k-k', k) pairs
             for tuple_spins in coupled_spins:
-                spin_coupled_maps[:,i] += .5 * h_n_spin_dict[tuple_spins[0]]*total_spin_maps[tuple_spins[1]]
+                spin_coupled_maps[:,i] += factor_dict[spin] * h_n_spin_dict[tuple_spins[0]]*total_spin_maps[tuple_spins[1]]
 
         # Third, compute the inverse of the mapmaking matrix
         inverse_mapmaking_matrix = np.linalg.pinv(mapmaking_matrix)
 
+        #TODO: Have condtion number as output
+
         # Finally, compute the final CMB fields
-        final_CMB_fields = np.einsum('pij,pj->ip', inverse_mapmaking_matrix, spin_coupled_maps)
+        final_CMB_fields = contract('pij,pj->ip', inverse_mapmaking_matrix, spin_coupled_maps)
 
         if return_Q_U:
-            final_Q = (final_CMB_fields[-2,:] + final_CMB_fields[-1,:])/2.
-            final_U = 1j*(final_CMB_fields[-2,:] - final_CMB_fields[-1,:])/2.
+            final_Q = (final_CMB_fields[-2,:] + final_CMB_fields[-1,:])
+            final_U = 1j*(final_CMB_fields[-2,:] - final_CMB_fields[-1,:])
             if self.nstokes == 3:
                 final_I = final_CMB_fields[-3,:]
-                return np.vstack([final_I, final_Q, final_U])
+                output = np.vstack([final_I, final_Q, final_U])
             else:
-                return np.vstack([final_Q, final_U])
+                output = np.vstack([final_Q, final_U])
         else:
-            return final_CMB_fields
+            output = final_CMB_fields
+        
+        if return_inverse_mapmaking_matrix:
+            return output, inverse_mapmaking_matrix
+        return output
