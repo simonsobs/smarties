@@ -159,8 +159,8 @@ class FrameworkSystematics(object):
         final_CMB_fields = contract('pij,pj->ip', inverse_mapmaking_matrix, spin_coupled_maps)
 
         if return_Q_U:
-            final_Q = (final_CMB_fields[-2,:] + final_CMB_fields[-1,:])
-            final_U = 1j*(final_CMB_fields[-2,:] - final_CMB_fields[-1,:])
+            final_Q = (final_CMB_fields[-2,:] + final_CMB_fields[-1,:])/2.
+            final_U = 1j*(final_CMB_fields[-2,:] - final_CMB_fields[-1,:])/2.
             if self.nstokes == 3:
                 final_I = final_CMB_fields[-3,:]
                 output = np.vstack([final_I, final_Q, final_U])
