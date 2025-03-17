@@ -1,6 +1,6 @@
 import numpy as np
 import healpy as hp
-
+from mapbased_syste.hn import Spin_maps
 
 def read_h_n_file(name_file, list_spin=[2,4]):
     """
@@ -37,19 +37,34 @@ def read_h_n_file(name_file, list_spin=[2,4]):
         h_n_spin_dict[spin] = np.expand_dims(cos_spin_h_n + 1j * sin_spin_h_n, 0)
         h_n_spin_dict[-spin] = np.expand_dims(cos_spin_h_n - 1j * sin_spin_h_n, 0)
 
-    h_n_spin_dict[0] = np.expand_dims([1],0)
+    h_n_spin_dict[0] = np.expand_dims([1.],0)
     return h_n_spin_dict
 
-def read_detectors_h_n_maps(list_name_files, list_spin):
+def read_detectors_h_n_maps(list_name_files, list_spin, list_weights=None):
     """
     Read the $h_n$ maps for all the detectors given in list_name_files
 
     Args:
         list_name_files (list[str]): list of the name of the files to read
         list_spin (list[int]): list of the spin to read
+        list_weights (list[float]): list of the weights per detector, to apply to the $h_n$ so that the total $h_n$ maps are weighted by the total nhits of the detectors, if None, the nhits is assumed to be the same for all detectors and a weight of 1/sqrt(n_det) is applied
     
     Returns:
-    
+        h_n_spin_dict (Spin_maps): the $h_n$ maps stored in a Spin_maps object with the keys being the spins and the elements being ordered as [n_det, n_pix], with n_det the number of detectors and n_pix the number of pixels in the $h_n$ maps, except for spin=0 which dimension is [n_det,1] and only contains the float 1.
 
     """
-    pass
+    
+    n_det = len(list_name_files)
+
+    if list_weights is None:
+        list_weights = np.ones(n_det, dtype=float) / n_det
+
+    h_n_spin_dict = Spin_maps.from_dictionary(read_h_n_file(list_name_files[0], list_spin=list_spin))
+    for spin in h_n_spin_dict.spins:
+        h_n_spin_dict[spin] *= list_weights[0]
+
+    for i, path_h_n_maps in enumerate(list_name_files[1:]):
+        h_n_spin_dict_to_add = Spin_maps.from_dictionary(read_h_n_file(path_h_n_maps, list_spin=list_spin))
+        for spin in h_n_spin_dict.spins:
+            h_n_spin_dict[spin] = np.vstack((h_n_spin_dict[spin],h_n_spin_dict_to_add[spin]*list_weights[i+1]))
+    return h_n_spin_dict

@@ -3,7 +3,7 @@ from opt_einsum import contract
 
 from mapbased_syste.tools import get_coupled_spin, get_row_mapmaking_matrix
 from mapbased_syste.cmb import create_CMB_spin_maps
-
+from mapbased_syste.hn import Spin_maps
 class FrameworkSystematics(object):
     """
     Class to simulate systematics maps
@@ -87,9 +87,9 @@ class FrameworkSystematics(object):
         ----------
         mask: np.ndarray
             mask of the maps, only the pixels in the observed area will be considered for the inversion
-        h_n_spin_dict: dict
+        h_n_spin_dict: dict or Spin_maps
             dictionary of the summed $h_n$ maps, with the keys being the spins and the values the $h_n$ maps
-        spin_sky_maps: dict
+        spin_sky_maps: dict or Spin_maps
             dictionary of the spin CMB maps, with the keys being the spins and the values the spin CMB maps (e.g. if nstokes=3, the keys are 0, -2, 2 and the fields (I, Q-iU, Q+iU))
         spin_systematics_maps: dict
             dictionary of the spin systematics maps, with the keys being the spins and the values the spin systematics maps
@@ -109,9 +109,9 @@ class FrameworkSystematics(object):
         
         # Masking the h_n maps, CMB maps and systematics maps
         observed_pixels_array = mask != 0
-        h_n_spin_dict = {spin: h_n_spin_dict[spin][...,observed_pixels_array] if np.size(h_n_spin_dict[spin][0,...]) == mask.size else h_n_spin_dict[spin] for spin in h_n_spin_dict.keys()}
-        spin_sky_maps = {spin: spin_sky_maps[spin][...,observed_pixels_array] if np.size(spin_sky_maps[spin]) == mask.size else spin_sky_maps[spin] for spin in spin_sky_maps.keys()}
-        spin_systematics_maps = {spin: spin_systematics_maps[spin][...,observed_pixels_array] if np.size(spin_systematics_maps[spin][0,...]) == mask.size else spin_systematics_maps[spin] for spin in spin_systematics_maps.keys() }
+        h_n_spin_dict = Spin_maps.from_dictionary({spin: h_n_spin_dict[spin][...,observed_pixels_array] if np.size(h_n_spin_dict[spin][0,...]) == mask.size else h_n_spin_dict[spin] for spin in h_n_spin_dict.keys()})
+        spin_sky_maps = Spin_maps.from_dictionary({spin: spin_sky_maps[spin][...,observed_pixels_array] if np.size(spin_sky_maps[spin]) == mask.size else spin_sky_maps[spin] for spin in spin_sky_maps.keys()})
+        spin_systematics_maps = Spin_maps.from_dictionary({spin: spin_systematics_maps[spin][...,observed_pixels_array] if np.size(spin_systematics_maps[spin][0,...]) == mask.size else spin_systematics_maps[spin] for spin in spin_systematics_maps.keys()})
         # TODO: Decide if input maps are masked here, or if the user should provide the masked maps directly
 
         npix = mask[observed_pixels_array].size
@@ -125,19 +125,13 @@ class FrameworkSystematics(object):
         # Second, form the data vector composed of (<d_j>, <d_j cos 2\phi_j>, <d_j sin 2\phi_j>)
 
         # Form the total spin maps
-        list_spin_maps = np.unique(list(spin_sky_maps.keys()) + list(spin_systematics_maps.keys()))
-        for spin in list_spin_maps:
-            if spin not in spin_sky_maps:
-                spin_sky_maps[spin] = 0
-            if spin not in spin_systematics_maps:
-                spin_systematics_maps[spin] = 0
-
-        total_spin_maps =  {spin: spin_sky_maps[spin] + spin_systematics_maps[spin] for spin in list_spin_maps}
+        total_spin_maps = spin_sky_maps + spin_systematics_maps
+        list_spin_maps = total_spin_maps.spins
         
         spin_coupled_maps = np.zeros((npix, len(self.list_spin_output),), dtype=complex)
         factor_dict = {0: 1, -2: .5, 2: .5}
         for i, spin in enumerate(self.list_spin_input):
-            coupled_spins = get_coupled_spin(spin, h_n_spin_dict.keys(), list_spin_maps)
+            coupled_spins = get_coupled_spin(spin, h_n_spin_dict.spins, list_spin_maps)
             
             # \sum_{k' = -\infty}^{\infty} h_{k-k'} S_{k'} on all (k-k', k) pairs
             for tuple_spins in coupled_spins:
