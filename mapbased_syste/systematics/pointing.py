@@ -1,7 +1,13 @@
 import numpy as np
 import healpy as hp
+from mapbased_syste.hn import Spin_maps
+from mapbased_syste.operators import get_naive_spin_derivative
 
-def create_pointing_spin_leakage_map(intensity_CMB, angular_amplitude_offset, lmax=None):
+def create_pointing_spin_leakage_map(
+        intensity_CMB, 
+        angular_amplitude_offset, 
+        lmax=None
+    ):
     """
     Create the pointing leakage maps for a given intensity CMB map and angular amplitude offset,
     with output spins 1 and -1, resulting in maps
@@ -29,18 +35,34 @@ def create_pointing_spin_leakage_map(intensity_CMB, angular_amplitude_offset, lm
 
     nside = hp.npix2nside(intensity_CMB.size)
 
-    alm_itensity = hp.map2alm(intensity_CMB, lmax=lmax)
+    # alm_itensity = hp.map2alm(intensity_CMB, lmax=lmax)
 
-    _, map_I_dtheta, map_I_dphi = hp.alm2map_der1(alm_itensity, nside, lmax=lmax) 
-    # map_I_dphi already contains the sin(theta) factor
+    # _, map_I_dtheta, map_I_dphi = hp.alm2map_der1(alm_itensity, nside, lmax=lmax) 
+    # # map_I_dphi already contains the sin(theta) factor
+
+    # # Compute the spin raising and lowering operators
+    # pointing_leakage_spin_maps = dict()
+
+    # # Spin 1
+    # pointing_leakage_spin_maps[1] = - angular_amplitude_offset / 4 * (map_I_dtheta - 1j * map_I_dphi)
+
+    # # Spin -1
+    # pointing_leakage_spin_maps[-1] = - angular_amplitude_offset / 4 * (map_I_dtheta + 1j * map_I_dphi)
+
+    intensity_spin_derivatives = get_naive_spin_derivative(
+        intensity_CMB, 
+        0, 
+        lmax=lmax
+    )
 
     # Compute the spin raising and lowering operators
-    pointing_leakage_spin_maps = dict()
+    pointing_leakage_spin_maps = Spin_maps()
 
     # Spin 1
-    pointing_leakage_spin_maps[1] = - angular_amplitude_offset / 4 * (map_I_dtheta - 1j * map_I_dphi)
+    pointing_leakage_spin_maps[1] = - angular_amplitude_offset / 4 * intensity_spin_derivatives[-1]
 
     # Spin -1
-    pointing_leakage_spin_maps[-1] = - angular_amplitude_offset / 4 * (map_I_dtheta + 1j * map_I_dphi)
+    pointing_leakage_spin_maps[-1] = - angular_amplitude_offset / 4 * intensity_spin_derivatives[1]
+
 
     return pointing_leakage_spin_maps
