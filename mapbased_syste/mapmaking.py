@@ -27,13 +27,9 @@ class FrameworkSystematics(object):
         self.nside = nside
         assert np.unique(list_spin_output).size == np.array(list_spin_output).size, 'The list of spins must be unique'
         if not np.isin(list_spin_output, np.array([0,-2,2])).all():
-            raise NotImplemented('The spins involved in the signal maps must be 0, -2 or 2, other spins are not implemented yet')
-        if nstokes > 1:
-            assert list_spin_output[-2:] == [-2, 2], 'The spins involved in the signal maps must be ordered as -2, 2 for the polarization part'
+            print('The output spins maps appeared to contain spin different than 0, -2 or 2, the package has not been tested in this case!', flush=True)
         self.list_spin_output = list_spin_output # list spins involved in the signal maps only (for CMB only, the spins are 0, -2, 2 if intensity is involved)
         self.nstokes = nstokes
-        if nstokes == 1:
-            raise NotImplemented('The intensity only case is not implemented yet')
         self.lmax = lmax
 
     @property

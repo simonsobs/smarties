@@ -162,10 +162,10 @@ def create_CMB_spin_maps(nside, nstokes, lmax, maps_CMB=None, seed=42):
             
         maps_CMB = generate_CMB_map(nside, lmax, seed=seed)[relevant_indices]
 
-    if nstokes == 1:
+    if nstokes == 1 or nstokes == 3:
         spin_dict_maps[0] = maps_CMB # [spin=0]
     
-    else:        
+    if nstokes > 1:        
         spin_dict_maps[-2] = .5*(maps_CMB[idx_polar[0]] - 1j * maps_CMB[idx_polar[1]]) # [spin=-2]
         spin_dict_maps[2] = .5*(maps_CMB[idx_polar[0]] + 1j * maps_CMB[idx_polar[1]]) # [spin=2]
         
