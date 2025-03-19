@@ -1,11 +1,14 @@
 import numpy as np
 import healpy as hp
+from opt_einsum import contract
+
 from mapbased_syste.hn import Spin_maps
 from mapbased_syste.operators import get_naive_spin_derivative
 
 def create_pointing_spin_leakage_map(
         intensity_CMB, 
-        angular_amplitude_offset, 
+        amplitude_offset, 
+        angle_offset,
         lmax=None
     ):
     """
@@ -19,9 +22,11 @@ def create_pointing_spin_leakage_map(
     Parameters
     ----------
     intensity_CMB: np.ndarray
-        intensity CMB map, the output maps will have the same dimension
-    angular_amplitude_offset: float
-        angular amplitude offset in radians
+        intensity CMB map already convolved with Gaussian circularly-symmetric beam (as assumed in the formalism), the output maps will have the same dimension
+    amplitude_offset: float
+        angular amplitude offset for each detector in radians
+    angle_offset: float
+        angle offset for each detector in radians
     
     Returns
     -------
@@ -33,21 +38,14 @@ def create_pointing_spin_leakage_map(
     Only the temperature leakage is considered here, the polarization leakage is not implemented
     """
 
-    nside = hp.npix2nside(intensity_CMB.size)
+    assert intensity_CMB.ndim == 1, 'The intensity_CMB map must have only 1 dimension'
+    assert np.log(np.sqrt(intensity_CMB.size/12)) / np.log(2) % 1 == 0, 'The intensity_CMB map dimension must be compatible with a full sky healpy map'
 
-    # alm_itensity = hp.map2alm(intensity_CMB, lmax=lmax)
+    amplitude_offset = np.asarray(amplitude_offset)
+    angle_offset = np.asarray(angle_offset)
 
-    # _, map_I_dtheta, map_I_dphi = hp.alm2map_der1(alm_itensity, nside, lmax=lmax) 
-    # # map_I_dphi already contains the sin(theta) factor
-
-    # # Compute the spin raising and lowering operators
-    # pointing_leakage_spin_maps = dict()
-
-    # # Spin 1
-    # pointing_leakage_spin_maps[1] = - angular_amplitude_offset / 4 * (map_I_dtheta - 1j * map_I_dphi)
-
-    # # Spin -1
-    # pointing_leakage_spin_maps[-1] = - angular_amplitude_offset / 4 * (map_I_dtheta + 1j * map_I_dphi)
+    assert np.array(amplitude_offset).ndim == 1, 'The dimension of the amplitude_offset must be (n_det,)'
+    assert amplitude_offset.shape == angle_offset.shape, 'The amplitude offset must have the same shape as the angle offset'
 
     intensity_spin_derivatives = get_naive_spin_derivative(
         intensity_CMB, 
@@ -55,14 +53,14 @@ def create_pointing_spin_leakage_map(
         lmax=lmax
     )
 
-    # Compute the spin raising and lowering operators
+    # Compute the spin raising and lowering operators, knowing that the final dict must have shape {spin:np.ndarray[n_det,n_pix]}
     pointing_leakage_spin_maps = Spin_maps()
 
     # Spin 1
-    pointing_leakage_spin_maps[1] = - angular_amplitude_offset / 4 * intensity_spin_derivatives[-1]
+    pointing_leakage_spin_maps[1] = contract('d,p->dp', - amplitude_offset / 4 * np.exp(1j*angle_offset), intensity_spin_derivatives[-1])
 
     # Spin -1
-    pointing_leakage_spin_maps[-1] = - angular_amplitude_offset / 4 * intensity_spin_derivatives[1]
+    pointing_leakage_spin_maps[-1] = contract('d,p->dp', - amplitude_offset / 4 *  np.exp(1j*angle_offset), intensity_spin_derivatives[1])
 
 
     return pointing_leakage_spin_maps
