@@ -83,7 +83,7 @@ def get_alpha_lower(s, lmax):
     )
     return ret
 
-def get_first_second_spin_derivative(grad_curl_alms, nside, input_spin):
+def get_first_spin_derivative(grad_curl_alms, nside, input_spin):
     """
     Function to obtain the maps after applying the spin-raising and spin-lowering operators on the input alms of arbitrary spin.
 
