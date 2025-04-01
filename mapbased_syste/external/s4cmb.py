@@ -17,49 +17,34 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 """
-Module readapted including diverse tools to manipulate alms and maps from the s4cmb package.
+Routines taken from CMBS4 and readapted including diverse tools to manipulate alms and maps from the s4cmb package.
 """
 import numpy as np
 import healpy as hp
-
-
-def get_healpix_ring_pixel_layout(nside, th_idx):
-    """Healpix ring layout.
-
-    From 'get_pixel_layout' subroutine in healpix f90 package.
-
-    Author: Julien Carron (j.carron@sussex.ac.uk)
-    """
-    ith = th_idx + 1
-    nrings = 2 * nside
-    assert 1 <= ith <= 4 * nside - 1, (ith, nrings)
-    if ith > nrings:
-        startpix, nphi, kphi0, cth, sth = get_healpix_ring_pixel_layout(
-            nside, ith - 2 * (ith - nrings) - 1
-        )
-        return 12 * nside ** 2 - startpix - nphi, nphi, kphi0, -cth, sth
-    dth1 = 1.0 / 3.0 / nside ** 2
-    dth2 = 2.0 / 3.0 / nside
-    dst1 = 1.0 / (np.sqrt(6.0) * nside)
-    if ith < nside:  # polar cap (north)
-        cth = 1.0 - ith ** 2 * dth1
-        nphi = 4 * ith
-        kphi0 = 1
-        sth = np.sin(2.0 * np.arcsin(ith * dst1))
-        startpix = 2 * ith * (ith - 1)
-    else:
-        cth = (2 * nside - ith) * dth2
-        nphi = 4 * nside
-        kphi0 = (ith + 1 - nside) % 2
-        sth = np.sqrt((1.0 - cth) * (1.0 + cth))
-        startpix = 2 * nside * (nside - 1) + (ith - nside) * int(nphi)
-    return startpix, nphi, kphi0, cth, sth
-
 
 def get_alpha_raise(s, lmax):
     """Response coefficient of spin-s spherical harmonic to spin raising operator.
 
     Author: Julien Carron (j.carron@sussex.ac.uk)
+
+    Parameters
+    ----------
+    s : int
+        Input spin of the spherical harmonic.
+    lmax : int
+        Maximum multipole moment.
+    
+    Returns
+    -------
+    ret : np.ndarray
+        Response coefficient of spin-s spherical harmonic to spin raising operator.
+
+    Notes
+    -----
+    The response coefficient is defined as:
+        alpha(s, l) = sqrt((l - s) * (l + s + 1))
+    where l is the multipole moment.
+    The response coefficient is zero for l < |s|.
     """
     ret = np.zeros(lmax + 1, dtype=float)
     ret[abs(s):] = np.sqrt(
@@ -72,6 +57,25 @@ def get_alpha_lower(s, lmax):
     """Response coefficient of spin-s spherical harmonic to spin lowering operator.
 
     Author: Julien Carron (j.carron@sussex.ac.uk)
+
+    Parameters
+    ----------
+    s : int
+        Input spin of the spherical harmonic.
+    lmax : int
+        Maximum multipole moment.
+
+    Returns
+    -------
+    ret : np.ndarray
+        Response coefficient of spin-s spherical harmonic to spin lowering operator.
+
+    Notes
+    -----
+    The response coefficient is defined as:
+        alpha(s, l) = sqrt((l + s) * (l - s + 1))
+    where l is the multipole moment.
+    The response coefficient is zero for l < |s|.
     """
     ret = np.zeros(lmax + 1, dtype=float)
     ret[abs(s):] = -np.sqrt(
@@ -79,60 +83,126 @@ def get_alpha_lower(s, lmax):
     )
     return ret
 
-
-def alm2map_spin_der1(gclm, nside, spin, zbounds=(-1.0, 1.0), ret_slice=None):
-    """Returns spin-s transform '_{s}d' of alm,
-    together with d/dtheta _{s}d and 1/sin tht d/dphi _{s}d.
-
-    This crude version has three calls to spin-weight harmonics alm2map_spin.
-
-    Author: Julien Carron (j.carron@sussex.ac.uk)
+def get_first_second_spin_derivative(grad_curl_alms, nside, input_spin):
     """
-    assert spin > 0, spin
-    assert hp.Alm.getlmax(gclm[0].size) == hp.Alm.getlmax(gclm[1].size)
-    lmax = hp.Alm.getlmax(gclm[0].size)
-    zbounds = np.sort(np.array(zbounds))
+    Function to obtain the maps after applying the spin-raising and spin-lowering operators on the input alms of arbitrary spin.
+
+    Parameters
+    ----------
+    grad_curl_alms : list of np.ndarray
+        List of two arrays containing the grad and curl parts of the spherical harmonic coefficients.
+        grad_curl_alms[0] is the grad part and grad_curl_alms[1] is the curl part, and the last dimension is the healpix ordering
+        of the alms.
+    nside : int
+        Healpix nside parameter.
+    input_spin : int
+        Input spin of the spherical harmonic coefficients grad_curl_alms.
+    
+    Returns
+    -------
+    dictionary_spin_derivative : dict
+        Dictionary containing the spin-s transform of the input spherical harmonic with keys being:
+        * '1': map after application of the spin-raising operator on the input alms
+        * '-1': map after application of the spin-lowering operator on the input alms
+
+    """
+
+    assert input_spin >= 0, input_spin
+    assert hp.Alm.getlmax(grad_curl_alms[0].size) == hp.Alm.getlmax(grad_curl_alms[1].size)
+    lmax = hp.Alm.getlmax(grad_curl_alms[0].size)
     # shape (2, 12 * nside ** 2),
-    # first entry = real part, second entry imaginary part.
-    _sd = np.array(hp.alm2map_spin(gclm, nside, spin, lmax))
-    if spin > 1:
-        _gclm = [
-            hp.almxfl(gclm[0], get_alpha_lower(spin, lmax)),
-            hp.almxfl(gclm[1], get_alpha_lower(spin, lmax)),
-        ]
-        _sm1d = np.array(hp.alm2map_spin(_gclm, nside, spin - 1, lmax))
-    else:
-        _sm1d = -np.array(
-            [
-                hp.alm2map(
-                    hp.almxfl(gclm[0], get_alpha_lower(spin, lmax)),
-                    nside,
-                    verbose=False,
-                ),
-                hp.alm2map(
-                    hp.almxfl(gclm[1], get_alpha_lower(spin, lmax)),
-                    nside,
-                    verbose=False,
-                ),
-            ]
-        )
 
+    # First obtaining the application of the spin-lowering operator on the input alms
     _gclm = [
-        hp.almxfl(gclm[0], get_alpha_raise(spin, lmax)),
-        hp.almxfl(gclm[1], get_alpha_raise(spin, lmax)),
+        hp.almxfl(grad_curl_alms[0], get_alpha_raise(input_spin, lmax)),
+        hp.almxfl(grad_curl_alms[1], get_alpha_raise(input_spin, lmax)),
     ]
-    _sp1d = np.array(hp.alm2map_spin(_gclm, nside, spin + 1, lmax))
+    spin_raised_maps = np.array(hp.alm2map_spin(_gclm, nside, input_spin+1, lmax))
 
-    d_dth = -0.5 * (_sp1d + _sm1d)
+    # Second obtaining the application of the spin-raising operator on the input alms
+    if input_spin == 0:
+        spin_lowered_maps = np.copy(spin_raised_maps)
+        spin_lowered_maps[1] *= -1
+    else:
+        _gclm = [
+            hp.almxfl(grad_curl_alms[0], get_alpha_lower(input_spin, lmax)),
+            hp.almxfl(grad_curl_alms[1], get_alpha_lower(input_spin, lmax)),
+            ]
+        spin_lowered_maps = np.array(hp.alm2map_spin(_gclm, nside, input_spin-1, lmax))
 
-    d_dphi_sin0 = 0.5 * np.array([-_sp1d[1] + _sm1d[1], _sp1d[0] - _sm1d[0]])
-    for iring in range(4 * nside - 1):
-        startpix, nphi, kphi0, cth, sth = get_healpix_ring_pixel_layout(nside, iring)
-        if zbounds[0] <= cth <= zbounds[1]:
-            slic = slice(startpix, startpix + nphi)
-            d_dphi_sin0[1, slic] -= spin * (cth / sth) * _sd[0, slic]
-            d_dphi_sin0[0, slic] += spin * (cth / sth) * _sd[1, slic]
-    if ret_slice is not None:
-        return _sd[:, ret_slice], d_dth[:, ret_slice], d_dphi_sin0[:, ret_slice]
+    
+    return {
+        input_spin+1: spin_raised_maps[0] + 1j * spin_raised_maps[1], 
+        input_spin-1: spin_lowered_maps[0] + 1j * spin_lowered_maps[1], 
+    } 
 
-    return _sd, d_dth, d_dphi_sin0
+
+def get_second_spin_derivative(grad_curl_alms, nside, input_spin):
+    """
+    Function to obtain the maps after applying any combination of two applications of the spin-raising and spin-lowering operators on the input alms of arbitrary spin. 
+
+    Parameters
+    ----------
+    grad_curl_alms : list of np.ndarray
+        List of two arrays containing the grad and curl parts of the spherical harmonic coefficients.
+        grad_curl_alms[0] is the grad part and grad_curl_alms[1] is the curl part, and the last dimension is the healpix ordering
+        of the alms.
+    nside : int
+        Healpix nside parameter.
+    input_spin : int
+        Input spin of the spherical harmonic coefficients grad_curl_alms.
+    
+    Returns
+    -------
+    dictionary_spin_derivative : dict
+        Dictionary containing the spin-s transform of the input spherical harmonic with keys being:
+        * '2': map after application of two spin-raising operator on the input alms
+        * '-2': map after application of two spin-lowering operator on the input alms
+        * '+1-1': map after application of the spin-raising then the spin-lowering operators on the input alms
+        * '-1+1': map after application of the spin-lowering then the spin-raising operators on the input alms
+
+    """
+
+    assert input_spin >= 0, input_spin
+    assert hp.Alm.getlmax(grad_curl_alms[0].size) == hp.Alm.getlmax(grad_curl_alms[1].size)
+    lmax = hp.Alm.getlmax(grad_curl_alms[0].size)
+    # shape (2, 12 * nside ** 2),
+
+    assert input_spin >= 0, input_spin
+    assert hp.Alm.getlmax(grad_curl_alms[0].size) == hp.Alm.getlmax(grad_curl_alms[1].size)
+    lmax = hp.Alm.getlmax(grad_curl_alms[0].size)
+    # shape (2, 12 * nside ** 2),
+
+    # First obtaining the application of two successsive spin-raising operators on the input alms
+    _gclm = [
+        hp.almxfl(alms, get_alpha_lower(input_spin, lmax)*get_alpha_lower(input_spin-1, lmax)) for alms in grad_curl_alms
+    ]
+    if input_spin <= 1:
+        spin_2_raised_maps = -np.array([hp.alm2map(alms, nside) for alms in _gclm])
+    else:
+        spin_2_raised_maps = np.array(hp.alm2map_spin(_gclm, nside, input_spin-2, lmax))
+
+    # Second obtaining the application of two successsive spin-lowering operators on the input alms
+    _gclm = [
+        hp.almxfl(alms, get_alpha_raise(input_spin, lmax)*get_alpha_raise(input_spin+1, lmax)) for alms in grad_curl_alms
+    ]
+    spin_2_lowered_maps = np.array(hp.alm2map_spin(_gclm, nside, input_spin+2, lmax))
+
+    # Third obtaining the application of the spin-raising then the spin-lowering operators on the input alms
+    _gclm = [
+        hp.almxfl(alms, get_alpha_raise(input_spin, lmax)*get_alpha_lower(input_spin+1, lmax)) for alms in grad_curl_alms
+    ]
+    spin_raised_lowered_maps = -np.array([hp.alm2map(alms, nside) for alms in _gclm])
+
+    # Fourth obtaining the application of the spin-lowering then the spin-raising operators on the input alms
+    _gclm = [
+        hp.almxfl(alms, get_alpha_lower(input_spin, lmax)*get_alpha_raise(input_spin-1, lmax)) for alms in grad_curl_alms
+    ]
+    spin_lowered_raised_maps = -np.array([hp.alm2map(alms, nside) for alms in _gclm])
+
+    return {
+        input_spin+2: spin_2_raised_maps[0] + 1j * spin_2_raised_maps[1], 
+        input_spin-2: spin_2_lowered_maps[0] + 1j * spin_2_lowered_maps[1], 
+        '+1-1': spin_lowered_raised_maps[0] + 1j * spin_lowered_raised_maps[1],
+        '-1+1': spin_raised_lowered_maps[0] + 1j * spin_raised_lowered_maps[1],
+    } 
