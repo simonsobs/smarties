@@ -3,7 +3,7 @@ import healpy as hp
 from opt_einsum import contract
 
 from mapbased_syste.hn import Spin_maps
-from mapbased_syste.operators import get_naive_spin_derivative
+from mapbased_syste.external.s4cmb import get_first_spin_derivative
 
 def create_pointing_spin_leakage_map(
         intensity_CMB, 
@@ -47,9 +47,15 @@ def create_pointing_spin_leakage_map(
     assert np.array(amplitude_offset).ndim == 1, 'The dimension of the amplitude_offset must be (n_det,)'
     assert amplitude_offset.shape == angle_offset.shape, 'The amplitude offset must have the same shape as the angle offset'
 
-    intensity_spin_derivatives = get_naive_spin_derivative(
-        intensity_CMB, 
-        0, 
+    nside = hp.npix2nside(intensity_CMB.size)
+    if lmax is None:
+        lmax = 2 * nside
+
+    alms_I = hp.map2alm(intensity_CMB, lmax=lmax, iter=10)
+    
+    intensity_spin_derivatives = get_first_spin_derivative(
+        np.hstack([alms_I, np.zeros(alms_I)]), 
+        input_spin=0, 
         lmax=lmax
     )
 
