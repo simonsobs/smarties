@@ -54,3 +54,28 @@ def get_row_mapmaking_matrix(reference_spin, h_n_spin_dict, list_spin_input):
         mapmaking_matrix_row[:,i] = factor_func(reference_spin) * factor_func(spin_name) * h_n_spin_dict[spin_name-reference_spin].sum(axis=0)
         
     return mapmaking_matrix_row
+
+def get_rotation_matrix(angle):
+    """
+    Get the rotation matrix for a given angle.
+    
+    Parameters
+    ----------
+    angle: np.ndarray
+        angle in radians
+
+    Returns
+    -------
+    rotation_matrix: np.ndarray
+        rotation matrix of shape (angle.shape, 2, 2), with the first dimension being the same as the input angle
+    """
+
+    angle = np.asarray(angle)
+
+    rotation_matrix = np.zeros(angle.shape + (2, 2))
+    rotation_matrix[...,0,0] = np.cos(2 * angle)
+    rotation_matrix[...,0,1] = -np.sin(2 * angle)
+    rotation_matrix[...,1,0] = np.sin(2 * angle)
+    rotation_matrix[...,1,1] = np.cos(2 * angle)
+
+    return rotation_matrix
