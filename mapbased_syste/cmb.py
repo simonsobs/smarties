@@ -1,6 +1,8 @@
 import numpy as np
 import healpy as hp
 
+from mapbased_syste.hn import Spin_maps
+
 def generate_power_spectra_CAMB(
     nside,
     lmax=None,
@@ -108,7 +110,7 @@ def generate_CMB_map(nside, lmax, seed=42):
     return hp.synfast(all_spectra, nside, lmax=lmax, new=True)
     
 
-def create_CMB_spin_maps(nside, nstokes, lmax, maps_CMB=None, seed=42):
+def create_CMB_spin_maps(nside, nstokes, lmax, fwhm=0., maps_CMB=None, seed=42):
     """
     Create spin maps for the CMB contribution, the $\Tilde{S}_k$ maps, defined
     as 
@@ -125,6 +127,8 @@ def create_CMB_spin_maps(nside, nstokes, lmax, maps_CMB=None, seed=42):
         number of Stokes parameters : 1 for the intensity only, 2 for the polarization only and 3 for the full Stokes parameters (T, Q, U)
     lmax: int
         maximum multipole
+    fwhm: float
+        full width at half maximum of the beam in arcmin ; if 0, no smoothing is applied
     maps_CMB: np.ndarray
         CMB maps ; if None, the CMB maps are generated with CAMB ; must be of shape (nstokes, npix)
     seed: int
@@ -139,10 +143,10 @@ def create_CMB_spin_maps(nside, nstokes, lmax, maps_CMB=None, seed=42):
     npix = 12*nside**2
 
     assert maps_CMB is None or maps_CMB.shape == (nstokes, npix), 'The shape of the CMB maps is not correct'
-    assert nstokes in [1, 2, 3], 'The number of Stokes parameters must be 1, 2 or 3'
+    assert nstokes in [1, 2, 3], 'The number of Stokes parameters must be 1 (only temperature), 2 (only polarization) or 3 (both temperature and polarization)'
     
 
-    spin_dict_maps = dict()
+    spin_dict_maps = Spin_maps()
 
     if maps_CMB is not None:
         assert maps_CMB.shape == (nstokes, npix), 'The shape of the CMB maps is not correct'
@@ -154,18 +158,25 @@ def create_CMB_spin_maps(nside, nstokes, lmax, maps_CMB=None, seed=42):
             idx_polar = np.array([0, 1])
         elif nstokes == 1:
             # I
-            relevant_indices = np.array([0])
+            relevant_indices = [...] #np.array([0])
         else:
             # I, Q, U
             relevant_indices = np.arange(3)
             idx_polar = np.array([1, 2])
             
-        maps_CMB = generate_CMB_map(nside, lmax, seed=seed)[relevant_indices]
+        maps_CMB = generate_CMB_map(nside, lmax, seed=seed)
+        
+        if fwhm != 0:
+            maps_CMB = hp.smoothing(maps_CMB, fwhm=np.deg2rad(fwhm/60), lmax=lmax)[relevant_indices]
+
+        
 
     if nstokes == 1:
         spin_dict_maps[0] = maps_CMB # [spin=0]
     
-    else:        
+    if nstokes > 1:
+        if nstokes == 3: 
+            spin_dict_maps[0] = maps_CMB[0] # [spin=0]
         spin_dict_maps[-2] = .5*(maps_CMB[idx_polar[0]] - 1j * maps_CMB[idx_polar[1]]) # [spin=-2]
         spin_dict_maps[2] = .5*(maps_CMB[idx_polar[0]] + 1j * maps_CMB[idx_polar[1]]) # [spin=2]
         

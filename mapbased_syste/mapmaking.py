@@ -27,13 +27,9 @@ class FrameworkSystematics(object):
         self.nside = nside
         assert np.unique(list_spin_output).size == np.array(list_spin_output).size, 'The list of spins must be unique'
         if not np.isin(list_spin_output, np.array([0,-2,2])).all():
-            raise NotImplemented('The spins involved in the signal maps must be 0, -2 or 2, other spins are not implemented yet')
-        if nstokes > 1:
-            assert list_spin_output[-2:] == [-2, 2], 'The spins involved in the signal maps must be ordered as -2, 2 for the polarization part'
+            print('The output spins maps appeared to contain spin different than 0, -2 or 2, the package has not been tested in this case!', flush=True)
         self.list_spin_output = list_spin_output # list spins involved in the signal maps only (for CMB only, the spins are 0, -2, 2 if intensity is involved)
         self.nstokes = nstokes
-        if nstokes == 1:
-            raise NotImplemented('The intensity only case is not implemented yet')
         self.lmax = lmax
 
     @property
@@ -45,7 +41,7 @@ class FrameworkSystematics(object):
         else:
             raise NotImplemented('The number of Stokes parameters must be 2 (polarization only) or 3 (intensity and polarization), other cases are not implemented yet')
 
-    def get_spin_sky_maps(self, seed=42):
+    def get_spin_sky_maps(self, fwhm=0., seed=42):
         """
         Get the spin CMB maps which are the following for intensity and polarization:
             * Spin 0: I
@@ -54,6 +50,8 @@ class FrameworkSystematics(object):
         
         Parameters
         ----------
+        fwhm: float
+            full width at half maximum of the beam in arcmin ; if 0, no smoothing is applied
         seed: int
             seed for the random generation of the CMB maps
 
@@ -67,7 +65,12 @@ class FrameworkSystematics(object):
         The ordering of the spins must be the given as [0,-2,2] or [-2,2], depending on the number of Stokes parameters,
         currently the other cases are not implemented for the input spin maps
         """
-        return create_CMB_spin_maps(self.nside, self.nstokes, self.lmax, seed=seed)
+        return create_CMB_spin_maps(
+            nside=self.nside, 
+            nstokes=self.nstokes, 
+            lmax=self.lmax, 
+            fwhm=fwhm,
+            seed=seed)
     
     def get_spin_systematics_maps(self):
         pass
@@ -132,6 +135,9 @@ class FrameworkSystematics(object):
         factor_dict = {0: 1, -2: .5, 2: .5}
         for i, spin in enumerate(self.list_spin_input):
             coupled_spins = get_coupled_spin(spin, h_n_spin_dict.spins, list_spin_maps)
+
+            # TODO: Remove print
+            print(f'Coupled spins for spin {spin}: {coupled_spins}')
             
             # \sum_{k' = -\infty}^{\infty} h_{k-k'} S_{k'} on all (k-k', k) pairs
             for tuple_spins in coupled_spins:
