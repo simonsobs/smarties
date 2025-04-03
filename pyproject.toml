@@ -30,13 +30,15 @@ dependencies = [
     'healpy>=0.16.6',
     'numpy',
     'scipy',
+    'opt_einsum',
 ]
 dynamic = ['version']
 
 [project.optional-dependencies]
-full = [
+optional = [
     'camb',
     'toml',
+    'matplotlib',
 ]
 
 
