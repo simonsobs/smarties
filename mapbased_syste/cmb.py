@@ -164,10 +164,10 @@ def create_CMB_spin_maps(nside, nstokes, lmax, fwhm=0., maps_CMB=None, seed=42):
             relevant_indices = np.arange(3)
             idx_polar = np.array([1, 2])
             
-        maps_CMB = generate_CMB_map(nside, lmax, seed=seed)
+        maps_CMB = generate_CMB_map(nside, lmax, seed=seed)[relevant_indices]
         
         if fwhm != 0:
-            maps_CMB = hp.smoothing(maps_CMB, fwhm=np.deg2rad(fwhm/60), lmax=lmax)[relevant_indices]
+            maps_CMB = hp.smoothing(maps_CMB, fwhm=np.deg2rad(fwhm/60), lmax=lmax)
 
         
 

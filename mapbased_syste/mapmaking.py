@@ -109,6 +109,8 @@ class FrameworkSystematics(object):
 
         # Few tests
         assert np.allclose([spin_systematics_maps[spin].ndim for spin in spin_systematics_maps.keys() if spin != 0 ], 2), 'The systematics maps must be 2D arrays of shape (n_det, n_pix)'
+
+        assert h_n_spin_dict[0].sum() == 1, 'The h_n maps must be normalized'
         
         # Masking the h_n maps, CMB maps and systematics maps
         observed_pixels_array = mask != 0
@@ -141,24 +143,25 @@ class FrameworkSystematics(object):
             
             # \sum_{k' = -\infty}^{\infty} h_{k-k'} S_{k'} on all (k-k', k) pairs
             for tuple_spins in coupled_spins:
-                spin_coupled_maps[...,i] += factor_dict[spin] * (h_n_spin_dict[tuple_spins[0]] * total_spin_maps[tuple_spins[1]]).sum(axis=0)
+                spin_coupled_maps[...,i] += factor_dict[spin] * contract('d...,d...->...',h_n_spin_dict[tuple_spins[0]], total_spin_maps[tuple_spins[1]])
 
         # Third, compute the inverse of the mapmaking matrix
         inverse_mapmaking_matrix = np.linalg.pinv(mapmaking_matrix)
 
         # Finally, compute the final CMB fields
         final_CMB_fields = contract('pij,pj->ip', inverse_mapmaking_matrix, spin_coupled_maps)
+        dict_final_CMB_fields = Spin_maps.from_list_maps(final_CMB_fields, self.list_spin_output)
 
         if return_Q_U:
-            final_Q = (final_CMB_fields[-2,:] + final_CMB_fields[-1,:])/2.
-            final_U = 1j*(final_CMB_fields[-2,:] - final_CMB_fields[-1,:])/2.
+            final_Q = (dict_final_CMB_fields[-2] + dict_final_CMB_fields[2])/2.
+            final_U = 1j*(dict_final_CMB_fields[-2] - dict_final_CMB_fields[2])/2.
             if self.nstokes == 3:
-                final_I = final_CMB_fields[-3,:]
+                final_I = dict_final_CMB_fields[0]
                 output = np.vstack([final_I, final_Q, final_U])
             else:
                 output = np.vstack([final_Q, final_U])
         else:
-            output = final_CMB_fields
+            output = dict_final_CMB_fields
         
         if return_inverse_mapmaking_matrix:
             return output, inverse_mapmaking_matrix
