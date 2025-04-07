@@ -39,10 +39,11 @@ def get_ellipse_deviation(ellipticity, sigma_cs):
 
     
 
-    return np.where(ellipticity != 0, 
-                    2 * sigma_cs * (1 - np.sqrt(1 - ellipticity ** 2)) / ellipticity,
-                    0
-                    ) # the formula is not defined for ellipticity = 0, which correspond to a circular beam where the deviation is 0
+    return np.where(
+        ellipticity != 0, 
+        2 * sigma_cs * (1 - np.sqrt(1 - ellipticity ** 2)) / ellipticity,
+        0
+    ) # the formula is not defined for ellipticity = 0, which correspond to a circular beam where the deviation is 0
 
 
 def get_differential_ellipticity(
@@ -75,9 +76,11 @@ def get_differential_ellipticity(
     The coefficients given in `coefficient_Taylor_expansion[:,0]` correspond to $\alpha_{2,xx} + \alpha_{2,yy}$
     """
 
+    intensity_CMB = np.asarray(intensity_CMB)
     assert intensity_CMB.ndim == 1, 'The intensity_CMB map must have only 1 dimension'
     assert np.log(np.sqrt(intensity_CMB.size/12)) / np.log(2) % 1 == 0, 'The intensity_CMB map dimension must be compatible with a full sky healpy map'
-    
+    nside = hp.npix2nside(intensity_CMB.size)
+
     ellipticity = np.asarray(ellipticity)
     ellipse_angle = np.asarray(ellipse_angle)
     sigma_cs = np.asarray(sigma_FWHM) / ((8 * np.log(2)) ** 0.5) * np.pi/(180*60)  # convert from FWHM to sigma_cs, in radians
@@ -89,9 +92,9 @@ def get_differential_ellipticity(
     alms_I = hp.map2alm(intensity_CMB, lmax=lmax, iter=10)
 
     intensity_spin_2_derivatives = get_second_spin_derivative(
-        np.hstack([alms_I, np.zeros(alms_I)]), 
+        np.vstack([alms_I, np.zeros_like(alms_I)]), 
+        nside=nside,
         input_spin=0, 
-        lmax=lmax
     )
 
     rotation_matrix_ellipse_angle = get_rotation_matrix(ellipse_angle)

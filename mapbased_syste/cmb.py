@@ -110,14 +110,14 @@ def generate_CMB_map(nside, lmax, seed=42):
     return hp.synfast(all_spectra, nside, lmax=lmax, new=True)
     
 
-def create_CMB_spin_maps(nside, nstokes, lmax, fwhm=0., maps_CMB=None, seed=42):
+def create_CMB_spin_maps(nside, nstokes, lmax, fwhm=0., seed=42):
     """
     Create spin maps for the CMB contribution, the $\Tilde{S}_k$ maps, defined
     as 
         $\Tilde{S}_0 = I$
         $\Tilde{S}_2 = \frac{1}{2} (Q + iU)$
         $\Tilde{S}_{-2} = \frac{1}{2} (Q - iU)$
-    either by generating or forming them from existing CMB maps given as argument
+    by generating them from CAMB 
 
     Parameters
     ----------
@@ -129,8 +129,6 @@ def create_CMB_spin_maps(nside, nstokes, lmax, fwhm=0., maps_CMB=None, seed=42):
         maximum multipole
     fwhm: float
         full width at half maximum of the beam in arcmin ; if 0, no smoothing is applied
-    maps_CMB: np.ndarray
-        CMB maps ; if None, the CMB maps are generated with CAMB ; must be of shape (nstokes, npix)
     seed: int
         seed for the random generation of the CMB maps, only relevant if maps_CMB is None
 
@@ -142,33 +140,30 @@ def create_CMB_spin_maps(nside, nstokes, lmax, fwhm=0., maps_CMB=None, seed=42):
     """
     npix = 12*nside**2
 
-    assert maps_CMB is None or maps_CMB.shape == (nstokes, npix), 'The shape of the CMB maps is not correct'
     assert nstokes in [1, 2, 3], 'The number of Stokes parameters must be 1 (only temperature), 2 (only polarization) or 3 (both temperature and polarization)'
     
 
     spin_dict_maps = Spin_maps()
 
-    if maps_CMB is not None:
-        assert maps_CMB.shape == (nstokes, npix), 'The shape of the CMB maps is not correct'
+    # Selecting the relevant maps
+    if nstokes == 2:
+        # Q, U
+        relevant_indices = np.array([1, 2])
+        idx_polar = np.array([0, 1])
+    elif nstokes == 1:
+        # I
+        relevant_indices = [...] #np.array([0])
     else:
-        # Selecting the relevant maps
-        if nstokes == 2:
-            # Q, U
-            relevant_indices = np.array([1, 2])
-            idx_polar = np.array([0, 1])
-        elif nstokes == 1:
-            # I
-            relevant_indices = [...] #np.array([0])
-        else:
-            # I, Q, U
-            relevant_indices = np.arange(3)
-            idx_polar = np.array([1, 2])
-            
-        maps_CMB = generate_CMB_map(nside, lmax, seed=seed)[relevant_indices]
+        # I, Q, U
+        relevant_indices = np.arange(3)
+        idx_polar = np.array([1, 2])
         
-        if fwhm != 0:
-            maps_CMB = hp.smoothing(maps_CMB, fwhm=np.deg2rad(fwhm/60), lmax=lmax)
-
+    maps_CMB = generate_CMB_map(nside, lmax, seed=seed)
+    
+    if fwhm != 0:
+        maps_CMB = hp.smoothing(maps_CMB, fwhm=np.deg2rad(fwhm/60), lmax=lmax)
+    
+    maps_CMB = maps_CMB[relevant_indices]
         
 
     if nstokes == 1:

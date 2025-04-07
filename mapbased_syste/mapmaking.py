@@ -71,9 +71,6 @@ class FrameworkSystematics(object):
             lmax=self.lmax, 
             fwhm=fwhm,
             seed=seed)
-    
-    def get_spin_systematics_maps(self):
-        pass
 
     def compute_total_maps(
             self, 
@@ -107,8 +104,10 @@ class FrameworkSystematics(object):
             the final CMB fields, with the shape (npix, nstokes) if return_Q_U is False, (npix, 3) otherwise
         """
 
-        # Few tests
+        # Few assert
         assert np.allclose([spin_systematics_maps[spin].ndim for spin in spin_systematics_maps.keys() if spin != 0 ], 2), 'The systematics maps must be 2D arrays of shape (n_det, n_pix)'
+        assert np.allclose([spin_sky_maps[spin].ndim for spin in spin_sky_maps.keys()], 1), 'The CMB maps must be 1D arrays of shape (n_pix)'
+        assert np.allclose([h_n_spin_dict[spin].ndim for spin in h_n_spin_dict.keys() if spin != 0 ], 2), 'The h_n maps must be 2D arrays of shape (n_det, n_pix)'
 
         assert h_n_spin_dict[0].sum() == 1, 'The h_n maps must be normalized'
         
@@ -130,18 +129,22 @@ class FrameworkSystematics(object):
         # Second, form the data vector composed of (<d_j>, <d_j cos 2\phi_j>, <d_j sin 2\phi_j>)
 
         # Form the total spin maps
+        n_det = h_n_spin_dict[0].shape[0]
+        spin_sky_maps.extend_first_dimension(n_det) # Extend the first dimension of the spin_sky_maps to match the number of detectors before summing them to the systematics maps
+
         total_spin_maps = spin_sky_maps + spin_systematics_maps
         list_spin_maps = total_spin_maps.spins
         
         spin_coupled_maps = np.zeros((npix, len(self.list_spin_output),), dtype=complex)
         factor_dict = {0: 1, -2: .5, 2: .5}
         for i, spin in enumerate(self.list_spin_input):
+            # Get all combinations of spins (k-k', k') such that k-k' = spin
             coupled_spins = get_coupled_spin(spin, h_n_spin_dict.spins, list_spin_maps)
 
             # TODO: Remove print
             print(f'Coupled spins for spin {spin}: {coupled_spins}')
             
-            # \sum_{k' = -\infty}^{\infty} h_{k-k'} S_{k'} on all (k-k', k) pairs
+            # \sum_{k' = -\infty}^{\infty} h_{k-k'} S_{k'} on all (k-k', k') pairs
             for tuple_spins in coupled_spins:
                 spin_coupled_maps[...,i] += factor_dict[spin] * contract('d...,d...->...',h_n_spin_dict[tuple_spins[0]], total_spin_maps[tuple_spins[1]])
 

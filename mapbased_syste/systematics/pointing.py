@@ -54,9 +54,9 @@ def create_pointing_spin_leakage_map(
     alms_I = hp.map2alm(intensity_CMB, lmax=lmax, iter=10)
     
     intensity_spin_derivatives = get_first_spin_derivative(
-        np.hstack([alms_I, np.zeros(alms_I)]), 
+        np.vstack([alms_I, np.zeros_like(alms_I)]), 
+        nside=nside,
         input_spin=0, 
-        lmax=lmax
     )
 
     # Compute the spin raising and lowering operators, knowing that the final dict must have shape {spin:np.ndarray[n_det,n_pix]}

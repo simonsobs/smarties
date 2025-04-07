@@ -51,3 +51,11 @@ class Spin_maps(dict):
             else:
                 result[key] = self[key] + other[key]
         return result
+
+    def extend_first_dimension(self, new_shape_first_dimension):
+        """
+        Extend the first dimension of the spin maps to a new shape
+        """
+        for key in self.keys():
+            self[key] = np.broadcast_to(self[key], (new_shape_first_dimension,) + np.asarray(self[key]).shape)
+        
