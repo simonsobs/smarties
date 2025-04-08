@@ -192,13 +192,19 @@ def get_second_spin_derivative(grad_curl_alms, nside, input_spin):
     _gclm = [
         hp.almxfl(alms, get_alpha_raise(input_spin, lmax)*get_alpha_lower(input_spin+1, lmax)) for alms in grad_curl_alms
     ]
-    spin_raised_lowered_maps = -np.array([hp.alm2map(alms, nside) for alms in _gclm])
+    if input_spin == 0:
+        spin_raised_lowered_maps = -np.array([hp.alm2map(alms, nside) for alms in _gclm])
+    else:
+        spin_raised_lowered_maps = np.array(hp.alm2map_spin(_gclm, nside, input_spin, lmax))
 
     # Fourth obtaining the application of the spin-lowering then the spin-raising operators on the input alms
     _gclm = [
         hp.almxfl(alms, get_alpha_lower(input_spin, lmax)*get_alpha_raise(input_spin-1, lmax)) for alms in grad_curl_alms
     ]
-    spin_lowered_raised_maps = -np.array([hp.alm2map(alms, nside) for alms in _gclm])
+    if input_spin == 0:
+        spin_lowered_raised_maps = -np.array([hp.alm2map(alms, nside) for alms in _gclm])
+    else:
+        spin_lowered_raised_maps = np.array(hp.alm2map_spin(_gclm, nside, input_spin, lmax))
 
     return {
         input_spin+2: spin_2_raised_maps[0] + 1j * spin_2_raised_maps[1], 
