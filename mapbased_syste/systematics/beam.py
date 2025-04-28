@@ -92,7 +92,7 @@ def get_differential_ellipticity(
     alms_I = hp.map2alm(intensity_CMB, lmax=lmax, iter=10)
 
     intensity_spin_2_derivatives = get_second_spin_derivative(
-        np.vstack([alms_I, np.zeros_like(alms_I)]), 
+        -np.vstack([alms_I.real, np.zeros_like(alms_I)]), 
         nside=nside,
         input_spin=0, 
     )
