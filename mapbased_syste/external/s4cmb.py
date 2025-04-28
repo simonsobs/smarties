@@ -177,8 +177,11 @@ def get_second_spin_derivative(grad_curl_alms, nside, input_spin):
     _gclm = [
         hp.almxfl(alms, get_alpha_lower(input_spin, lmax)*get_alpha_lower(input_spin-1, lmax)) for alms in grad_curl_alms
     ]
-    if input_spin <= 1:
+    if input_spin - 2 == 0:
         spin_2_lowered_maps = -np.array([hp.alm2map(alms, nside) for alms in _gclm])
+    elif input_spin - 2 < 0:
+        spin_2_lowered_maps = np.array(hp.alm2map_spin(_gclm, nside, np.abs(input_spin - 2), lmax))
+        spin_2_lowered_maps[1] *= -1
     else:
         spin_2_lowered_maps = np.array(hp.alm2map_spin(_gclm, nside, input_spin-2, lmax))
 

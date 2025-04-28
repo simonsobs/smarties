@@ -1,4 +1,3 @@
-# S4CMB
 # Copyright (c) 2016-2021 Julien Peloton, Giulio Fabbian.
 #
 # This file is part of s4cmb
@@ -15,9 +14,8 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-
 """
-Module taken from CMBS4 and readapted including diverse tools to manipulate alms and maps from the s4cmb package.
+Module including diverse tools to manipulate alms and maps .
 """
 import numpy as np
 import healpy as hp
@@ -171,37 +169,33 @@ def alm2map_spin_der1(gclm, nside, spin, zbounds=(-1.0, 1.0), ret_slice=None):
         First partial derivative of the spin-s transform with respect to phi with factor 1/(sin (theta)), shape (2, 12 * nside ** 2) if ret_slide is None, otherwise (2, len(ret_slide)).
     """
 
-    assert spin > 0, spin
+    assert spin >= 0, spin
     assert hp.Alm.getlmax(gclm[0].size) == hp.Alm.getlmax(gclm[1].size)
     lmax = hp.Alm.getlmax(gclm[0].size)
     zbounds = np.sort(np.array(zbounds))
     # shape (2, 12 * nside ** 2),
 
+    if spin == 0:
+        # If spin == 0, we can use the alm2map function directly on the input alms
+        _sd, d_dth, d_dphi_sin0 = hp.alm2map_der1(-(gclm[0] + 1j*gclm[1]), nside, lmax)
+
+        return np.vstack([_sd.real, _sd.imag]), np.vstack([d_dth.real, d_dth.imag]), np.vstack([d_dphi_sin0.real, d_dphi_sin0.imag])
+
     # first entry = real part, second entry imaginary part.
     
     # Computing the maps from the input alms, where _sd[0] + 1j*_sd[1] is the spin (+s) fiedl, and _sd[0] - 1j*_sd[1] is the spin (-s) field.
-    _sd = np.array(hp.alm2map_spin(gclm, nside, spin, lmax))
+    _sd = -np.array([hp.alm2map(alms, nside) for alms in gclm])
 
     # First computing the spin-lowering operator on the input alms
-    if spin > 1:
-        _gclm = [
+    _gclm = [
             hp.almxfl(gclm[0], get_alpha_lower(spin, lmax)),
             hp.almxfl(gclm[1], get_alpha_lower(spin, lmax)),
         ]
+    if spin > 1:
         _sm1d = np.array(hp.alm2map_spin(_gclm, nside, spin - 1, lmax))
     else:
-        _sm1d = -np.array(
-            [
-                hp.alm2map(
-                    hp.almxfl(gclm[0], get_alpha_lower(spin, lmax)),
-                    nside,                
-                ),
-                hp.alm2map(
-                    hp.almxfl(gclm[1], get_alpha_lower(spin, lmax)),
-                    nside,
-                ),
-            ]
-        )
+        _sm1d = -np.array([hp.alm2map(alms, nside) for alms in gclm])
+
 
     # Then computing the spin-raising operator on the input alms
     _gclm = [
@@ -272,7 +266,7 @@ def alm2map_spin_der2(gclm, nside, spin, zbounds=(-1.0, 1.0), ret_slice=None):
     Note that the computation is done on the entire healpix grid, even if ret_slice is provided. 
 
     """
-    assert spin > 0, spin
+    assert spin >= 0, spin
     assert hp.Alm.getlmax(gclm[0].size) == hp.Alm.getlmax(gclm[1].size)
     lmax = hp.Alm.getlmax(gclm[0].size)
     zbounds = np.sort(np.array(zbounds))
@@ -290,8 +284,6 @@ def alm2map_spin_der2(gclm, nside, spin, zbounds=(-1.0, 1.0), ret_slice=None):
     if spin > 2:
         _sm2_d = np.array(hp.alm2map_spin(_gclm, nside, spin - 2, lmax))
     elif spin - 2 < 0:
-        print("spin - 2 < 0", spin)
-        # _gclm[(spin+1) % 2] *= -1 
         _sm2_d = np.array(hp.alm2map_spin(_gclm, nside, np.abs(spin - 2), lmax))
         _sm2_d[1] *= -1
     else:
@@ -299,15 +291,13 @@ def alm2map_spin_der2(gclm, nside, spin, zbounds=(-1.0, 1.0), ret_slice=None):
 
     # Retrieving the application of two consecutive spin raising operators
     _gclm = [
-        hp.almxfl(gclm[0], get_alpha_raise(spin, lmax) * get_alpha_raise(spin+1, lmax)),
-        hp.almxfl(gclm[1], get_alpha_raise(spin, lmax) * get_alpha_raise(spin+1, lmax)),
+        hp.almxfl(alms, get_alpha_raise(spin, lmax) * get_alpha_raise(spin+1, lmax)) for alms in gclm
     ]
     _sp2_d = np.array(hp.alm2map_spin(_gclm, nside, spin + 2, lmax))
 
     # Retrieving the application of one spin raising and one spin lowering operator
     _gclm = [
-        hp.almxfl(gclm[0], get_alpha_lower(spin, lmax) * get_alpha_raise(spin-1, lmax)),
-        hp.almxfl(gclm[1], get_alpha_lower(spin, lmax) * get_alpha_raise(spin-1, lmax)),
+        hp.almxfl(alms, get_alpha_lower(spin, lmax) * get_alpha_raise(spin-1, lmax)) for alms in gclm
     ]
     if spin == 0:
         _spm_d = -np.array([hp.alm2map(alms, nside) for alms in _gclm])
@@ -316,8 +306,7 @@ def alm2map_spin_der2(gclm, nside, spin, zbounds=(-1.0, 1.0), ret_slice=None):
     
     # Retrieving the application of one spin lowering and one spin raising operator
     _gclm = [
-        hp.almxfl(gclm[0], get_alpha_raise(spin, lmax) * get_alpha_lower(spin+1, lmax)),
-        hp.almxfl(gclm[1], get_alpha_raise(spin, lmax) * get_alpha_lower(spin+1, lmax)),
+        hp.almxfl(alms, get_alpha_raise(spin, lmax) * get_alpha_lower(spin+1, lmax)) for alms in gclm
     ]
     if spin == 0:
         _smp_d = -np.array([hp.alm2map(alms, nside) for alms in _gclm])
@@ -328,22 +317,24 @@ def alm2map_spin_der2(gclm, nside, spin, zbounds=(-1.0, 1.0), ret_slice=None):
     d2_dth2 = 0.25 * (_sp2_d + _sm2_d + _smp_d + _spm_d)
 
     # Computing the first term for the partial derivatives with respect to phi and theta with the factor 1/sin(theta) 
-    d_phi_sin0_d_th = 0.25 * (_sp2_d - _sm2_d)
+    # d_phi_sin0_d_th = 0.25 * (_sp2_d - _sm2_d)
+    correction_1j = np.array([-1, 1]).reshape(2, 1)
+    d_phi_sin0_d_th = - 0.25 * np.roll(_sp2_d - _sm2_d, axis=0, shift=1)*correction_1j # The roll is needed to account for the 1j factor and the correction_1j is needed to account for the 1j * 1j contribution to the real part 
 
     # Computing the first term for the double partial derivative with respect to phi with the factor 1/sin(theta)**2
     d2_dphi2_sin_m2 = 0.25 * (_smp_d + _spm_d - (_sp2_d + _sm2_d))
 
-    correction_1j = np.array([-1, 1]).reshape(2, 1)
     for iring in range(4 * nside - 1):
         startpix, nphi, kphi0, cth, sth = get_healpix_ring_pixel_layout(nside, iring)
         if zbounds[0] <= cth <= zbounds[1]:
             slic = slice(startpix, startpix + nphi)
 
-            d_phi_sin0_d_th[:, slic] -=  np.roll( (spin * (cth / sth) **2 + spin/2.)* _sd  - spin * (cth / sth) * d_dth, axis=0, shift=-1)[:, slic] * correction_1j  - (cth / sth) * d_dphi_sin0 # The roll is needed to account for the 1j factor and the correction_1j is needed to account for the 1j * 1j contribution to the real part 
+            d_phi_sin0_d_th[:, slic] += np.roll( (spin * (cth / sth) **2 + spin/2.)* _sd  - spin * (cth / sth) * d_dth, axis=0, shift=1)[:, slic]*correction_1j + ((cth / sth) * d_dphi_sin0)[:, slic] # The roll is needed to account for the 1j factor and the correction_1j is needed to account for the 1j * 1j contribution to the real part 
 
-            d2_dphi2_sin_m2[:, slic] -= ( - spin**2 * (cth / sth) ** 2 * _sd + (cth / sth) * d_dth + np.roll(2 * (cth / sth) * d_dphi_sin0, axis=0, shift=1) )[:, slic] * correction_1j # The roll is needed to account for the 1j factor and the correction_1j is needed to account for the 1j * 1j contribution to the real part 
+
+            d2_dphi2_sin_m2[:, slic] -= ( - spin**2 * (cth / sth) ** 2 * _sd + (cth / sth) * d_dth + np.roll(2 * spin * (cth / sth) * d_dphi_sin0, axis=0, shift=1)* correction_1j )[:, slic]  # The roll is needed to account for the 1j factor and the correction_1j is needed to account for the 1j * 1j contribution to the real part 
 
     if ret_slice is not None:
         return _sd[:, ret_slice], d_dth[:, ret_slice], d_dphi_sin0[:, ret_slice], d2_dth2[:, ret_slice], d_phi_sin0_d_th[:, ret_slice], d2_dphi2_sin_m2[:, ret_slice]
 
-    return _sd, d_dth, d_dphi_sin0, d2_dth2, d_phi_sin0_d_th, d2_dphi2_sin_m2, (_sp2_d + _sm2_d)/2.
+    return _sd, d_dth, d_dphi_sin0, d2_dth2, d_phi_sin0_d_th, d2_dphi2_sin_m2
