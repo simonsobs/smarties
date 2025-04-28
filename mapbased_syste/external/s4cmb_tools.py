@@ -153,7 +153,7 @@ def alm2map_spin_der1(gclm, nside, spin, zbounds=(-1.0, 1.0), ret_slice=None):
     nside : int
         Healpix nside parameter.
     spin : int
-        Spin of the spherical harmonic transforms.
+        Input spin of the fields given in gclm, must be >= 0.
     zbounds : tuple of ndarray
         Bounds of the polar angle (cosine) for the output map, must be of shape (2,), default is (-1.0, 1.0).
     ret_slice : slice, optional
@@ -164,9 +164,9 @@ def alm2map_spin_der1(gclm, nside, spin, zbounds=(-1.0, 1.0), ret_slice=None):
     _sd : np.ndarray
         Spin-s maps of the input spherical harmonic, shape (2, 12 * nside ** 2) if ret_slide is None, otherwise (2, len(ret_slide)). Note that (_sd[0] + 1j*_sd[1]) is the spin (+s) field, and (_sd[0] - 1j*_sd[1]) is the spin (-s) field.
     d_dth : np.ndarray
-        First partial derivative of the spin-s transform with respect to theta, shape (2, 12 * nside ** 2) if ret_slide is None, otherwise (2, len(ret_slide)).
+        First partial derivative of the spin-s alms with respect to theta, shape (2, 12 * nside ** 2) if ret_slide is None, otherwise (2, len(ret_slide)).
     d_dphi_sin0 : np.ndarray
-        First partial derivative of the spin-s transform with respect to phi with factor 1/(sin (theta)), shape (2, 12 * nside ** 2) if ret_slide is None, otherwise (2, len(ret_slide)).
+        First partial derivative of the spin-s alms with respect to phi with factor 1/(sin (theta)), shape (2, 12 * nside ** 2) if ret_slide is None, otherwise (2, len(ret_slide)).
     """
 
     assert spin >= 0, spin
@@ -238,7 +238,7 @@ def alm2map_spin_der2(gclm, nside, spin, zbounds=(-1.0, 1.0), ret_slice=None):
     nside : int
         Healpix nside parameter.
     spin : int
-        Spin of the spherical harmonic transforms.
+        Input spin of the fields given in gclm, must be >= 0.
     zbounds : tuple of ndarray
         Bounds of the polar angle (cosine) for the output map, must be of shape (2,), default is (-1.0, 1.0).
     ret_slice : slice, optional
@@ -249,15 +249,15 @@ def alm2map_spin_der2(gclm, nside, spin, zbounds=(-1.0, 1.0), ret_slice=None):
     _sd : np.ndarray
         Spin-s maps of the input spherical harmonic, shape (2, 12 * nside ** 2) if ret_slide is None, otherwise (2, len(ret_slide)). Note that (_sd[0] + 1j*_sd[1]) is the spin (+s) field, and (_sd[0] - 1j*_sd[1]) is the spin (-s) field.
     d_dth : np.ndarray
-        First partial derivative of the spin-s transform with respect to theta, shape (2, 12 * nside ** 2) if ret_slide is None, otherwise (2, len(ret_slice)).
+        First partial derivative of the spin-s alms with respect to theta, shape (2, 12 * nside ** 2) if ret_slide is None, otherwise (2, len(ret_slice)).
     d_dphi_sin0 : np.ndarray
-        First partial derivative of the spin-s transform with respect to phi with factor 1/(sin theta), shape (2, 12 * nside ** 2) if ret_slide is None, otherwise (2, len(ret_slice)).
+        First partial derivative of the spin-s alms with respect to phi with factor 1/(sin theta), shape (2, 12 * nside ** 2) if ret_slide is None, otherwise (2, len(ret_slice)).
     d2_dth2 : np.ndarray
-        Second partial derivative of the spin-s transform with respect to theta, shape (2, 12 * nside ** 2) if ret_slide is None, otherwise (2, len(ret_slice)).
+        Second partial derivative of the spin-s alms with respect to theta, shape (2, 12 * nside ** 2) if ret_slide is None, otherwise (2, len(ret_slice)).
     d_phi_d_th : np.ndarray
-        Succession of partial derivatives with respect to phi and theta with factor 1/(sin theta), shape (2, 12 * nside ** 2) if ret_slide is None, otherwise (2, len(ret_slice)).
+        Succession of partial derivatives of the spin-s alms with respect to phi and theta with factor 1/(sin theta), shape (2, 12 * nside ** 2) if ret_slide is None, otherwise (2, len(ret_slice)).
     d2_dphi2_sin_m2 : np.ndarray
-        Second partial derivative of the spin-s transform with respect to phi with factor 1/(sin theta)**2, shape (2, 12 * nside ** 2) if ret_slide is None, otherwise (2, len(ret_slice)).
+        Second partial derivative of the spin-s alms with respect to phi with factor 1/(sin theta)**2, shape (2, 12 * nside ** 2) if ret_slide is None, otherwise (2, len(ret_slice)).
 
     Notes
     -----
