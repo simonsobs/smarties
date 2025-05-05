@@ -108,12 +108,15 @@ def get_differential_ellipticity(
 
 
     alpha_2 = contract('d, dxy->dxy', 
-                       sigma_cs / (sigma_cs ** 2 - delta_sigma ** 2), 
+                       sigma_cs**3 / (sigma_cs ** 2 - delta_sigma ** 2), 
                        propagation_perturbation_ellipse
                     ) - np.broadcast_to(
-                        delta_sigma ** 2 / ((sigma_cs ** 2 - delta_sigma ** 2)), 
-                        (sigma_cs.size, 2, 2)
-                    ) * np.eye(2)
+                        delta_sigma ** 2 * sigma_cs ** 2 / ((sigma_cs ** 2 - delta_sigma ** 2)), 
+                        (2, 2, sigma_cs.size)
+                    ).T * np.eye(2)
+
+    alpha_0 = sigma_cs**2 / (sigma_cs ** 2 - delta_sigma ** 2) + np.linalg.trace(alpha_2)/sigma_cs**2
+    alpha_2 = contract('dxy,d->dxy', alpha_2, 1/alpha_0)
 
     differential_ellipticity_spin_maps = Spin_maps()
 
