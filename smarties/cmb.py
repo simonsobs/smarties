@@ -1,7 +1,7 @@
 import numpy as np
 import healpy as hp
 
-from mapbased_syste.hn import Spin_maps
+from smarties.hn import Spin_maps
 
 def generate_power_spectra_CAMB(
     nside,

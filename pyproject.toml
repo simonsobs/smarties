@@ -7,7 +7,7 @@ requires = [
 ]
 
 [project]
-name = 'mapbased_syste'
+name = 'smarties'
 authors = [
 ]
 maintainers = [
@@ -48,12 +48,12 @@ optional = [
 
 [[tool.mypy.overrides]]
 module = [
-    'mapbased_syste',
+    'smarties',
 ]
 ignore_missing_imports = true
 
 [tool.setuptools]
-packages = ["mapbased_syste"]
+packages = ["smarties"]
 
 [tool.setuptools_scm]
 # version_scheme = 'release'

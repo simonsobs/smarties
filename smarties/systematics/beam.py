@@ -2,9 +2,9 @@ import numpy as np
 import healpy as hp
 from opt_einsum import contract
 
-from mapbased_syste.hn import Spin_maps
-from mapbased_syste.external.s4cmb import get_second_spin_derivative
-from mapbased_syste.tools import get_rotation_matrix
+from smarties.hn import Spin_maps
+from smarties.external.s4cmb import get_second_spin_derivative
+from smarties.tools import get_rotation_matrix
 
 def get_ellipse_deviation(ellipticity, sigma_cs):
     """

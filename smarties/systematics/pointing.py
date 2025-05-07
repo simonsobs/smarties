@@ -2,8 +2,8 @@ import numpy as np
 import healpy as hp
 from opt_einsum import contract
 
-from mapbased_syste.hn import Spin_maps
-from mapbased_syste.external.s4cmb import get_first_spin_derivative
+from smarties.hn import Spin_maps
+from smarties.external.s4cmb import get_first_spin_derivative
 
 def create_pointing_spin_leakage_map(
         intensity_CMB, 

@@ -1,9 +1,9 @@
 import numpy as np
 from opt_einsum import contract
 
-from mapbased_syste.tools import get_coupled_spin, get_row_mapmaking_matrix
-from mapbased_syste.cmb import create_CMB_spin_maps
-from mapbased_syste.hn import Spin_maps
+from smarties.tools import get_coupled_spin, get_row_mapmaking_matrix
+from smarties.cmb import create_CMB_spin_maps
+from smarties.hn import Spin_maps
 class FrameworkSystematics(object):
     """
     Class to simulate systematics maps

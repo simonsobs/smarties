@@ -1,6 +1,6 @@
 import numpy as np
 import healpy as hp
-from mapbased_syste.hn import Spin_maps
+from smarties.hn import Spin_maps
 
 def read_h_n_file(name_file, list_spin=[2,4]):
     """

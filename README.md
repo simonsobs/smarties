@@ -1,3 +1,5 @@
-# Map-based systematics package
+# SMARTIES package
 
-Readme in Work in Progress.
+**SMARTIES** (Spin MAp Reduction Toolkit for systematics Impact EStimation, backronym is still a work in progress) 
+
+Map-based systematics package, readme in Work in Progress. 
