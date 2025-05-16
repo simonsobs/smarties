@@ -22,7 +22,7 @@ def get_coordinates_from_healpix_mask(mask, degree_output=True, nest=False):
     
     npix = mask.shape[-1]
     nside = hp.npix2nside(npix)
-    theta, phi = hp.pix2ang(nside, np.arange(npix), nest=nest, lonlat=degree_output)
+    phi, theta = hp.pix2ang(nside, np.arange(npix), nest=nest, lonlat=degree_output)
 
     booleran_array = mask != 0
 
@@ -80,12 +80,13 @@ def generate_point_source_map(
     res = np.pi/(utils.nint(np.pi/(hp.nside2resol(nside, arcmin=True) * utils.arcmin)))#/utils.arcmin
     
     if mask is None:
-        theta_min, theta_max, phi_min, phi_max = -180, 180, -90, 90
+        theta_min, theta_max, phi_min, phi_max = -90, 90, -180, 180
         shape, wcs = enmap.fullsky_geometry(res=res, proj='car')
 
     else:
         theta_min, theta_max, phi_min, phi_max = get_coordinates_from_healpix_mask(mask)
-        box = np.array([[theta_min,theta_max],[phi_min,phi_max]]) * pxl.utils.degree
+        print(theta_min, theta_max, phi_min, phi_max)
+        box = np.array([[theta_min, phi_min],[theta_max, phi_max]]) * pxl.utils.degree
 
         shape, wcs = enmap.geometry(pos=box, res=res, proj='car')
 
