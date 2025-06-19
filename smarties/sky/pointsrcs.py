@@ -1,5 +1,38 @@
 import numpy as np
 import healpy as hp
+import scipy.constants
+
+boltzmann_constant = scipy.constants.k # J/K
+planck_constant = scipy.constants.h  # J.s
+light_speed = scipy.constants.c  # m/s
+
+def convert_flux_mJy_to_muK(flux_mJy, frequency, beam_fwhm):
+    """
+    Convert flux density in mJy to temperature in K 
+    using the Rayleigh-Jeans approximation.
+
+    Parameters
+    ----------
+    flux_mJy: float
+        Flux density in mJy.
+    frequency: float
+        Frequency in GHz.
+    beam_fwhm: float
+        Beam full width at half maximum in arcminutes.
+
+    Returns
+    -------
+    temperature: float
+        Temperature in muK.
+    """
+    
+    # Convert beam FWHM from arcminutes to radians
+    beam_fwhm_rad = np.radians(beam_fwhm / 60.0)
+    
+    # Convert flux density to temperature using the conversion formula
+    temperature = (flux_mJy * 1e-3 * 1e-26) * (light_speed ** 2) / (2 * (frequency * 1e9) ** 2 * boltzmann_constant * beam_fwhm_rad ** 2)
+    
+    return temperature * 1e6
 
 
 def get_coordinates_from_healpix_mask(mask, degree_output=True, nest=False):
@@ -65,12 +98,38 @@ def generate_circular_profile_point_sources(
 def generate_point_source_map(
         nside, 
         n_point_sources, 
-        amplitude_pointsource_min=2.0,
-        amplitude_pointsource_max=5.0,
+        log_amplitude_pointsource_min=2.0,
+        log_amplitude_pointsource_max=5.0,
         fwhm_pointsrcs=5.0,
         mask=None,
         return_CAR_map=False
     ):
+    """
+    Generate a point source map in HEALPix format.
+
+    Parameters
+    ----------
+    nside: int
+        HEALPix nside parameter.
+    n_point_sources: int
+        Number of point sources to generate.
+    log_amplitude_pointsource_min: float
+        Minimum logarithmic amplitude of the point sources, in base 10 (so that 10**log_amplitude_pointsource_min is in the same dimension as the output map).
+    log_amplitude_pointsource_max: float
+        Maximum logarithmic amplitude of the point sources, in base 10 (so that 10**log_amplitude_pointsource_max is in the same dimension as the output map).
+    fwhm_pointsrcs: float
+        Full width at half maximum of the point sources in arcminutes.
+    mask: np.ndarray, optional
+        HEALPix mask to define the area of the sky to generate the point sources in. If None, the full sky is used.
+    return_CAR_map: bool, optional
+        If True, return the map in CAR projection instead of HEALPix format. Default is False.
+    
+    Returns
+    -------
+    srcmap: np.ndarray
+        Point source map in HEALPix format or CAR projection, depending on the value of return_CAR_map.
+
+    """
     try:
         import pixell as pxl
         from pixell import enmap, utils, pointsrcs, reproject
@@ -100,7 +159,7 @@ def generate_point_source_map(
 
 
     # we choose a logspace between 100 and 10000
-    amplitude_logspace = np.logspace(amplitude_pointsource_min, amplitude_pointsource_max, n_point_sources)
+    amplitude_logspace = np.logspace(log_amplitude_pointsource_min, log_amplitude_pointsource_max, n_point_sources)
     # the position are random values inside omap
     dec_positions = np.random.uniform(theta_min, theta_max, n_point_sources) * np.pi / 180
     ra_positions = np.random.uniform(phi_min, phi_max, n_point_sources)  *np.pi / 180

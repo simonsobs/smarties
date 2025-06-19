@@ -1,5 +1,6 @@
 import numpy as np
 
+from smarties.hn import Spin_maps
 
 def get_coupled_spin(reference_spin, available_h_n_spin, available_signal_spins):
     """
@@ -23,12 +24,6 @@ def get_coupled_spin(reference_spin, available_h_n_spin, available_signal_spins)
 
     minimum_spin = np.min(list(available_h_n_spin) + list(available_signal_spins))
     maximum_spin = np.max(list(available_h_n_spin) + list(available_signal_spins))
-
-    # all_spins = np.arange(minimum_spin, maximum_spin+1)
-    # h_n_spins = np.array(available_h_n_spin)
-    # signal_spins = np.array(available_signal_spins)
-    # contribution_h_n_spin = np.isin(all_spins, h_n_spins)
-    # contribution_signal_spin = np.isin(all_spins, signal_spins)
 
     coupled_spin = []
     for spin in range(minimum_spin, maximum_spin+1):
@@ -79,3 +74,78 @@ def get_rotation_matrix(angle):
     rotation_matrix[...,1,1] = np.cos(2 * angle)
 
     return rotation_matrix
+
+def transform_array_maps_into_spin_maps(array_maps):
+    """
+    Transform an array of maps into a Spin_maps object,
+    inheriting from the dictionary structure as
+      {key:element} being the spin and the corresponding map, respectively.
+    The transformation is done as follows:
+        * The spin 0 field is assumed to be the first Stokes parameter (temperature) if n_stokes = 1 or 3.
+        * The spin -2 field is assumed to be given by $0.5 * (Q - iU)$
+        * The spin 2 field is assumed to be given by $0.5 * (Q + iU)$
+    where Q and U are the second and third Stokes parameters, respectively, if n_stokes = 2 or 3.
+      
+    Parameters
+    ----------
+    array_maps: np.ndarray
+        Array of maps of shape (..., n_stokes, n_pix) with
+        * if n_stokes = 1, the temperature field [T] is assumed to be provided (spin=0)
+        * if n_stokes = 2, the polarization field [Q,U] is assumed to be provided (spin=2, -2)
+        * if n_stokes = 3, the full Stokes parameters [T,Q,U] are assumed to be provided (spin=0, 2, -2)
+
+    Returns
+    -------
+    spin_maps: Spin_maps
+        Spin_maps object with keys being the spins and values being the corresponding maps
+
+    """
+    
+    n_stokes = array_maps.shape[-2] if array_maps.ndim > 1 else 1
+    assert n_stokes in [1, 2, 3], 'The number of Stokes parameters must be 1 (only temperature), 2 (only polarization) or 3 (both temperature and polarization)'
+
+    output_spin_maps = Spin_maps()
+    
+    if n_stokes == 1 or n_stokes == 3:
+        # Only temperature field is provided
+        output_spin_maps[0] = array_maps[...,0,:] # [spin=0]
+    
+    if n_stokes >= 2:
+        output_spin_maps[-2] = .5*(array_maps[...,-2,:] - 1j * array_maps[...,-1,:]) # [spin=-2]
+        output_spin_maps[2] = .5*(array_maps[...,-2,:] + 1j * array_maps[...,-1,:]) # [spin=2]
+    
+    return output_spin_maps
+    
+def transform_spin_maps_into_array_maps(spin_maps):
+    """
+    Transform a Spin_maps object into an array of maps, 
+    as:
+        * the spin 0 field is assumed to be the first Stokes parameter (temperature).
+        * the spin -2 field is assumed to be given by $0.5 * (Q - iU)$
+        * the spin 2 field is assumed to be given by $0.5 * (Q + iU)$
+    where Q and U are the second and third Stokes parameters, respectively, if n_stokes = 2 or 3. 
+    
+    Parameters
+    ----------
+    spin_maps: Spin_maps
+        Spin_maps object to transform each with keys being the spins and values being the corresponding maps
+        associated to the dimension (..., n_pix) where n_pix is the number of pixels in the maps.
+
+    Returns
+    -------
+    array_maps: np.ndarray
+        Array of maps of shape (..., n_stokes, n_pix)
+    """
+    
+    n_stokes = 0
+    if 0 in spin_maps:
+        n_stokes += 1
+    if -2 in spin_maps and 2 in spin_maps:
+        n_stokes += 2
+    assert n_stokes in [1, 2, 3], 'The number of Stokes parameters must be 1 (only temperature), 2 (only polarization) or 3 (both temperature and polarization)'
+    n_pix = spin_maps[0].shape[-1] if n_stokes == 1 else spin_maps[-2].shape[-1]
+    dtype = spin_maps[0].dtype if n_stokes == 1 else spin_maps[-2].dtype
+
+    array_maps = np.zeros(spin_maps[0].shape[:-1] + (n_stokes, n_pix), dtype=dtype)
+    
+    return array_maps
