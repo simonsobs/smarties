@@ -148,4 +148,11 @@ def transform_spin_maps_into_array_maps(spin_maps):
 
     array_maps = np.zeros(spin_maps[0].shape[:-1] + (n_stokes, n_pix), dtype=dtype)
     
+    if n_stokes == 1 or n_stokes == 3:
+        # Only temperature field is provided
+        array_maps[...,0,:] = spin_maps[0]
+    if n_stokes >= 2:
+        array_maps[...,1,:] = spin_maps[-2] + spin_maps[2]  # [Q, U] -> spin -2 and 2
+        array_maps[...,2,:] = -1j * (spin_maps[2] - spin_maps[-2])
+        
     return array_maps

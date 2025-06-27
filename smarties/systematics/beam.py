@@ -61,8 +61,12 @@ def get_differential_ellipticity(
     ----------
     intensity_CMB: np.ndarray
         intensity CMB map already convolved with Gaussian circularly-symmetric beam (as assumed in the formalism), the output maps will have the same dimension
-    coefficient_Taylor_expansion: np.ndarray
-        Taylor expansion coefficients for the differential ellipticity, the shape must be (n_det, 2), with respectively the coefficients [:,0] being multiplied to the temperature leakage in the spin 0 maps, and the coefficients [:,1] being multiplied to the temperature leakage in the spin 2 maps (and its conjugate mutliplied to the temperature leakage in the spin -2 maps)
+    ellipticity: np.ndarray
+        ellipticity map for each detector, defined as the ratio of the difference between the squares of the major and minor axes of the ellipse to their sum, i.e. $\epsilon = (\sigma_{\rm maj}^2 - \sigma_{\rm min}^2) / (\sigma_{\rm maj}^2 + \sigma_{\rm min}^2)$, which is also the square of the third eccentricity parameter
+    ellipse_angle: np.ndarray
+        angle of the ellipse in radians, defined as the angle between the major axis and the x-axis, for each detector
+    sigma_FWHM: np.ndarray
+        full width at half maximum of the beam in arcmin, for each detector, used to compute the circularly-symmetric (cs) beam width $\sigma_{\rm cs}$ as $\sigma_{\rm cs} = \frac{\rm FWHM}{\sqrt{8 \ln(2)}}$
     lmax: int
         maximum multipole for the computation of the spin derivatives of the intensity CMB map
 
@@ -73,8 +77,10 @@ def get_differential_ellipticity(
 
     Notes
     -----
-    The coefficients given in `coefficient_Taylor_expansion[:,0]` correspond to $\alpha_{2,xx} + \alpha_{2,yy}$
+    Currently, the input intensity_CMB map is assumed to be a full sky map, i.e. it must have a dimension of 12 * nside^2, where nside is the HEALPix nside parameter, and smooth with the circularly-symmetric beam defined by the sigma_FWHM parameter. 
     """
+
+    #TODO: Allow for intensity_CMB to be different for each detector in case sigma_FWHM is different for each detector, i.e. allow for a 2D array of shape (n_det, npix) for intensity_CMB 
 
     intensity_CMB = np.asarray(intensity_CMB)
     assert intensity_CMB.ndim == 1, 'The intensity_CMB map must have only 1 dimension'

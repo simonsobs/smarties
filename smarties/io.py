@@ -29,7 +29,7 @@ def read_h_n_file(name_file, list_spin=[2,4]):
     assert np.unique(list_spin).size == np.array(list_spin).size, 'The list of spins must be unique'
     assert (np.array(list_spin) > 0).all(), 'The spins provided must be positive, their negative counterpart will be computed from the components read'
 
-    h_n_spin_dict = dict()
+    h_n_spin_dict = Spin_maps()
     
     for i,spin in enumerate(list_spin):
         sin_spin_h_n = hp.read_map(name_file + '_sin_{}.fits'.format(spin))
