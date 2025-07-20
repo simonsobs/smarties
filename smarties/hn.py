@@ -53,6 +53,16 @@ class Spin_maps(dict):
                 result[key] = self[key] + other[key]
         return result
 
+    def add_inplace(self, other):
+        """
+        Add another Spin_maps object to this one in place
+        """
+        for key, value in other.items():
+            if key in self:
+                self[key] = self[key] + value
+            else:
+                self[key] = value
+        
     def extend_first_dimension(self, new_shape_first_dimension):
         """
         Extend the first dimension of the spin maps to a new shape

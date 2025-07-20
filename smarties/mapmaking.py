@@ -31,6 +31,7 @@ class FrameworkSystematics(object):
         self.list_spin_output = list_spin_output # list spins involved in the signal maps only (for CMB only, the spins are 0, -2, 2 if intensity is involved)
         self.nstokes = nstokes
         self.lmax = lmax
+        self.npix = 12*nside**2
 
     @property
     def list_spin_input(self):
@@ -75,7 +76,10 @@ class FrameworkSystematics(object):
     def get_inverse_mapmaking_matrix(
             self, 
             h_n_spin_dict: dict | Spin_maps,
-            mask: np.ndarray = None):
+            mask: np.ndarray = None,
+            mask_input: bool = True,
+            dtype: type = np.complex128
+        ):
         """
         Compute the inverse of the mapmaking matrix from the h_n maps
         
@@ -100,7 +104,8 @@ class FrameworkSystematics(object):
         if mask is not None:
             assert mask.size == 12 * self.nside **2, 'The mask must be a HEALPix map of the same size as the h_n maps'
             observed_pixels_array = mask != 0
-            h_n_spin_dict = Spin_maps.from_dictionary({spin: h_n_spin_dict[spin][...,observed_pixels_array] if np.size(h_n_spin_dict[spin][0,...]) == mask.size else h_n_spin_dict[spin] for spin in h_n_spin_dict.keys()})
+            if mask_input:
+                h_n_spin_dict = Spin_maps.from_dictionary({spin: h_n_spin_dict[spin][...,observed_pixels_array] if np.size(h_n_spin_dict[spin][0,...]) == mask.size else h_n_spin_dict[spin] for spin in h_n_spin_dict.keys()})
             
             npix = mask[observed_pixels_array].size
         else:
@@ -108,7 +113,7 @@ class FrameworkSystematics(object):
             npix = h_n_spin_dict[list_spin[list_spin != 0][0]].shape[-1]
     
         # First, form the mapmaking matrix composed of the h_n map
-        mapmaking_matrix = np.zeros((npix, self.nstokes, self.nstokes), dtype=np.complex128)
+        mapmaking_matrix = np.zeros((npix, self.nstokes, self.nstokes), dtype=dtype)
         for i, reference_spin in enumerate(self.list_spin_output):
             mapmaking_matrix[:,i,:] = get_row_mapmaking_matrix(reference_spin, h_n_spin_dict, self.list_spin_input)
         # Then, compute the inverse of the mapmaking matrix
@@ -122,7 +127,9 @@ class FrameworkSystematics(object):
             spin_systematics_maps: dict | Spin_maps, 
             inverse_mapmaking_matrix : np.ndarray = None,
             return_Q_U: bool = False,
-            return_inverse_mapmaking_matrix: bool = False):
+            return_inverse_mapmaking_matrix: bool = False,
+            mask_input: bool = True
+        ):
         """
         Compute the total maps from the $h_n$ maps, the spin CMB maps and the spin systematics maps
 
@@ -159,43 +166,64 @@ class FrameworkSystematics(object):
         
         # Masking the h_n maps, CMB maps and systematics maps
         observed_pixels_array = mask != 0
-        h_n_spin_dict = Spin_maps.from_dictionary({spin: h_n_spin_dict[spin][...,observed_pixels_array] if np.size(h_n_spin_dict[spin][0,...]) == mask.size else h_n_spin_dict[spin] for spin in h_n_spin_dict.keys()})
-        spin_sky_maps = Spin_maps.from_dictionary({spin: spin_sky_maps[spin][...,observed_pixels_array] if np.size(spin_sky_maps[spin]) == mask.size else spin_sky_maps[spin] for spin in spin_sky_maps.keys()})
-        spin_systematics_maps = Spin_maps.from_dictionary({spin: spin_systematics_maps[spin][...,observed_pixels_array] if np.size(spin_systematics_maps[spin][0,...]) == mask.size else spin_systematics_maps[spin] for spin in spin_systematics_maps.keys()})
-        # TODO: Decide if input maps are masked here, or if the user should provide the masked maps directly
+        if mask_input:
+            h_n_spin_dict = Spin_maps.from_dictionary({spin: h_n_spin_dict[spin][...,observed_pixels_array] if np.size(h_n_spin_dict[spin][0,...]) == mask.size else h_n_spin_dict[spin] for spin in h_n_spin_dict.keys()})
+            spin_sky_maps = Spin_maps.from_dictionary({spin: spin_sky_maps[spin][...,observed_pixels_array] if np.size(spin_sky_maps[spin]) == mask.size else spin_sky_maps[spin] for spin in spin_sky_maps.keys()})
+            spin_systematics_maps = Spin_maps.from_dictionary({spin: spin_systematics_maps[spin][...,observed_pixels_array] if np.size(spin_systematics_maps[spin][0,...]) == mask.size else spin_systematics_maps[spin] for spin in spin_systematics_maps.keys()})
+            # TODO: Decide if input maps are masked here, or if the user should provide the masked maps directly
+        # else: 
+        #     spin_sky_maps = Spin_maps.from_dictionary(spin_sky_maps)
+        
+    
+        assert np.all(sum(spin_sky_maps.values()).imag < 1e-14), 'The sum of the input sky maps must be real, the imaginary part is not expected to be non-zero'
+        assert np.all(sum(spin_systematics_maps.values()).imag < 1e-14), 'The sum of the input systematics maps must be real, the imaginary part is not expected to be non-zero'
+
+        total_spin_maps = Spin_maps.from_dictionary(spin_systematics_maps) # Initialize the total spin maps with the input systematics maps
 
         npix = mask[observed_pixels_array].size
 
         if inverse_mapmaking_matrix is None:
-            inverse_mapmaking_matrix = self.get_inverse_mapmaking_matrix(h_n_spin_dict, mask=mask)
+            inverse_mapmaking_matrix = self.get_inverse_mapmaking_matrix(h_n_spin_dict, mask=mask, mask_input=mask_input)
         else: 
             assert inverse_mapmaking_matrix.shape == (npix, self.nstokes, self.nstokes), 'The inverse mapmaking matrix must be of shape (npix, nstokes, nstokes), with npix being the number of pixels in the observed area of the provided mask'
-        
+
+        print("Finishing the mapmaking process, computing the total maps...", flush=True)        
         # Second, form the data vector composed of (<d_j>, <d_j cos 2\phi_j>, <d_j sin 2\phi_j>)
 
         # Form the total spin maps
         n_det = h_n_spin_dict[0].shape[0]
-        spin_sky_maps.extend_first_dimension(n_det) # Extend the first dimension of the spin_sky_maps to match the number of detectors before summing them to the systematics maps
+        # spin_sky_maps.extend_first_dimension(n_det) # Extend the first dimension of the spin_sky_maps to match the number of detectors before summing them to the systematics maps
 
-        total_spin_maps = spin_sky_maps + spin_systematics_maps
-        list_spin_maps = total_spin_maps.spins
+        print("Summing the spin sky maps and systematics maps...", flush=True)
+        total_spin_maps.add_inplace(spin_sky_maps)
         
+        print("Computing the spin coupled maps...", flush=True)
         spin_coupled_maps = np.zeros((npix, len(self.list_spin_output),), dtype=complex)
+        list_spin_maps = total_spin_maps.spins
         factor_dict = {0: 1, -2: .5, 2: .5}
         for i, spin in enumerate(self.list_spin_input):
             # Get all combinations of spins (k-k', k') such that k-k' = spin
             coupled_spins = get_coupled_spin(spin, h_n_spin_dict.spins, list_spin_maps)
 
             # TODO: Remove print
-            print(f'Coupled spins for spin {spin}: {coupled_spins}')
+            print(f'Coupled spins for spin {spin}: {coupled_spins}', flush=True)
             
             # \sum_{k' = -\infty}^{\infty} h_{k-k'} S_{k'} on all (k-k', k') pairs
             for tuple_spins in coupled_spins:
                 spin_coupled_maps[...,i] += factor_dict[spin] * contract('d...,d...->...',h_n_spin_dict[tuple_spins[0]], total_spin_maps[tuple_spins[1]])
+                # spin_coupled_maps[...,i] += factor_dict[spin] * contract('dp,dp->p', h_n_spin_dict[tuple_spins[0]], total_spin_maps[tuple_spins[1]], memory_limit='max_input')
+                
+                # spin_coupled_maps[...,i] += factor_dict[spin] * np.einsum('d...,d...->...',h_n_spin_dict[tuple_spins[0]], total_spin_maps[tuple_spins[1]])
 
+                # spin_coupled_maps[...,i] += factor_dict[spin] * (h_n_spin_dict[tuple_spins[0]] * total_spin_maps[tuple_spins[1]]).sum(axis=0)
 
+        del total_spin_maps
+        print("Computing the final CMB fields...", flush=True)
         # Finally, compute the final CMB fields
-        final_CMB_fields = contract('pij,pj->ip', inverse_mapmaking_matrix, spin_coupled_maps)
+        final_CMB_fields = contract('pij,pj->ip', inverse_mapmaking_matrix, spin_coupled_maps) #, memory_limit='max_input') ## Memory handling necessary?
+        # final_CMB_fields = np.einsum('pij,pj->ip', inverse_mapmaking_matrix, spin_coupled_maps)
+
+        print("Final CMB fields computed, transforming them into Spin_maps...", flush=True)
         dict_final_CMB_fields = Spin_maps.from_list_maps(final_CMB_fields, self.list_spin_output)
 
         if return_Q_U:

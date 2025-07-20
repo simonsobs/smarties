@@ -63,7 +63,7 @@ def create_pointing_spin_leakage_map(
     pointing_leakage_spin_maps = Spin_maps()
 
     # Spin 1
-    pointing_leakage_spin_maps[1] = contract('d,p->dp', - amplitude_offset / 4 * np.exp(1j*angle_offset), intensity_spin_derivatives[-1])
+    pointing_leakage_spin_maps[1] = contract('d,p->dp', - amplitude_offset / 4 * np.exp(-1j*angle_offset), intensity_spin_derivatives[-1])
 
     # Spin -1
     pointing_leakage_spin_maps[-1] = contract('d,p->dp', - amplitude_offset / 4 *  np.exp(1j*angle_offset), intensity_spin_derivatives[1])
