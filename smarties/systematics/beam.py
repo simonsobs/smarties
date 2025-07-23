@@ -51,7 +51,9 @@ def get_differential_ellipticity(
         ellipticity,
         ellipse_angle,
         sigma_FWHM,
-        lmax=None
+        lmax=None,
+        mask=None,
+        bool_secondary_term=True
     ):
     """
     Get the differential ellipticity maps for a given intensity CMB map and Taylor expansion coefficients, "
@@ -94,6 +96,16 @@ def get_differential_ellipticity(
     assert ellipticity.ndim == 1, 'The ellipticity map must have only 1 dimension'
     assert ellipticity.shape == sigma_cs.shape, 'The ellipticity and sigma_cs maps must have the same shape'
     assert ellipticity.shape == ellipse_angle.shape, 'The ellipticity and ellipse angle maps must have the same shape'
+
+    if mask is None:
+        mask_bool = ...
+    else:
+        mask_bool = mask != 0
+
+    if bool_secondary_term:
+        coefficient_secondary_term = 1
+    else:
+        coefficient_secondary_term = 0
     
     alms_I = hp.map2alm(intensity_CMB, lmax=lmax, iter=10)
 
@@ -116,7 +128,7 @@ def get_differential_ellipticity(
     alpha_2 = contract('d, dxy->dxy', 
                        sigma_cs**3 / (sigma_cs ** 2 - delta_sigma ** 2), 
                        propagation_perturbation_ellipse
-                    ) - np.broadcast_to(
+                    ) - coefficient_secondary_term * np.broadcast_to(
                         delta_sigma ** 2 * sigma_cs ** 2 / ((sigma_cs ** 2 - delta_sigma ** 2)), 
                         (2, 2, sigma_cs.size)
                     ).T * np.eye(2)
@@ -127,13 +139,18 @@ def get_differential_ellipticity(
     differential_ellipticity_spin_maps = Spin_maps()
 
     # Spin 0
-    differential_ellipticity_spin_maps[0] = contract('d,p->dp',  np.linalg.trace(alpha_2) / 2., intensity_spin_2_derivatives['+1-1'])
+    print("Computing spin 0 differential ellipticity map ...", flush=True)
+    differential_ellipticity_spin_maps[0] = contract('d,p->dp',  np.linalg.trace(alpha_2) / 2., intensity_spin_2_derivatives['+1-1'][mask_bool], memory_limit='max_input')
 
     spin_2_prefactor = (alpha_2[...,1,1] - alpha_2[...,0,0]) / 2. - 1j*(alpha_2[...,1,0] + alpha_2[...,0,1]) / 2.
     # Spin 2
-    differential_ellipticity_spin_maps[2] = contract('d,p->dp', spin_2_prefactor, intensity_spin_2_derivatives[-2])
+    print("Computing spin -2 differential ellipticity map ...", flush=True)
+    differential_ellipticity_spin_maps[2] = contract('d,p->dp', spin_2_prefactor, intensity_spin_2_derivatives[-2][mask_bool], memory_limit='max_input')
 
     # Spin -2
-    differential_ellipticity_spin_maps[-2] = contract('d,p->dp', np.conj(spin_2_prefactor), intensity_spin_2_derivatives[2])
+    print("Computing spin 2 differential ellipticity map ...", flush=True)
+    differential_ellipticity_spin_maps[-2] = contract('d,p->dp', np.conj(spin_2_prefactor), intensity_spin_2_derivatives[2][mask_bool], memory_limit='max_input')
 
     return differential_ellipticity_spin_maps
+
+
