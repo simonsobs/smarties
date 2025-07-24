@@ -38,16 +38,18 @@ def create_pointing_spin_leakage_map(
     Parameters
     ----------
     intensity_CMB: np.ndarray
-        intensity CMB map already convolved with Gaussian circularly-symmetric beam (as assumed in the formalism), the output maps will have the same dimension
+        Intensity CMB map already convolved with Gaussian circularly-symmetric beam (as assumed in the formalism), the output maps will have the same dimension
     amplitude_offset: float
-        angular amplitude offset for each detector in radians
+        Angular amplitude offset for each detector in radians
     angle_offset: float
-        angle offset for each detector in radians
+        Angle offset for each detector in radians
+    lmax: int, optional
+        Maximum multipole for the computation of the spin derivatives of the intensity CMB map, if None, defaults to 2 * nside where nside is the nside of the intensity_CMB map
     
     Returns
     -------
-    pointing_leakage_spin_maps: dictionary of pointing leakage maps
-        dictionary of pointing leakage maps, each of shape (npix,), with keys being spin=1 and -1 
+    pointing_leakage_spin_maps: dictionary 
+        Dictionary of pointing leakage maps, each of shape (npix,), with keys being spin=1 and -1 
 
     Note
     ----

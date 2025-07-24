@@ -9,8 +9,10 @@ requires = [
 [project]
 name = 'smarties'
 authors = [
+    {name = 'Magdy Morshed', email = 'magdy.morshed@fe.infn.it'}
 ]
 maintainers = [
+    {name = 'Magdy Morshed', email = 'magdy.morshed@fe.infn.it'}
 ]
 description = 'Map-based systematics simulation package for CMB experiments'
 readme = 'README.md'
@@ -39,6 +41,8 @@ optional = [
     'camb',
     'toml',
     'matplotlib',
+    'pixell',
+    'tqdm'
 ]
 
 
@@ -56,7 +60,3 @@ ignore_missing_imports = true
 packages = ["smarties"]
 
 [tool.setuptools_scm]
-# version_scheme = 'release'
-# fallback_version = '0.0.0'
-# local_scheme = "no-local-version"
-# write_to = "micmac/_version.py"

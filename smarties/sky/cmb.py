@@ -138,15 +138,15 @@ def create_CMB_spin_maps(nside, nstokes, lmax, fwhm=0., seed=42):
     Parameters
     ----------
     nside: int
-        nside of the maps
+        Nside of the maps
     nstokes: int
-        number of Stokes parameters : 1 for the intensity only, 2 for the polarization only and 3 for the full Stokes parameters (T, Q, U)
+        Number of Stokes parameters : 1 for the intensity only, 2 for the polarization only and 3 for the full Stokes parameters (T, Q, U)
     lmax: int
-        maximum multipole
+        Maximum multipole
     fwhm: float
-        full width at half maximum of the beam in arcmin ; if 0, no smoothing is applied
+        Full width at half maximum of the beam in arcmin ; if 0, no smoothing is applied
     seed: int
-        seed for the random generation of the CMB maps, only relevant if maps_CMB is None
+        Seed for the random generation of the CMB maps, only relevant if maps_CMB is None
 
     Returns
     -------

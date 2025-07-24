@@ -25,6 +25,9 @@ class Spin_maps(dict):
     
     @property
     def spins(self):
+        """
+        Returns the list of spins in the Spin_maps object
+        """
         return list(self.keys())
 
     @classmethod

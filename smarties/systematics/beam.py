@@ -24,8 +24,8 @@ from smarties.tools import get_rotation_matrix
 
 def get_ellipse_deviation(ellipticity, sigma_cs):
     """
-    Get the ellipticity deviation $\Delta_\sigma$ from the input ellipticity given by:
-        $$ ellpticity = (\sigma_{\rm maj}^2 - \sigma_{\rm min}^2) / (\sigma_{\rm maj}^2 + \sigma_{\rm min}^2) $$
+    Get the ellipticity deviation $\Delta_\sigma$ from the input ellipticity (third eccentricity) given by:
+        $$ ellipticity = (\sigma_{\rm maj}^2 - \sigma_{\rm min}^2) / (\sigma_{\rm maj}^2 + \sigma_{\rm min}^2) $$
     where $\sigma_{\rm maj}$ and $\sigma_{\rm min}$ are the major and minor axes of the ellipse, respectively, and
     defined as:
         $$ \sigma_{\rm maj} = \sigma_{\rm cs} + \Delta_\sigma / 2 $$.
@@ -34,14 +34,14 @@ def get_ellipse_deviation(ellipticity, sigma_cs):
     Parameters
     ----------
     ellipticity: np.ndarray
-        ellipticity parameter for each detector
+        Ellipticity parameter for each detector
     sigma_cs: np.ndarray
-        circularly-symmetric beam width for each detector, in arcmin
+        Circularly-symmetric beam width for each detector, in arcmin
 
     Returns
     -------
     delta_sigma: np.ndarray
-        ellipticity deviation $\Delta_\sigma$ for each detector so that the major and minor axes of the ellipse are given by:
+        Ellipticity deviation $\Delta_\sigma$ for each detector so that the major and minor axes of the ellipse are given by:
         $$ \sigma_{\rm maj} = \sigma_{\rm cs} + \Delta_\sigma / 2 $$
         $$ \sigma_{\rm min} = \sigma_{\rm cs} - \Delta_\sigma / 2 $$
         without taking into account the rotation of the ellipse.
@@ -72,26 +72,29 @@ def get_differential_ellipticity(
         bool_secondary_term=True,
     ):
     """
-    Get the differential ellipticity maps for a given intensity CMB map and Taylor expansion coefficients, "
-    in the formalism describe in arXiv:2011.13910, with output spins 0, 2, -2. "
+    Get the differential ellipticity maps for a given intensity CMB map and ellipticity parameters as described in the formalism describe in arXiv:2011.13910, with output spins 0, 2, -2. 
     
     Parameters
     ----------
     intensity_CMB: np.ndarray
-        intensity CMB map already convolved with Gaussian circularly-symmetric beam (as assumed in the formalism), the output maps will have the same dimension
+        Full sky intensity CMB map already convolved with Gaussian circularly-symmetric beam (as assumed in the formalism), the output maps will have the same dimension
     ellipticity: np.ndarray
-        ellipticity map for each detector, defined as the ratio of the difference between the squares of the major and minor axes of the ellipse to their sum, i.e. $\epsilon = (\sigma_{\rm maj}^2 - \sigma_{\rm min}^2) / (\sigma_{\rm maj}^2 + \sigma_{\rm min}^2)$, which is also the square of the third eccentricity parameter
+        Ellipticity parameter provided for each detector, defined as the ratio of the difference between the squares of the major and minor axes of the ellipse to their sum, i.e. $\epsilon = (\sigma_{\rm maj}^2 - \sigma_{\rm min}^2) / (\sigma_{\rm maj}^2 + \sigma_{\rm min}^2)$, which is also two times the third eccentricity parameter
     ellipse_angle: np.ndarray
-        angle of the ellipse in radians, defined as the angle between the major axis and the x-axis, for each detector
+        Angle of the ellipse in radians, defined as the angle between the major axis and the x-axis, for each detector
     sigma_FWHM: np.ndarray
-        full width at half maximum of the beam in arcmin, for each detector, used to compute the circularly-symmetric (cs) beam width $\sigma_{\rm cs}$ as $\sigma_{\rm cs} = \frac{\rm FWHM}{\sqrt{8 \ln(2)}}$
+        Full width at half maximum of the beam in arcmin, for each detector, used to compute the circularly-symmetric (cs) beam width $\sigma_{\rm cs}$ as $\sigma_{\rm cs} = \frac{\rm FWHM}{\sqrt{8 \ln(2)}}$
     lmax: int
-        maximum multipole for the computation of the spin derivatives of the intensity CMB map
+        Maximum multipole for the computation of the spin derivatives of the intensity CMB map
+    mask: np.ndarray, optional
+        HEALPix mask to define the area of the sky to compute the differential systematics maps. If None, the full sky is used.
+    bool_secondary_term: bool, optional
+        If False, ignore the secondary term in the differential ellipticity formalism.
 
     Returns
     -------
-    differential_ellipticity_spin_maps: dictionary of differential ellipticity maps
-        dictionary of differential ellipticity maps, each of shape (n_det,npix), with keys being spin=0, 2, -2 
+    differential_ellipticity_spin_maps: dictionary 
+        Dictionary of differential ellipticity maps, each of shape (n_det,npix), with keys being spin=0, 2, -2 
 
     Notes
     -----
@@ -167,8 +170,4 @@ def get_differential_ellipticity(
     print("Computing spin 2 differential ellipticity map ...", flush=True)
     differential_ellipticity_spin_maps[-2] = contract('d,p->dp', np.conj(spin_2_prefactor), intensity_spin_2_derivatives[2][mask_bool], memory_limit='max_input')
 
-
-
     return differential_ellipticity_spin_maps
-
-

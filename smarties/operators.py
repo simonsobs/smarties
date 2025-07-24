@@ -14,6 +14,8 @@
 # You should have received a copy of the GNU General Public License
 # along with SMARTIES. If not, see <https://www.gnu.org/licenses/>.
 
+## Function not used anymore, to be removed in the future
+
 import numpy as np
 import healpy as hp
 from smarties.hn import Spin_maps

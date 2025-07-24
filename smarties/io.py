@@ -16,10 +16,9 @@
 
 import numpy as np
 import healpy as hp
-from tqdm import tqdm
 from smarties.hn import Spin_maps
 
-def read_file(name_file:str, format_file:str='fits', mask:str=...):
+def read_file(name_file:str, format_file:str='fits', mask:np.ndarray=None):
     """
     Read the $h_n$ maps as provided either in FITS, NPY or NPZ
     format, and eventually mask them. 
@@ -38,22 +37,26 @@ def read_file(name_file:str, format_file:str='fits', mask:str=...):
         Optional, boolean array corresponding to the selected pixels in 
         the array to retain after loading the file. By default, return 
         all pixels. Note that this option is not active for 'npz' format
-        files. 
+        files. If None, the full maps are read.
 
     Returns
     -------
         Array containing the $h_n$ map read, from which only the relevant
         pixels are possibly retained. 
     """
+    if mask is None:
+        mask_bool = ...
+    else:
+        mask_bool = mask != 0
 
     if format_file == 'fits':
         if not name_file.endswith('.fits'):
             name_file = name_file + '.fits'
-        return hp.read_map(name_file)[mask]
+        return hp.read_map(name_file)[mask_bool]
     elif format_file == 'npy':
         if not name_file.endswith('.npy'):
             name_file = name_file + '.npy'
-        return np.load(name_file)[mask]
+        return np.load(name_file)[mask_bool]
     elif format_file == 'npz':
         if not name_file.endswith('.npz'):
             name_file = name_file + '.npz'
@@ -82,6 +85,12 @@ def read_h_n_file(name_file, list_spin=[2,4], format_file='fits', mask=None):
     ----------
     name_file: str
         The version of the file, given so that `hp.read_map(name_file + '_sin_1.fits')` can be used to read the file (with `sin_1` being the sin or cos component of the $h_n$ maps and the spin dependence) list_spin (list[int]): list of the spin to read
+    list_spin: list[int]
+        List of the spins to read, must be positive integers, their negative counterpart will be computed
+    format_file: str
+        Format of the file to read, must be 'fits', 'npy' or 'npz', otherwise a ValueError is raised
+    mask: np.ndarray, optional
+        HEALPix mask to define the area of the sky to compute the $h_n$ maps. If None, the full maps are read.
 
     Returns
     -------
@@ -93,17 +102,11 @@ def read_h_n_file(name_file, list_spin=[2,4], format_file='fits', mask=None):
     assert np.unique(list_spin).size == np.array(list_spin).size, 'The list of spins must be unique'
     assert (np.array(list_spin) > 0).all(), 'The spins provided must be positive, their negative counterpart will be computed from the components read'
 
-    if mask is None:
-        bool_mask = ...
-    elif mask is not None:
-        bool_mask = np.array(mask, dtype=bool)
-
-
     h_n_spin_dict = Spin_maps()
     
     for i,spin in enumerate(list_spin):
-        sin_spin_h_n = read_file(name_file + '_sin_{}'.format(spin), format_file=format_file, mask=bool_mask)
-        cos_spin_h_n = read_file(name_file + '_cos_{}'.format(spin), format_file=format_file, mask=bool_mask)
+        sin_spin_h_n = read_file(name_file + '_sin_{}'.format(spin), format_file=format_file, mask=mask)
+        cos_spin_h_n = read_file(name_file + '_cos_{}'.format(spin), format_file=format_file, mask=mask)
         h_n_spin_dict[spin] = np.expand_dims(cos_spin_h_n + 1j * sin_spin_h_n, 0)
         h_n_spin_dict[-spin] = np.expand_dims(cos_spin_h_n - 1j * sin_spin_h_n, 0)
         cos_spin_h_n = None
@@ -112,7 +115,13 @@ def read_h_n_file(name_file, list_spin=[2,4], format_file='fits', mask=None):
     h_n_spin_dict[0] = np.expand_dims([1.],0)
     return h_n_spin_dict
 
-def read_detectors_h_n_maps(list_name_files, list_spin, format_file='fits', list_weights=None, mask=None):
+def read_detectors_h_n_maps(
+        list_name_files: list[str], 
+        list_spin: list[int], 
+        format_file: str='fits', 
+        list_weights: list[float]=None, 
+        mask=None
+    ):
     """
     Read the $h_n$ maps for all the detectors given in list_name_files
 
@@ -120,8 +129,15 @@ def read_detectors_h_n_maps(list_name_files, list_spin, format_file='fits', list
     ----------
     list_name_files: list[str]
         List of the name of the files to read
-        list_spin (list[int]): list of the spin to read
-        list_weights (list[float]): list of the weights per detector, to apply to the $h_n$ so that the total $h_n$ maps are weighted by the total nhits of the detectors, if None, the nhits is assumed to be the same for all detectors and a weight of 1/sqrt(n_det) is applied
+    list_spin: list[int]
+        List of the spins to read, must be positive integers, their negative counterpart will be computed
+    list_weights: list[float]
+        list of the weights per detector, to apply to the $h_n$ so that the total $h_n$ maps are weighted by the total nhits of the detectors, if None, the nhits is assumed to be the same for all detectors and a weight of 1/sqrt(n_det) is applied.
+    format_file: str
+        Format of the file to read, must be 'fits', 'npy' or 'npz', otherwise a ValueError is raised
+    mask: np.ndarray, optional
+        HEALPix mask to define the area of the sky to compute the $h_n$ maps. If None, the full maps are read.
+    
     
     Returns
     -------
@@ -153,13 +169,13 @@ def read_detectors_h_n_maps(list_name_files, list_spin, format_file='fits', list
 
 
 def read_detectors_h_n_file_npz(
-        list_name_files, 
-        list_spin=[2,4], 
-        list_prefix=['A_', 'B_'], 
+        list_name_files: list[str], 
+        list_spin: list[int]=[2,4], 
+        list_prefix: list[str]=['A_', 'B_'], 
         list_weights=None, 
-        mask=None, 
-        format_file='npz',
-        new_weighting_bool=False
+        mask: np.ndarray=None, 
+        format_file: str='npz',
+        new_weighting_bool: bool=False
     ):
     """
     Read the $h_n$ map as generated by TOAST, 
@@ -179,7 +195,18 @@ def read_detectors_h_n_file_npz(
     ----------
     name_file: str
         The version of the file, given so that `hp.read_map(name_file + '_sin_1.fits')` can be used to read the file (with `sin_1` being the sin or cos component of the $h_n$ maps and the spin dependence)
-        list_spin (list[int]): list of the spin to read
+    list_spin (list[int]): 
+        List of the spin to read
+    list_prefix: list[str]
+        List of the prefixes to read, typically ['A_', 'B_'] for two polarization detectors in a pair
+    list_weights: list[float], optional
+        List of the weights per detector, to apply to the $h_n$ so that the total $h_n$ maps are weighted by the total nhits of the detectors, if None, the nhits is assumed to be the same for all detectors and a weight of 1 is applied, except if new_weighting_bool is True, in which case the weights are computed from the number of pixels with non-zero $h_n$ values.
+    mask: np.ndarray, optional
+        HEALPix mask to define the area of the sky to compute the $h_n$ maps. If None, the full maps are read.
+    format_file: str
+        Format of the file to read, must be 'fits', 'npy' or 'npz', otherwise a ValueError is raised
+    new_weighting_bool: bool, optional
+        If True, the weights are computed from the number of pixels with non-zero $h_n$ values, so that the total $h_n$ maps are weighted by the number of detectors observing each pixel. 
 
     Returns
     -------
@@ -188,6 +215,11 @@ def read_detectors_h_n_file_npz(
 
     Note:
     """
+    try:
+        from tqdm import tqdm
+    except ImportError:
+        raise ImportError('tqdm is not installed. Please install it with "pip install tqdm"')
+
     assert np.unique(list_spin).size == np.array(list_spin).size, 'The list of spins must be unique'
     assert (np.array(list_spin) > 0).all(), 'The spins provided must be positive, their negative counterpart will be computed from the components read'
 

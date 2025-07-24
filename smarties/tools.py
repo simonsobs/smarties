@@ -26,16 +26,16 @@ def get_coupled_spin(reference_spin, available_h_n_spin, available_signal_spins)
     Parameters
     ----------
     reference_spin: int
-        reference spin $k$
+        Reference spin $k$
     available_h_n_spin: list[int]
-        list of available $h_n$ spins, typically [-4, -2, 2, 4]
+        List of available $h_n$ spins, typically [-4, -2, 2, 4]
     available_signal_spins: list[int]
-        list of available signal spins, typically [-2, 2]
+        List of available signal spins, typically [-2, 2]
     
     Returns
     -------
     coupled_spin: list[tuple]
-        list of available coupled spins, each tuple being the coupled spins $(k-k', k')$
+        List of available coupled spins, each tuple being the coupled spins $(k-k', k')$
     """
 
     minimum_spin = np.min(list(available_h_n_spin) + list(available_signal_spins))
@@ -56,6 +56,21 @@ def get_row_mapmaking_matrix(reference_spin, h_n_spin_dict, list_spin_input):
         h_n_spin_dict = {spin: np.array([n_det, n_pix])} (for spin != 0)
         h_n_spin_dict = {0: np.array([1, 1])} (for spin = 0)
     And the $h_n$ maps will be summed over the detectors in the mapmaking matrix, so that the mapmaking matrix will be of shape [n_spin, n_pix] with n_spin the number of spins involved in list_spin_input and n_pix the number of pixels in the $h_n$ maps.
+
+    Parameters
+    ----------
+    reference_spin: int
+        Reference spin $k$ for the mapmaking matrix, typically 0, 2 or -2
+    h_n_spin_dict: Spin_maps
+        Dictionary of the summed $h_n$ maps, with the keys being the spins and the values the $h_n$ maps
+    list_spin_input: list[int]
+        List of spins involved in the input signal maps, typically [-2, 2] for polarization maps
+    
+    Returns
+    -------
+    mapmaking_matrix_row: np.ndarray
+        Row of the mapmaking matrix of shape [n_pix, n_spin] with n_spin the number of spins involved in list_spin_input and n_pix the number of pixels in the $h_n$ maps.
+        The row is given by list_spin_input.
     """
 
     factor_func = lambda x: 1 if x == 0 else .5
@@ -73,12 +88,12 @@ def get_rotation_matrix(angle):
     Parameters
     ----------
     angle: np.ndarray
-        angle in radians
+        Angle in radians
 
     Returns
     -------
     rotation_matrix: np.ndarray
-        rotation matrix of shape (angle.shape, 2, 2), with the first dimension being the same as the input angle
+        Rotation matrix of shape (angle.shape, 2, 2), with the first dimension being the same as the input angle
     """
 
     angle = np.asarray(angle)

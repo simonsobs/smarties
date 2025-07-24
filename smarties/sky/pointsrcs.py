@@ -60,6 +60,12 @@ def get_coordinates_from_healpix_mask(mask, degree_output=True, nest=False):
     ----------
     mask: np.ndarray
         HEALPix mask.
+    degree_output: bool, optional
+        If True, the output coordinates are in degrees. If False, they are in radians.
+        Default is True.
+    nest: bool, optional
+        If True, the mask is assumed to be in NESTED format. If False, it is assumed to be
+        provided in RING format. Default is False.
 
     Returns
     -------
@@ -93,7 +99,7 @@ def generate_circular_profile_point_sources(
     fwhm_pointsrcs: float
         Full width at half maximum of the Gaussian profile in arcminutes.
     n_points_profile: int
-        Number of points in the profile.
+        Number of points in the profile, default is 1000.
 
     Returns
     -------

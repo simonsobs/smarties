@@ -32,13 +32,13 @@ class FrameworkSystematics(object):
         Parameters
         ----------
         nside: int
-            nside of the maps
+            Nside of the maps
         nstokes: int
-            number of Stokes parameters : 1 for the intensity only, 2 for the polarization only and 3 for the full Stokes parameters (T, Q, U)
+            Number of Stokes parameters : 1 for the intensity only, 2 for the polarization only and 3 for the full Stokes parameters (T, Q, U)
         lmax: int
-            maximum multipole (useful for CMB and systematics generation)
+            Maximum multipole (useful for CMB and systematics generation)
         list_spin: list[int]
-            list of spins involved in the signal maps only (for CMB only, the spins are -2, 2 with polarization only)
+            List of spins involved in the signal maps only (for CMB only, the spins are -2, 2 with polarization only)
         """
         self.nside = nside
         assert np.unique(list_spin_output).size == np.array(list_spin_output).size, 'The list of spins must be unique'
@@ -62,25 +62,20 @@ class FrameworkSystematics(object):
         """
         Get the spin CMB maps which are the following for intensity and polarization:
             * Spin 0: I
-            * Spin 2: Q + iU
-            * Spin -2: Q - iU
+            * Spin 2: (Q + iU)/2.
+            * Spin -2: (Q - iU)/2.
         
         Parameters
         ----------
         fwhm: float
-            full width at half maximum of the beam in arcmin ; if 0, no smoothing is applied
+            Full width at half maximum of the beam in arcmin ; if 0, no smoothing is applied
         seed: int
-            seed for the random generation of the CMB maps
+            Seed for the random generation of the CMB maps
 
         Returns
         -------
         spin_sky_maps: dictionary of spin sky maps (CMB, ...)
             dictionary of spin sky maps, each of shape (n_spin, npix), with n_spin being 1 if nstokes=1 (spin=0), 2 if nstokes=2 (spin=-2, 2) and 3 if nstokes=3 (spin=0, -2, 2) 
-
-        Note
-        ----
-        The ordering of the spins must be the given as [0,-2,2] or [-2,2], depending on the number of Stokes parameters,
-        currently the other cases are not implemented for the input spin maps
         """
         return create_CMB_spin_maps(
             nside=self.nside, 
@@ -93,7 +88,7 @@ class FrameworkSystematics(object):
             self, 
             h_n_spin_dict: dict | Spin_maps,
             mask: np.ndarray = None,
-            mask_input: bool = True,
+            mask_input: bool = False,
             dtype: type = np.complex128
         ):
         """
@@ -102,15 +97,18 @@ class FrameworkSystematics(object):
         Parameters
         ----------
         h_n_spin_dict: dict or Spin_maps
-            dictionary of the summed $h_n$ maps, with the keys being the spins and the values the $h_n$ maps
+            Dictionary of the summed $h_n$ maps, with the keys being the spins and the values the $h_n$ maps
         mask: np.ndarray
-            mask of the maps, only the pixels in the observed area will be considered for the inversion, default is None
-            if None, all the pixels are considered
-        
+            Mask of the maps, only the pixels in the observed area will be considered for the inversion, default is None, then all the pixels are considered
+        mask_input: bool
+            If True, the input $h_n$ maps will be copied and masked, otherwise the input $h_n$ maps will not be masked and assumed to be provided in the right format. Default is False.
+        dtype: type
+            Data type of the output inverse mapmaking matrix, for memory efficiency, default is np.complex128.
+
         Returns
         -------
         inverse_mapmaking_matrix: np.ndarray
-            the inverse of the mapmaking matrix, with the shape (npix, nstokes, nstokes), with npix being the number of pixels in the observed area of the provided mask
+            The inverse of the mapmaking matrix, with the shape (npix, nstokes, nstokes), with npix being the number of pixels in the observed area of the provided mask
         
         Note
         ----
@@ -152,17 +150,21 @@ class FrameworkSystematics(object):
         Parameters
         ----------
         mask: np.ndarray
-            mask of the maps, only the pixels in the observed area will be considered for the inversion
+            Mask of the maps, only the pixels in the observed area will be considered for the inversion
         h_n_spin_dict: dict or Spin_maps
-            dictionary of the summed $h_n$ maps, with the keys being the spins and the values the $h_n$ maps
+            Dictionary of the summed $h_n$ maps, with the keys being the spins and the values the $h_n$ maps
         spin_sky_maps: dict or Spin_maps
-            dictionary of the spin CMB maps, with the keys being the spins and the values the spin CMB maps (e.g. if nstokes=3, the keys are 0, -2, 2 and the fields (I, Q-iU, Q+iU))
+            Dictionary of the spin CMB maps, with the keys being the spins and the values the spin CMB maps (e.g. if nstokes=3, the keys are 0, -2, 2 and the fields (I, Q-iU, Q+iU))
         spin_systematics_maps: dict
-            dictionary of the spin systematics maps, with the keys being the spins and the values the spin systematics maps
+            Dictionary of the spin systematics maps, with the keys being the spins and the values the spin systematics maps
+        inverse_mapmaking_matrix : np.ndarray, optional
+            The inverse of the mapmaking matrix, with the shape (npix, n_spin, n_spin), with npix being the number of pixels in the observed area of the provided mask. If None (default), it will be computed from the h_n maps
         return_Q_U: bool
-            if True, return the Q and U maps instead of the spin -2 and 2 maps, default is False
+            If True, return the Q and U maps instead of the spin -2 and 2 maps, default is False
         return_inverse_mapmaking_matrix: bool
-            if True, return the inverse of the mapmaking matrix, default is False
+            If True, return the inverse of the mapmaking matrix, default is False
+        mask_input: bool
+            If True, the input spin_sky_maps, spin_systematics_maps and h_n_spin_dict will be copied and masked, otherwise the input maps will not be masked and assumed to be provided in the right format. Default is True.
 
         Returns
         -------
@@ -186,7 +188,7 @@ class FrameworkSystematics(object):
             h_n_spin_dict = Spin_maps.from_dictionary({spin: h_n_spin_dict[spin][...,observed_pixels_array] if np.size(h_n_spin_dict[spin][0,...]) == mask.size else h_n_spin_dict[spin] for spin in h_n_spin_dict.keys()})
             spin_sky_maps = Spin_maps.from_dictionary({spin: spin_sky_maps[spin][...,observed_pixels_array] if np.size(spin_sky_maps[spin]) == mask.size else spin_sky_maps[spin] for spin in spin_sky_maps.keys()})
             spin_systematics_maps = Spin_maps.from_dictionary({spin: spin_systematics_maps[spin][...,observed_pixels_array] if np.size(spin_systematics_maps[spin][0,...]) == mask.size else spin_systematics_maps[spin] for spin in spin_systematics_maps.keys()})
-            # TODO: Decide if input maps are masked here, or if the user should provide the masked maps directly
+            
         # else: 
         #     spin_sky_maps = Spin_maps.from_dictionary(spin_sky_maps)
         
@@ -199,7 +201,8 @@ class FrameworkSystematics(object):
         npix = mask[observed_pixels_array].size
 
         if inverse_mapmaking_matrix is None:
-            inverse_mapmaking_matrix = self.get_inverse_mapmaking_matrix(h_n_spin_dict, mask=mask, mask_input=mask_input)
+            inverse_mapmaking_matrix = self.get_inverse_mapmaking_matrix(h_n_spin_dict, mask=mask, mask_input=False)
+            # The h_n_spin_dict is not masked here, as it is assumed to be already in the right format
         else: 
             assert inverse_mapmaking_matrix.shape == (npix, self.nstokes, self.nstokes), 'The inverse mapmaking matrix must be of shape (npix, nstokes, nstokes), with npix being the number of pixels in the observed area of the provided mask'
 
@@ -275,17 +278,17 @@ class FrameworkSystematics(object):
         Parameters
         ----------
         mask: np.ndarray
-            mask of the maps, only the pixels in the observed area will be considered for the inversion
+            Mask of the maps, only the pixels in the observed area will be considered for the inversion
         h_n_spin_dict: dict or Spin_maps
-            dictionary of the summed $h_n$ maps, with the keys being the spins and the values the $h_n$ maps
+            Dictionary of the summed $h_n$ maps, with the keys being the spins and the values the $h_n$ maps
         spin_sky_maps: dict or Spin_maps
-            dictionary of the spin CMB maps, with the keys being the spins and the values the spin CMB maps (e.g. if nstokes=3, the keys are 0, -2, 2 and the fields (I, Q-iU, Q+iU))
+            Dictionary of the spin CMB maps, with the keys being the spins and the values the spin CMB maps (e.g. if nstokes=3, the keys are 0, -2, 2 and the fields (I, Q-iU, Q+iU))
         spin_systematics_maps: dict
-            dictionary of the spin systematics maps, with the keys being the spins and the values the spin systematics maps
+            Dictionary of the spin systematics maps, with the keys being the spins and the values the spin systematics maps
         return_Q_U: bool
-            if True, return the Q and U maps instead of the spin -2 and 2 maps, default is False
+            If True, return the Q and U maps instead of the spin -2 and 2 maps, default is False
         return_inverse_mapmaking_matrix: bool
-            if True, return the inverse of the mapmaking matrix, default is False
+            If True, return the inverse of the mapmaking matrix, default is False
 
         Returns
         -------
