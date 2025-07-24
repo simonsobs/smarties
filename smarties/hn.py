@@ -1,3 +1,19 @@
+# This file is part of SMARTIES.
+# Copyright (C) 2024 CNRS / SciPol developers
+#
+# SMARTIES is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# SMARTIES is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with SMARTIES. If not, see <https://www.gnu.org/licenses/>.
+
 from collections.abc import Iterable
 import numpy as np
 import healpy as hp
@@ -30,15 +46,17 @@ class Spin_maps(dict):
         """
         assert isinstance(list_spin, Iterable)
         result = cls()
-        for spin, map in zip(list_spin, maps):
-            result[spin] = map
+        for spin, map_ in zip(list_spin, maps):
+            result[spin] = map_
         return result
     
     def __add__(self, other):
         """
         Add two spin maps objects
 
-        Note: a new object is created
+        Notes
+        ----- 
+        A new object is created.
         """
 
         result = Spin_maps()
@@ -66,6 +84,10 @@ class Spin_maps(dict):
     def extend_first_dimension(self, new_shape_first_dimension):
         """
         Extend the first dimension of the spin maps to a new shape
+
+        Notes
+        ----- 
+        A broadcast is performed to extend the first dimension of each element of the dictionary. 
         """
         for key in self.keys():
             self[key] = np.broadcast_to(self[key], (new_shape_first_dimension,) + np.asarray(self[key]).shape)
@@ -80,7 +102,7 @@ def ud_grade_hn(h_n_maps, nside_out):
     ----------
     h_n_maps: Spin_maps
         Spin maps containing the $h_n$ maps, with keys being the spins and values being
-        the maps of shape (n_det, n_pix) or (n_pix,) for spin=0.
+        the maps of shape (n_det, n_pix) or (n_det,) for spin=0.
     nside_out: int
         The desired output resolution, given as nside.
 
@@ -88,13 +110,13 @@ def ud_grade_hn(h_n_maps, nside_out):
     -------
     new_h_n: Spin_maps
         A new Spin_maps object containing the $h_n$ maps at the desired resolution,
-        with the same spins as the input maps. The maps are of shape (n_det, n_pix) or (n_pix,) for spin=0,
-        where n_det is the number of detectors (1 for spin=0) and n_pix is the number of pixels at the output
-        resolution.
+        with the same spins as the input maps. The maps are of shape (n_det, n_pix) or 
+        (n_det,) for spin=0, where n_det is the number of detectors (1 for spin=0) and 
+        n_pix is the number of pixels at the output resolution.
 
     Notes
     -----
-    Currently the corresponding operations only work with HEALPix maps, so the input maps must be in HEALPix format. 
+    Currently the corresponding operations only work with HEALPix maps, so the input maps must be provided in the HEALPix format. 
     """
     
     new_h_n = Spin_maps()

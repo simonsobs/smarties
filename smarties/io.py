@@ -1,9 +1,50 @@
+# This file is part of SMARTIES.
+# Copyright (C) 2024 CNRS / SciPol developers
+#
+# SMARTIES is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# SMARTIES is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with SMARTIES. If not, see <https://www.gnu.org/licenses/>.
+
 import numpy as np
 import healpy as hp
 from tqdm import tqdm
 from smarties.hn import Spin_maps
 
-def read_file(name_file, format_file='fits', mask=...):
+def read_file(name_file:str, format_file:str='fits', mask:str=...):
+    """
+    Read the $h_n$ maps as provided either in FITS, NPY or NPZ
+    format, and eventually mask them. 
+
+    Parameters
+    ----------
+    name_file: str
+        Path to the $h_n$ file to be read. If the path provided does
+        not contain the fomat suffix, in '.fits', '.npy' or '.npz',
+        the suffix corresponding to the format indicated in format_file
+        will be concatenated. 
+    format_file: str
+        String indicated the format of the file to be read, must be 
+        either 'fits', 'npy' or 'npz' otherwise a ValueError is raised 
+    mask: array[bool] | Ellipsis
+        Optional, boolean array corresponding to the selected pixels in 
+        the array to retain after loading the file. By default, return 
+        all pixels. Note that this option is not active for 'npz' format
+        files. 
+
+    Returns
+    -------
+        Array containing the $h_n$ map read, from which only the relevant
+        pixels are possibly retained. 
+    """
 
     if format_file == 'fits':
         if not name_file.endswith('.fits'):
@@ -37,12 +78,15 @@ def read_h_n_file(name_file, list_spin=[2,4], format_file='fits', mask=None):
     
     Only the latest part of the file actually matters, considering the $sin$ or $cos$ component of the $h_n$ map as well as its spin dependence. 
 
-    Args:
-        name_file (str): the version of the file, given so that `hp.read_map(name_file + '_sin_1.fits')` can be used to read the file (with `sin_1` being the sin or cos component of the $h_n$ maps and the spin dependence)
-        list_spin (list[int]): list of the spin to read
+    Parameters
+    ----------
+    name_file: str
+        The version of the file, given so that `hp.read_map(name_file + '_sin_1.fits')` can be used to read the file (with `sin_1` being the sin or cos component of the $h_n$ maps and the spin dependence) list_spin (list[int]): list of the spin to read
 
-    Returns:
-        h_n (dict): the $h_n$ maps stored in a dictionary of spins and ordered as [n_det, n_pix], with n_det=1, except for spin=0 which dimension is [1,1] and only contains the float 1.
+    Returns
+    -------
+    h_n: dict
+        The $h_n$ maps stored in a dictionary of spins and ordered as [n_det, n_pix], with n_det=1, except for spin=0 which dimension is [1,1] and only contains the float 1.
 
     Note:
     """
@@ -72,13 +116,17 @@ def read_detectors_h_n_maps(list_name_files, list_spin, format_file='fits', list
     """
     Read the $h_n$ maps for all the detectors given in list_name_files
 
-    Args:
-        list_name_files (list[str]): list of the name of the files to read
+    Parameters
+    ----------
+    list_name_files: list[str]
+        List of the name of the files to read
         list_spin (list[int]): list of the spin to read
         list_weights (list[float]): list of the weights per detector, to apply to the $h_n$ so that the total $h_n$ maps are weighted by the total nhits of the detectors, if None, the nhits is assumed to be the same for all detectors and a weight of 1/sqrt(n_det) is applied
     
-    Returns:
-        h_n_spin_dict (Spin_maps): the $h_n$ maps stored in a Spin_maps object with the keys being the spins and the elements being ordered as [n_det, n_pix], with n_det the number of detectors and n_pix the number of pixels in the $h_n$ maps, except for spin=0 which dimension is [n_det,1] and only contains the float 1.
+    Returns
+    -------
+    h_n_spin_dict: Spin_maps
+        The $h_n$ maps stored in a Spin_maps object with the keys being the spins and the elements being ordered as [n_det, n_pix], with n_det the number of detectors and n_pix the number of pixels in the $h_n$ maps, except for spin=0 which dimension is [n_det,1] and only contains the float 1.
 
     """
     
@@ -127,12 +175,16 @@ def read_detectors_h_n_file_npz(
     
     Only the latest part of the file actually matters, considering the $sin$ or $cos$ component of the $h_n$ map as well as its spin dependence. 
 
-    Args:
-        name_file (str): the version of the file, given so that `hp.read_map(name_file + '_sin_1.fits')` can be used to read the file (with `sin_1` being the sin or cos component of the $h_n$ maps and the spin dependence)
+    Parameters
+    ----------
+    name_file: str
+        The version of the file, given so that `hp.read_map(name_file + '_sin_1.fits')` can be used to read the file (with `sin_1` being the sin or cos component of the $h_n$ maps and the spin dependence)
         list_spin (list[int]): list of the spin to read
 
-    Returns:
-        h_n (dict): the $h_n$ maps stored in a dictionary of spins and ordered as [n_det, n_pix], with n_det=1, except for spin=0 which dimension is [1,1] and only contains the float 1.
+    Returns
+    -------
+    h_n: Spin_maps
+        The $h_n$ maps stored in a dictionary of spins and ordered as [n_det, n_pix], with n_det=1, except for spin=0 which dimension is [1,1] and only contains the float 1.
 
     Note:
     """

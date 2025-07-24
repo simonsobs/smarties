@@ -1,3 +1,19 @@
+# This file is part of SMARTIES.
+# Copyright (C) 2024 CNRS / SciPol developers
+#
+# SMARTIES is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# SMARTIES is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with SMARTIES. If not, see <https://www.gnu.org/licenses/>.
+
 import numpy as np
 import healpy as hp
 from opt_einsum import contract
@@ -53,7 +69,7 @@ def get_differential_ellipticity(
         sigma_FWHM,
         lmax=None,
         mask=None,
-        bool_secondary_term=True
+        bool_secondary_term=True,
     ):
     """
     Get the differential ellipticity maps for a given intensity CMB map and Taylor expansion coefficients, "
@@ -150,6 +166,8 @@ def get_differential_ellipticity(
     # Spin -2
     print("Computing spin 2 differential ellipticity map ...", flush=True)
     differential_ellipticity_spin_maps[-2] = contract('d,p->dp', np.conj(spin_2_prefactor), intensity_spin_2_derivatives[2][mask_bool], memory_limit='max_input')
+
+
 
     return differential_ellipticity_spin_maps
 
