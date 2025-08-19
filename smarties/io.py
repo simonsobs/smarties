@@ -16,6 +16,7 @@
 
 import numpy as np
 import healpy as hp
+import h5py
 from smarties.hn import Spin_maps
 
 def read_file(name_file:str, format_file:str='fits', mask:np.ndarray=None):
@@ -61,6 +62,9 @@ def read_file(name_file:str, format_file:str='fits', mask:np.ndarray=None):
         if not name_file.endswith('.npz'):
             name_file = name_file + '.npz'
         return np.load(name_file) #, allow_pickle=True)
+    elif format_file == 'h5':
+        return h5py.File(name_file+'.hdf5', "r")
+
     else:
         raise ValueError("Unknown format: {}".format(format_file))
 
@@ -168,7 +172,7 @@ def read_detectors_h_n_maps(
 
 
 
-def read_detectors_h_n_file_npz(
+def read_detectors_h_n_file_dictionary(
         list_name_files: list[str], 
         list_spin: list[int]=[2,4], 
         list_prefix: list[str]=['A_', 'B_'], 
@@ -223,6 +227,8 @@ def read_detectors_h_n_file_npz(
     assert np.unique(list_spin).size == np.array(list_spin).size, 'The list of spins must be unique'
     assert (np.array(list_spin) > 0).all(), 'The spins provided must be positive, their negative counterpart will be computed from the components read'
 
+    assert format_file == 'npz' or format_file == 'h5'
+
     n_det = len(list_name_files) * len(list_prefix)
 
     if list_weights is None:
@@ -235,22 +241,25 @@ def read_detectors_h_n_file_npz(
 
     total_list_spin = list_spin + [-spin for spin in list_spin]
 
-    h_n_dictionary = {spin: [] for spin in total_list_spin}  # Initialize dictionary for spins
+    n_pix = read_file(list_name_files[0], format_file=format_file)[list_prefix[0]+'sin_{}'.format(list_spin[0])][bool_mask].shape[0]
+
+    h_n_dictionary = {spin: np.zeros((n_det, n_pix), dtype=complex) for spin in total_list_spin}  # Initialize dictionary for spins
     for j, name_file in enumerate(tqdm(list_name_files)):
         spin_h_n = read_file(name_file, format_file=format_file)
 
         for spin in list_spin:
             for prefix in list_prefix:
-                
                 sin_spin_h_n = spin_h_n[prefix+'sin_{}'.format(spin)][bool_mask]
                 cos_spin_h_n = spin_h_n[prefix+'cos_{}'.format(spin)][bool_mask]
-                h_n_dictionary[spin].append((cos_spin_h_n + 1j * sin_spin_h_n)[np.newaxis,...] * list_weights[j])
-                h_n_dictionary[-spin].append((cos_spin_h_n - 1j * sin_spin_h_n)[np.newaxis,...] * list_weights[j])
+                # h_n_dictionary[spin].append((cos_spin_h_n + 1j * sin_spin_h_n)[np.newaxis,...] * list_weights[j])
+                # h_n_dictionary[-spin].append((cos_spin_h_n - 1j * sin_spin_h_n)[np.newaxis,...] * list_weights[j])
+                h_n_dictionary[spin][j,...] = (cos_spin_h_n + 1j * sin_spin_h_n) * list_weights[j]
+        h_n_dictionary[-spin] = np.conj(h_n_dictionary[spin])
         spin_h_n = None
 
     print("Finalizing h_n dictionary...", flush=True)
-    for spin in total_list_spin:
-        h_n_dictionary[spin] = np.vstack(h_n_dictionary[spin])
+    # for spin in total_list_spin:
+    #     h_n_dictionary[spin] = np.vstack(h_n_dictionary[spin])
 
     h_n_dictionary[0] = list_weights[..., np.newaxis]
 
