@@ -22,10 +22,18 @@ from smarties.hn import Spin_maps
 from smarties.external.s4cmb import get_second_spin_derivative
 from smarties.tools import get_rotation_matrix
 
-def get_ellipse_deviation(ellipticity, sigma_cs):
+def get_ellipse_deviation(
+        ellipticity, 
+        sigma_cs,
+        ellipticity_parameter_convention='Third flattening'
+    ):
     """
-    Get the ellipticity deviation $\Delta_\sigma$ from the input ellipticity (third eccentricity) given by:
+    Get the ellipticity deviation $\Delta_\sigma$ from the input ellipticity provided
+    either as:
+     * Third eccentricity:
         $$ ellipticity = (\sigma_{\rm maj}^2 - \sigma_{\rm min}^2) / (\sigma_{\rm maj}^2 + \sigma_{\rm min}^2) $$
+    * Third flattening:
+        $$ ellipticity = (\sigma_{\rm maj} - \sigma_{\rm min}) / (\sigma_{\rm maj} + \sigma_{\rm min}) $$
     where $\sigma_{\rm maj}$ and $\sigma_{\rm min}$ are the major and minor axes of the ellipse, respectively, and
     defined as:
         $$ \sigma_{\rm maj} = \sigma_{\rm cs} + \Delta_\sigma / 2 $$.
@@ -37,6 +45,8 @@ def get_ellipse_deviation(ellipticity, sigma_cs):
         Ellipticity parameter for each detector
     sigma_cs: np.ndarray
         Circularly-symmetric beam width for each detector, in arcmin
+    ellipticity_parameter_convention: str, optional
+        Convention used for the ellipticity parameter, either 'Third flattening' or 'Third eccentricity', default is 'Third flattening'
 
     Returns
     -------
@@ -44,7 +54,12 @@ def get_ellipse_deviation(ellipticity, sigma_cs):
         Ellipticity deviation $\Delta_\sigma$ for each detector so that the major and minor axes of the ellipse are given by:
         $$ \sigma_{\rm maj} = \sigma_{\rm cs} + \Delta_\sigma / 2 $$
         $$ \sigma_{\rm min} = \sigma_{\rm cs} - \Delta_\sigma / 2 $$
-        without taking into account the rotation of the ellipse.
+        without taking into account the rotation of the ellipse.  
+
+    Notes
+    -----
+    The convention adopted here omits a factor 2 compared to this (reference
+    document)[https://zenodo.org/records/32854/preview/ganshin69.pdf?include_deleted=0]
 
     """
     ellipticity = np.asarray(ellipticity)
@@ -53,23 +68,27 @@ def get_ellipse_deviation(ellipticity, sigma_cs):
     assert ellipticity.ndim == 1, 'The ellipticity map must have only 1 dimension'
     assert sigma_cs.shape == ellipticity.shape, 'The ellipticity and sigma_cs maps must have the same shape'
 
-    
-
-    return np.where(
-        ellipticity != 0, 
-        2 * sigma_cs * (1 - np.sqrt(1 - ellipticity ** 2)) / ellipticity,
-        0
-    ) # the formula is not defined for ellipticity = 0, which correspond to a circular beam where the deviation is 0
+    if ellipticity_parameter_convention=='Third flattening':
+        return ellipticity * sigma_cs
+    elif ellipticity_parameter_convention=='Third eccentricity':
+        return np.where(
+            ellipticity != 0,
+            2 * sigma_cs * (1 - np.sqrt(1 - ellipticity ** 2)) / ellipticity,
+            0
+        ) # the formula is not defined for ellipticity = 0, which correspond to a circular beam where the deviation is 0
+    else:
+        raise ValueError(f"Unknown ellipticity parameter convention: {ellipticity_parameter_convention}")
 
 
 def get_differential_ellipticity(
         intensity_CMB,
-        ellipticity,
+        ellipticity_parameter,
         ellipse_angle,
         sigma_FWHM,
         lmax=None,
         mask=None,
         bool_secondary_term=True,
+        ellipticity_parameter_convention='Third flattening'
     ):
     """
     Get the differential ellipticity maps for a given intensity CMB map and ellipticity parameters as described in the formalism describe in arXiv:2011.13910, with output spins 0, 2, -2. 
@@ -90,7 +109,8 @@ def get_differential_ellipticity(
         HEALPix mask to define the area of the sky to compute the differential systematics maps. If None, the full sky is used.
     bool_secondary_term: bool, optional
         If False, ignore the secondary term in the differential ellipticity formalism.
-
+    ellipticity_parameter_convention: str, optional
+        Convention used for the ellipticity parameter, either 'Third flattening' or 'Third eccentricity', default is 'Third flattening'
     Returns
     -------
     differential_ellipticity_spin_maps: dictionary 
@@ -99,6 +119,10 @@ def get_differential_ellipticity(
     Notes
     -----
     Currently, the input intensity_CMB map is assumed to be a full sky map, i.e. it must have a dimension of 12 * nside^2, where nside is the HEALPix nside parameter, and smooth with the circularly-symmetric beam defined by the sigma_FWHM parameter. 
+    
+    For now only those two parameterizations of the ellipticity are supported,
+    third eccentricity or third flattening, please refer to the documentation of
+    the function `get_ellipse_deviation` for more details.
     """
 
     #TODO: Allow for intensity_CMB to be different for each detector in case sigma_FWHM is different for each detector, i.e. allow for a 2D array of shape (n_det, npix) for intensity_CMB 
@@ -108,13 +132,13 @@ def get_differential_ellipticity(
     assert np.log(np.sqrt(intensity_CMB.size/12)) / np.log(2) % 1 == 0, 'The intensity_CMB map dimension must be compatible with a full sky healpy map'
     nside = hp.npix2nside(intensity_CMB.size)
 
-    ellipticity = np.asarray(ellipticity)
+    ellipticity_parameter = np.asarray(ellipticity_parameter)
     ellipse_angle = np.asarray(ellipse_angle)
     sigma_cs = np.asarray(sigma_FWHM) / ((8 * np.log(2)) ** 0.5) * np.pi/(180*60)  # convert from FWHM to sigma_cs, in radians
 
-    assert ellipticity.ndim == 1, 'The ellipticity map must have only 1 dimension'
-    assert ellipticity.shape == sigma_cs.shape, 'The ellipticity and sigma_cs maps must have the same shape'
-    assert ellipticity.shape == ellipse_angle.shape, 'The ellipticity and ellipse angle maps must have the same shape'
+    assert ellipticity_parameter.ndim == 1, 'The ellipticity array must have only 1 dimension'
+    assert ellipticity_parameter.shape == sigma_cs.shape, 'The ellipticity and sigma_cs maps must have the same shape'
+    assert ellipticity_parameter.shape == ellipse_angle.shape, 'The ellipticity and ellipse angle maps must have the same shape'
 
     if mask is None:
         mask_bool = ...
@@ -135,7 +159,10 @@ def get_differential_ellipticity(
     )
 
     rotation_matrix_ellipse_angle = get_rotation_matrix(ellipse_angle)
-    delta_sigma = get_ellipse_deviation(ellipticity, sigma_cs)
+    delta_sigma = get_ellipse_deviation(
+        ellipticity_parameter, 
+        sigma_cs,
+        ellipticity_parameter_convention=ellipticity_parameter_convention)
 
     propagation_perturbation_ellipse = np.einsum('dxy, xd, dxa->dya',
                                                  rotation_matrix_ellipse_angle,
