@@ -21,7 +21,7 @@ from smarties.hn import Spin_maps
 def get_coupled_spin(reference_spin, available_h_n_spin, available_signal_spins):
     """
     Get the coupled spins for a reference spin $k$ given a set of $h_n$ and signal spin maps, involved in a typical sum: 
-        $ \sum_{k' = -\infty}^{\infty} h_{k-k'} S_{k'}$
+        $ sum_{k' = -\infty}^{\infty} h_{k-k'} S_{k'}$
         
     Parameters
     ----------
@@ -106,7 +106,7 @@ def get_rotation_matrix(angle):
 
     return rotation_matrix
 
-def transform_array_maps_into_spin_maps(array_maps):
+def transform_array_maps_into_spin_maps(array_maps, n_stokes_output=None):
     """
     Transform an array of maps into a Spin_maps object,
     inheriting from the dictionary structure as
@@ -135,16 +135,35 @@ def transform_array_maps_into_spin_maps(array_maps):
     n_stokes = array_maps.shape[-2] if array_maps.ndim > 1 else 1
     assert n_stokes in [1, 2, 3], 'The number of Stokes parameters must be 1 (only temperature), 2 (only polarization) or 3 (both temperature and polarization)'
 
+    if n_stokes_output is not None:
+        assert n_stokes_output in [1, 2, 3], 'The number of Stokes parameters must be 1 (only temperature), 2 (only polarization) or 3 (both temperature and polarization)'
+        assert not((n_stokes_output == 1) and (n_stokes == 2)), 'Incompatible Stokes parameter configurations'
+    else:
+        n_stokes_output = n_stokes
+
     output_spin_maps = Spin_maps()
     
+    
     if n_stokes == 1 or n_stokes == 3:
-        # Only temperature field is provided
-        output_spin_maps[0] = array_maps[...,0,:] # [spin=0]
+        
+        if array_maps.ndim == 1:
+            # Only temperature field is provided
+            index_T = ...
+        else:
+            index_T = ...,0
+        output_spin_maps[0] = array_maps[index_T,:] # [spin=0]
     
     if n_stokes >= 2:
         output_spin_maps[-2] = .5*(array_maps[...,-2,:] - 1j * array_maps[...,-1,:]) # [spin=-2]
         output_spin_maps[2] = .5*(array_maps[...,-2,:] + 1j * array_maps[...,-1,:]) # [spin=2]
     
+    if n_stokes_output != n_stokes:
+        if n_stokes == 1:
+            output_spin_maps[2] = np.zeros_like(output_spin_maps[0], dtype=complex)
+            output_spin_maps[-2] = np.zeros_like(output_spin_maps[0], dtype=complex)
+        elif n_stokes == 2:
+            output_spin_maps[0] = np.zeros_like(output_spin_maps[-2], dtype=complex)
+
     return output_spin_maps
     
 def transform_spin_maps_into_array_maps(spin_maps):
