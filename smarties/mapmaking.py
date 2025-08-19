@@ -270,7 +270,8 @@ class FrameworkSystematics(object):
             return_Q_U: bool = False,
             return_inverse_mapmaking_matrix: bool = False,
             mask_input: bool = True,
-            polar_angle: bool = None
+            polar_angle: np.ndarray = None,
+            correct_polar_angle_h_n: bool = False
         ):
         """
         Compute the total maps from the $h_n$ maps, the spin CMB maps and the spin systematics maps
@@ -315,17 +316,37 @@ class FrameworkSystematics(object):
             # TODO: Decide if input maps are masked here, or if the user should provide the masked maps directly
         # else: 
         #     spin_sky_maps = Spin_maps.from_dictionary(spin_sky_maps)
+
+        if polar_angle is None:
+            polar_angle_coeff = {spin: np.ones(h_n_spin_dict[0].shape[0], dtype=complex) for spin in h_n_spin_dict.spins} # Default is to not apply any polar angle, i.e. the detectors are all aligned in the same direction
+        else:
+            assert polar_angle.size == h_n_spin_dict[0].size, 'The polar angle map must have the same shape as the h_n maps'
+            polar_angle_coeff = {spin: np.exp(spin * 1j * polar_angle) for spin in h_n_spin_dict.spins}
         
+        
+
     
         assert np.all(sum(spin_sky_maps.values()).imag < 1e-14), 'The sum of the input sky maps must be real, the imaginary part is not expected to be non-zero'
         assert np.all(sum(spin_systematics_maps.values()).imag < 1e-14), 'The sum of the input systematics maps must be real, the imaginary part is not expected to be non-zero'
 
         total_spin_maps = Spin_maps.from_dictionary(spin_systematics_maps) # Initialize the total spin maps with the input systematics maps
+        if correct_polar_angle_h_n:
+            # h_n maps are supposed to be provided with the polar angle, so we need to correct them here
+            print("Correcting the polarization angle in the input h_n maps!")
+            assert polar_angle is not None, 'The polar angle must be provided to correct the h_n maps'
+            # Remove the polar angle from the h_n maps, as it is already included in the spin_sky_maps
+            # for spin in h_n_spin_dict.spins:
+            #     h_n_spin_dict[spin] = contract('d...,d->d', h_n_spin_dict[spin], polar_angle_coeff[-spin])
+            h_n_spin_dict.divide_inplace_detectors_spin_maps(polar_angle_coeff, subscripts='d...,d...->d...') # Divide the h_n maps by the polar angle coefficient, to remove the polar angle from the h_n maps
 
         npix = mask[observed_pixels_array].size
 
         if inverse_mapmaking_matrix is None:
+            h_n_spin_dict.multiply_inplace_detectors_spin_maps(polar_angle_coeff, subscripts='d...,d...->d...')
+ 
             inverse_mapmaking_matrix = self.get_inverse_mapmaking_matrix(h_n_spin_dict, mask=mask, mask_input=mask_input)
+ 
+            h_n_spin_dict.divide_inplace_detectors_spin_maps(polar_angle_coeff, subscripts='d...,d...->d...') 
         else: 
             assert inverse_mapmaking_matrix.shape == (npix, self.nstokes, self.nstokes), 'The inverse mapmaking matrix must be of shape (npix, nstokes, nstokes), with npix being the number of pixels in the observed area of the provided mask'
 
@@ -336,11 +357,6 @@ class FrameworkSystematics(object):
         n_det = h_n_spin_dict[0].shape[0]
         # spin_sky_maps.extend_first_dimension(n_det) # Extend the first dimension of the spin_sky_maps to match the number of detectors before summing them to the systematics maps
 
-        if polar_angle is None:
-            polar_angle_coeff = {spin: np.ones(h_n_spin_dict[spin].shape[0], dtype=complex) for spin in h_n_spin_dict.spins}
-        else:
-            assert polar_angle.shape == h_n_spin_dict[0].shape, 'The polar angle map must have the same shape as the h_n maps'
-            polar_angle_coeff = {spin: np.exp(spin * 1j * polar_angle) for spin in h_n_spin_dict.spins}
 
         print("Summing the spin sky maps and systematics maps...", flush=True)
         # total_spin_maps.add_inplace(spin_sky_maps)
@@ -358,7 +374,8 @@ class FrameworkSystematics(object):
             
             # \sum_{k' = -\infty}^{\infty} h_{k-k'} S_{k'} on all (k-k', k') pairs
             for tuple_spins in coupled_spins:
-                spin_coupled_maps[...,i] += factor_dict[spin] * contract('d,d...,d...->...', polar_angle_coeff[-tuple_spins[0]], h_n_spin_dict[tuple_spins[0]], spin_systematics_maps[tuple_spins[1]]) + factor_dict[spin] * contract('dp,p->p',h_n_spin_dict[tuple_spins[0]], spin_sky_maps[tuple_spins[1]])
+                # spin_coupled_maps[...,i] += factor_dict[spin] * contract('d,d...,d...->...', polar_angle_coeff[-tuple_spins[0]], h_n_spin_dict[tuple_spins[0]], spin_systematics_maps[tuple_spins[1]]) + factor_dict[spin] * contract('dp,p->p',h_n_spin_dict[tuple_spins[0]], spin_sky_maps[tuple_spins[1]])
+                spin_coupled_maps[...,i] += factor_dict[spin] * contract('d,d...,d...->...', polar_angle_coeff[spin], h_n_spin_dict[tuple_spins[0]], spin_systematics_maps[tuple_spins[1]] + spin_sky_maps[tuple_spins[1]]) 
                 # spin_coupled_maps[...,i] += factor_dict[spin] * contract('dp,dp->p', h_n_spin_dict[tuple_spins[0]], total_spin_maps[tuple_spins[1]], memory_limit='max_input')
                 
                 # spin_coupled_maps[...,i] += factor_dict[spin] * np.einsum('d...,d...->...',h_n_spin_dict[tuple_spins[0]], total_spin_maps[tuple_spins[1]])

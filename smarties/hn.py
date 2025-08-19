@@ -17,10 +17,11 @@
 from collections.abc import Iterable
 import numpy as np
 import healpy as hp
+from opt_einsum import contract
 
 class Spin_maps(dict):
     """
-    Class to handle the spin maps
+    Class to handle fundamental operations related to the spin maps
     """
     
     @property
@@ -83,7 +84,42 @@ class Spin_maps(dict):
                 self[key] = self[key] + value
             else:
                 self[key] = value
-        
+    
+    def multiply_inplace_detectors_spin_maps(self, other, subscripts='d...,d...->d...'):
+        """
+        Multiply the spin maps by another Spin_maps object in place
+
+        Parameters
+        ----------
+        other: Spin_maps
+            Another Spin_maps object to multiply with.
+        subscripts: str
+            Einstein summation subscripts for the multiplication operation.
+            Default is 'd...,d...->d...' which multiplies each `spin` map by the corresponding `spin` map of the other Spin_maps object for each detector.
+        """
+        assert isinstance(other, Spin_maps), "The other object must be an instance of Spin_maps"
+        assert subscripts is not None, "Subscripts must be provided for the multiplication operation"
+        for key in self.keys():
+            if key != 0:
+                self[key] = contract(subscripts, self[key], other[key])
+
+    def divide_inplace_detectors_spin_maps(self, other, subscripts='d...,d...->d...'):
+        """
+        Multiply the spin maps in place, with each `spin` map multiplied
+        by the corresponding `-spin` map of the other Spin_maps object.
+
+        Parameters
+        ----------
+        other: Spin_maps
+            Another Spin_maps object to extract `-spin` maps from for multiplication.
+        """
+        assert isinstance(other, Spin_maps), "The other object must be an instance of Spin_maps"
+        assert subscripts is not None, "Subscripts must be provided for the multiplication operation"
+
+        for key in self.keys():
+            if key != 0:
+                self[key] = contract(subscripts, self[key], other[-key])
+
     def extend_first_dimension(self, new_shape_first_dimension):
         """
         Extend the first dimension of the spin maps to a new shape
