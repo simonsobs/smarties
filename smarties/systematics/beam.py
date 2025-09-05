@@ -22,6 +22,11 @@ from smarties.hn import Spin_maps
 from smarties.external.s4cmb import get_second_spin_derivative
 from smarties.tools import get_rotation_matrix
 
+list_ellipticity_conventions_implemented = [
+    'Third flattening', 
+    'Third eccentricity'
+]
+
 def get_ellipse_deviation(
         ellipticity, 
         sigma_cs,
@@ -58,8 +63,8 @@ def get_ellipse_deviation(
 
     Notes
     -----
-    The convention adopted here omits a factor 2 compared to this (reference
-    document)[https://zenodo.org/records/32854/preview/ganshin69.pdf?include_deleted=0]
+    The convention adopted here omits a factor 2 compared to this p.8 of 
+    this (reference document)[https://zenodo.org/records/32854/preview/ganshin69.pdf?include_deleted=0]
 
     """
     ellipticity = np.asarray(ellipticity)
@@ -77,7 +82,34 @@ def get_ellipse_deviation(
             0
         ) # the formula is not defined for ellipticity = 0, which correspond to a circular beam where the deviation is 0
     else:
-        raise ValueError(f"Unknown ellipticity parameter convention: {ellipticity_parameter_convention}")
+        raise ValueError(f"Unknown ellipticity parameter convention: {ellipticity_parameter_convention}, must be a convention as chosen in {list_ellipticity_conventions_implemented}")
+
+def get_ellipticities_values_from_dp_dc_dictionnary(
+        detector_features_all, 
+        sigma_FWHM,  # arcmin
+        dp_dc_dictionnary,
+        ellipticity_parameter_convention='Third flattening'
+    ):
+
+    sigma_cs = np.asarray(sigma_FWHM) / ((8 * np.log(2)) ** 0.5) * np.pi/(180*60)
+
+    delta_sigma = np.sqrt([
+            dp_dc_dictionnary[det_name]['dc']**2 + dp_dc_dictionnary[det_name]['dp']**2
+            for det_name in detector_features_all
+            ]) * sigma_cs / 2. 
+
+    ellipticity_angle = np.array([
+        np.arctan2(-dp_dc_dictionnary[det_name]['dc'], dp_dc_dictionnary[det_name]['dp']) /4. 
+        for det_name in (detector_features_all)
+        ])
+
+    if ellipticity_parameter_convention:
+        ellipticity_parameter = delta_sigma / sigma_cs
+    elif ellipticity_parameter_convention == 'Third eccentricity':
+        ellipticity_parameter = ((sigma_cs + delta_sigma)**2 - (sigma_cs - delta_sigma)**2) / ((sigma_cs + delta_sigma)**2 + (sigma_cs - delta_sigma)**2)
+    else:
+        raise ValueError(f"Unknown ellipticity parameter convention: {ellipticity_parameter_convention}, must be")
+    return ellipticity_parameter, ellipticity_angle
 
 
 def get_differential_ellipticity(
