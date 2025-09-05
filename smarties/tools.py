@@ -15,6 +15,7 @@
 # along with SMARTIES. If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
+from opt_einsum import contract
 
 from smarties.hn import Spin_maps
 
@@ -48,7 +49,13 @@ def get_coupled_spin(reference_spin, available_h_n_spin, available_signal_spins)
     return coupled_spin
 
 
-def get_row_mapmaking_matrix(reference_spin, h_n_spin_dict, list_spin_input):
+def get_row_mapmaking_matrix(
+        reference_spin, 
+        h_n_spin_dict, 
+        list_spin_input,
+        polar_angle_coeff=None,
+        dtype=complex
+    ):
     """
     The mapmaking matrix will always be multiplied to the vector ordered with spins [0, 2, -2] for the $\tilde{S}^{\rm pixel}_{k}$ term.
 
@@ -72,13 +79,15 @@ def get_row_mapmaking_matrix(reference_spin, h_n_spin_dict, list_spin_input):
         Row of the mapmaking matrix of shape [n_pix, n_spin] with n_spin the number of spins involved in list_spin_input and n_pix the number of pixels in the $h_n$ maps.
         The row is given by list_spin_input.
     """
+    if polar_angle_coeff is None:
+        polar_angle_coeff = {spin:np.ones(h_n_spin_dict[0].shape[0]) for spin in h_n_spin_dict.spins}
 
     factor_func = lambda x: 1 if x == 0 else .5
 
-    mapmaking_matrix_row = np.zeros((h_n_spin_dict[2].shape[-1], len(list_spin_input)), dtype=complex)
+    mapmaking_matrix_row = np.zeros((h_n_spin_dict[2].shape[-1], len(list_spin_input)), dtype=dtype)
     for i, spin_name in enumerate(list_spin_input):
-        mapmaking_matrix_row[:,i] = factor_func(reference_spin) * factor_func(spin_name) * h_n_spin_dict[spin_name-reference_spin].sum(axis=0)
-        
+        mapmaking_matrix_row[:,i] = factor_func(reference_spin) * factor_func(spin_name) * contract('d...,d...->...', polar_angle_coeff[spin_name-reference_spin], h_n_spin_dict[spin_name-reference_spin])
+
     return mapmaking_matrix_row
 
 def get_rotation_matrix(angle):
@@ -148,10 +157,10 @@ def transform_array_maps_into_spin_maps(array_maps, n_stokes_output=None):
         
         if array_maps.ndim == 1:
             # Only temperature field is provided
-            index_T = ...
+            index_T = (...,)
         else:
             index_T = ...,0
-        output_spin_maps[0] = array_maps[index_T,:] # [spin=0]
+        output_spin_maps[0] = array_maps[*index_T,:] # [spin=0]
     
     if n_stokes >= 2:
         output_spin_maps[-2] = .5*(array_maps[...,-2,:] - 1j * array_maps[...,-1,:]) # [spin=-2]
@@ -206,3 +215,24 @@ def transform_spin_maps_into_array_maps(spin_maps):
         array_maps[...,2,:] = -1j * (spin_maps[2] - spin_maps[-2])
         
     return array_maps
+
+
+def save_partial_spin_maps_as_healpy(
+        partial_spin_maps, 
+        mask_mpi_from_total_mask, 
+        nstokes,
+        nside,
+        path_output):
+
+    extended_final_maps = np.zeros((nstokes,12*nside**2), dtype=complex)
+    if nstokes == 3 or nstokes == 1:
+        extended_final_maps[0, mask_mpi_from_total_mask != 0] = partial_spin_maps[0]
+    if nstokes == 3 or nstokes == 2:
+        final_Q_map = (partial_spin_maps[-2] + partial_spin_maps[2])/2.
+        final_U_map = 1j*(partial_spin_maps[-2] - partial_spin_maps[2])/2.
+
+        extended_final_maps[-2, mask_mpi_from_total_mask != 0] = final_Q_map.real
+        extended_final_maps[-1, mask_mpi_from_total_mask != 0] = final_U_map.real
+
+    print("Saving map into", path_output)
+    np.save(path_output, extended_final_maps[:,mask_mpi_from_total_mask!=0])
