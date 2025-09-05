@@ -97,7 +97,7 @@ class Spin_maps(dict):
             Einstein summation subscripts for the multiplication operation.
             Default is 'd...,d...->d...' which multiplies each `spin` map by the corresponding `spin` map of the other Spin_maps object for each detector.
         """
-        assert isinstance(other, Spin_maps), "The other object must be an instance of Spin_maps"
+        assert isinstance(other, Spin_maps) or np.all([key in other for key in self.keys() if key!=0]), "The other object must be an instance of Spin_maps or at least contain all keys of self"
         assert subscripts is not None, "Subscripts must be provided for the multiplication operation"
         for key in self.keys():
             if key != 0:
@@ -113,7 +113,7 @@ class Spin_maps(dict):
         other: Spin_maps
             Another Spin_maps object to extract `-spin` maps from for multiplication.
         """
-        assert isinstance(other, Spin_maps), "The other object must be an instance of Spin_maps"
+        assert isinstance(other, Spin_maps) or np.all([key in other for key in self.keys() if key!=0]), "The other object must be an instance of Spin_maps or at least contain all keys of self"
         assert subscripts is not None, "Subscripts must be provided for the multiplication operation"
 
         for key in self.keys():
