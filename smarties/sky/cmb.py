@@ -90,27 +90,31 @@ def generate_power_spectra_CAMB(
         raise ImportError('camb is not installed. Please install it with "pip install camb"')
 
     if lmax is None:
-        lmax = 2 * nside
+        true_lmax = 2 * nside
+    if true_lmax < 128:
+        lmax_computation = 256
+    else:
+        lmax_computation = true_lmax
     # pars = camb.CAMBparams(max_l_tensor=lmax, parameterization='tensor_param_indeptilt')
-    pars = camb.CAMBparams(max_l_tensor=lmax)
+    pars = camb.CAMBparams(max_l_tensor=lmax_computation)
     pars.WantTensors = True
 
     pars.Accuracy.AccurateBB = True
     pars.Accuracy.AccuratePolarization = True
     pars.set_cosmology(H0=H0, ombh2=ombh2, omch2=omch2, mnu=mnu, omk=omk, tau=tau, Alens=Alens)
     pars.InitPower.set_params(As=As, ns=ns, r=r, parameterization='tensor_param_indeptilt', nt=nt, ntrun=ntrun)
-    pars.max_eta_k_tensor = lmax + 100 
+    pars.max_eta_k_tensor = lmax_computation + 100 
 
     # pars.set_cosmology(H0=H0)
-    pars.set_for_lmax(lmax, lens_potential_accuracy=lens_potential_accuracy)
+    pars.set_for_lmax(lmax_computation, lens_potential_accuracy=lens_potential_accuracy)
 
     print('Calculating spectra from CAMB !')
     results = camb.get_results(pars)
 
-    powers = results.get_cmb_power_spectra(pars, CMB_unit='muK', raw_cl=True, lmax=lmax)
+    powers = results.get_cmb_power_spectra(pars, CMB_unit='muK', raw_cl=True, lmax=lmax_computation)
     if typeless_bool:
-        return powers
-    return powers[type_power]
+        return {powers_type: powers[powers_type][:true_lmax+1, :] for powers_type in powers}
+    return powers[type_power][:true_lmax+1, :]
 
 
 def generate_CMB_map(nside, lmax, seed=42):
