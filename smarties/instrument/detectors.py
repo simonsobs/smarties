@@ -75,33 +75,61 @@ def save_extended_final_maps(
     print("Saving map into", path_output)
     np.save(path_output, extended_final_maps[:,mask_mpi_from_total_mask!=0])
 
-def get_ellipticities_values_from_interpolation_file(
+def get_ellipticities_values_from_yaml_file(
         detector_features_all, 
         sigma_FWHM,  # arcmin
-        path_interpolation_file
+        path_values,
+        ellipticity_parameter_convention='Third flattening',
+        input_type='ellipticity_parameters'
     ):
+    assert input_type in ['ellipticity_parameters', 'dp_dc', 'delta_sigma_angle'], "input_type must be either 'ellipticity_parameters' or 'dp_dc' or 'delta_sigma_angle'"
+    assert ellipticity_parameter_convention in ['Third flattening', 'Third eccentricity'], "ellipticity_parameter_convention must be either 'Third flattening' or 'Third eccentricity'"
 
-
-    with open(path_interpolation_file) as file:
+    with open(path_values) as file:
         ellipticity_file = yaml.safe_load(file)
 
     sigma_cs = np.asarray(sigma_FWHM) / ((8 * np.log(2)) ** 0.5) * np.pi/(180*60)
 
-    delta_sigma = np.sqrt([
-            ellipticity_file[det_name]['dc']**2 + ellipticity_file[det_name]['dp']**2
+    if input_type == 'dp_dc' or input_type == 'delta_sigma_angle':
+        if input_type == 'dp_dc':
+            delta_sigma = np.sqrt([
+                    ellipticity_file[det_name]['dc']**2 + ellipticity_file[det_name]['dp']**2
+                    for det_name in detector_features_all
+                    ]) * sigma_cs / 2. 
+
+            ellipticity_angle = np.array([
+                np.arctan2(-ellipticity_file[det_name]['dc'], ellipticity_file[det_name]['dp']) /4. 
+                for det_name in (detector_features_all)
+                ])
+        elif input_type == 'delta_sigma_angle':
+            delta_sigma = np.array([
+                ellipticity_file[det_name]['delta_sigma'] 
+                for det_name in detector_features_all
+                ]) * sigma_cs
+
+            ellipticity_angle = np.array([
+                np.deg2rad(ellipticity_file[det_name]['angle']) 
+                for det_name in (detector_features_all)
+                ])
+
+        if ellipticity_parameter_convention == 'Third flattening':
+            # Third flattening
+            # f = (a-b)/(a+b) = (sigma_maj - sigma_min)/(sigma_maj + sigma_min)
+            ellipticity_parameter = delta_sigma / sigma_cs
+        elif ellipticity_parameter_convention == 'Third eccentricity':
+            ellipticity_parameter = (
+                (sigma_cs + delta_sigma)**2 - (sigma_cs - delta_sigma)**2
+                ) / (
+                    (sigma_cs + delta_sigma)**2 + (sigma_cs - delta_sigma)**2
+                )
+    elif input_type == 'ellipticity_parameters':
+        ellipticity_parameter = np.array([
+            ellipticity_file[det_name]['ellipticity_value'] 
             for det_name in detector_features_all
-            ]) * sigma_cs / 2. 
-
-    ellipticity_angle = np.array([
-        np.arctan2(-ellipticity_file[det_name]['dc'], ellipticity_file[det_name]['dp']) /4. 
-        for det_name in (detector_features_all)
-        ])
-
-    ellipticity_parameter = (
-        (sigma_cs + delta_sigma)**2 - (sigma_cs - delta_sigma)**2
-        ) / (
-            (sigma_cs + delta_sigma)**2 + (sigma_cs - delta_sigma)**2
-        )
-
+            ])
+        ellipticity_angle = np.array([
+            np.deg2rad(ellipticity_file[det_name]['ellipticity_angle']) 
+            for det_name in (detector_features_all)
+            ])
+    
     return ellipticity_parameter, ellipticity_angle
-

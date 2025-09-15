@@ -104,17 +104,17 @@ def get_ellipticities_values_from_dp_dc_dictionnary(
         ])
 
     if ellipticity_parameter_convention:
-        ellipticity_parameter = delta_sigma / sigma_cs
+        ellipticity_value = delta_sigma / sigma_cs
     elif ellipticity_parameter_convention == 'Third eccentricity':
-        ellipticity_parameter = ((sigma_cs + delta_sigma)**2 - (sigma_cs - delta_sigma)**2) / ((sigma_cs + delta_sigma)**2 + (sigma_cs - delta_sigma)**2)
+        ellipticity_value = ((sigma_cs + delta_sigma)**2 - (sigma_cs - delta_sigma)**2) / ((sigma_cs + delta_sigma)**2 + (sigma_cs - delta_sigma)**2)
     else:
         raise ValueError(f"Unknown ellipticity parameter convention: {ellipticity_parameter_convention}, must be")
-    return ellipticity_parameter, ellipticity_angle
+    return ellipticity_value, ellipticity_angle
 
 
 def get_differential_ellipticity(
         intensity_CMB,
-        ellipticity_parameter,
+        ellipticity_value,
         ellipse_angle,
         sigma_FWHM,
         lmax=None,
@@ -164,13 +164,13 @@ def get_differential_ellipticity(
     assert np.log(np.sqrt(intensity_CMB.size/12)) / np.log(2) % 1 == 0, 'The intensity_CMB map dimension must be compatible with a full sky healpy map'
     nside = hp.npix2nside(intensity_CMB.size)
 
-    ellipticity_parameter = np.asarray(ellipticity_parameter)
+    ellipticity_value = np.asarray(ellipticity_value)
     ellipse_angle = np.asarray(ellipse_angle)
     sigma_cs = np.asarray(sigma_FWHM) / ((8 * np.log(2)) ** 0.5) * np.pi/(180*60)  # convert from FWHM to sigma_cs, in radians
 
-    assert ellipticity_parameter.ndim == 1, 'The ellipticity array must have only 1 dimension'
-    assert ellipticity_parameter.shape == sigma_cs.shape, 'The ellipticity and sigma_cs maps must have the same shape'
-    assert ellipticity_parameter.shape == ellipse_angle.shape, 'The ellipticity and ellipse angle maps must have the same shape'
+    assert ellipticity_value.ndim == 1, 'The ellipticity array must have only 1 dimension'
+    assert ellipticity_value.shape == sigma_cs.shape, 'The ellipticity and sigma_cs maps must have the same shape'
+    assert ellipticity_value.shape == ellipse_angle.shape, 'The ellipticity and ellipse angle maps must have the same shape'
 
     if mask is None:
         mask_bool = ...
@@ -192,7 +192,7 @@ def get_differential_ellipticity(
 
     rotation_matrix_ellipse_angle = get_rotation_matrix(ellipse_angle)
     delta_sigma = get_ellipse_deviation(
-        ellipticity_parameter, 
+        ellipticity_value, 
         sigma_cs,
         ellipticity_parameter_convention=ellipticity_parameter_convention)
 

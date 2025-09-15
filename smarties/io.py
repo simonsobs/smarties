@@ -62,8 +62,8 @@ def read_file(name_file:str, format_file:str='fits', mask:np.ndarray=None):
         if not name_file.endswith('.npz'):
             name_file = name_file + '.npz'
         return np.load(name_file) #, allow_pickle=True)
-    elif format_file == 'h5':
-        return h5py.File(name_file+'.hdf5', "r")
+    elif format_file in ['h5', 'hdf5', 'H5', 'hdf']:
+        return hp.reorder(h5py.File(name_file+'.hdf5', "r")['map'], n2r=True)
 
     else:
         raise ValueError("Unknown format: {}".format(format_file))
@@ -228,7 +228,7 @@ def read_detectors_h_n_file_dictionary(
     assert np.unique(list_spin).size == np.array(list_spin).size, 'The list of spins must be unique'
     assert (np.array(list_spin) > 0).all(), 'The spins provided must be positive, their negative counterpart will be computed from the components read'
 
-    assert format_file == 'npz' or format_file == 'h5' or format_file == 'fits'
+    assert format_file == 'npz' or format_file in ['h5', 'hdf5', 'H5', 'hdf'] or format_file == 'fits'
 
     number_detectors_prefix = len(list_prefix)
     n_det = len(list_name_files) * number_detectors_prefix
@@ -260,19 +260,24 @@ def read_detectors_h_n_file_dictionary(
         ) # Initialize dictionary for spins
 
     for j, name_file in enumerate(tqdm(list_name_files)):
-        if format_file != 'fits':
-            spin_h_n = read_file(name_file, format_file=format_file)
-        else:
-            spin_h_n = dict()
-            for spin in list_spin:
-                for prefix in list_prefix:
-                    spin_h_n[prefix+'sin_{}'.format(spin)] = read_file(name_file+'_{}_sin_{}'.format(prefix.replace('_',''),spin), format_file=format_file)
-                    spin_h_n[prefix+'cos_{}'.format(spin)] = read_file(name_file+'_{}_cos_{}'.format(prefix.replace('_',''),spin), format_file=format_file)
+        # if format_file != 'fits':
+        #     spin_h_n = read_file(name_file, format_file=format_file)
+        # else:
+        spin_h_n = dict()
+        if format_file == 'fits':
+            ellipsis_1 = ...
+        elif format_file == 'hdf5' or format_file == 'h5':
+            ellipsis_1 = 0
+
+        for spin in list_spin:
+            for prefix in list_prefix:
+                spin_h_n[prefix+'sin_{}'.format(spin)] = read_file(name_file+'_{}_sin_{}'.format(prefix.replace('_',''),spin), format_file=format_file)
+                spin_h_n[prefix+'cos_{}'.format(spin)] = read_file(name_file+'_{}_cos_{}'.format(prefix.replace('_',''),spin), format_file=format_file)
 
         for spin in list_spin:
             for count_prefix, prefix in enumerate(list_prefix):
-                sin_spin_h_n = spin_h_n[prefix+'sin_{}'.format(spin)][bool_mask]
-                cos_spin_h_n = spin_h_n[prefix+'cos_{}'.format(spin)][bool_mask]
+                sin_spin_h_n = spin_h_n[prefix+'sin_{}'.format(spin)][ellipsis_1][bool_mask]
+                cos_spin_h_n = spin_h_n[prefix+'cos_{}'.format(spin)][ellipsis_1][bool_mask]
                 # h_n_dictionary[spin].append((cos_spin_h_n + 1j * sin_spin_h_n)[np.newaxis,...] * list_weights[j])
                 # h_n_dictionary[-spin].append((cos_spin_h_n - 1j * sin_spin_h_n)[np.newaxis,...] * list_weights[j])
                 h_n_dictionary[spin][j*number_detectors_prefix + count_prefix,...] = (cos_spin_h_n + 1j * sin_spin_h_n) * list_weights[j]
@@ -354,41 +359,40 @@ def build_mask_from_h_n_maps(
     except ImportError:
         raise ImportError('tqdm is not installed. Please install it with "pip install tqdm"')
 
-    assert format_file == 'npz' or format_file == 'h5' or format_file == 'fits'
-
+    assert format_file == 'npz' or format_file in ['h5', 'hdf5', 'H5', 'hdf'] or format_file == 'fits'
 
     
-    if format_file != 'fits':
-        dict_spin_h_n = read_file(list_name_files[0], format_file=format_file)
-        mask = np.zeros_like(
-            dict_spin_h_n[list_prefix[0]+'cos_{}'.format(spin_to_read)], 
-            dtype=np.float64)
-    else:
-        mask = np.zeros_like(
-            read_file(
-                list_name_files[0]+'_{}_sin_{}'.format(list_prefix[0].replace('_',''),spin_to_read), format_file=format_file), 
-            dtype=np.float64)
+    # if format_file != 'fits':
+    #     dict_spin_h_n = read_file(list_name_files[0], format_file=format_file)
+    #     mask = np.zeros_like(
+    #         dict_spin_h_n[list_prefix[0]+'cos_{}'.format(spin_to_read)], 
+    #         dtype=np.float64)
+    # else:
+    mask = np.zeros_like(
+        read_file(
+            list_name_files[0]+'_{}_sin_{}'.format(list_prefix[0].replace('_',''),spin_to_read), format_file=format_file), 
+        dtype=np.float64).ravel()
     mask_detectors = np.int64(np.bool(mask))
 
     
     for name_file in tqdm(list_name_files):
-        if format_file != 'fits':
-            dict_spin_h_n = read_file(name_file, format_file=format_file)
-            map_cos_sin += np.abs(dict_spin_h_n[prefix+'cos_{}'.format(spin_to_read)]) + np.abs(dict_spin_h_n[prefix+'sin_{}'.format(spin_to_read)])
+        # if format_file != 'fits':
+        #     dict_spin_h_n = read_file(name_file, format_file=format_file)
+        #     map_cos_sin += np.abs(dict_spin_h_n[prefix+'cos_{}'.format(spin_to_read)]) + np.abs(dict_spin_h_n[prefix+'sin_{}'.format(spin_to_read)])
+        #     mask += map_cos_sin
+        #     mask_detectors += np.int64(np.bool(map_cos_sin))
+        # else:
+        for prefix in list_prefix:
+            map_cos_sin = np.abs(read_file(
+                name_file+'_{}_sin_{}'.format(prefix.replace('_',''),spin_to_read), 
+                format_file=format_file
+            )).ravel() + np.abs(read_file(
+                name_file+'_{}_cos_{}'.format(prefix.replace('_',''),spin_to_read), 
+                format_file=format_file
+            )).ravel()
             mask += map_cos_sin
             mask_detectors += np.int64(np.bool(map_cos_sin))
-        else:
-            for prefix in list_prefix:
-                map_cos_sin = np.abs(read_file(
-                    name_file+'_{}_sin_{}'.format(prefix.replace('_',''),spin_to_read), 
-                    format_file=format_file
-                )) + np.abs(read_file(
-                    name_file+'_{}_cos_{}'.format(prefix.replace('_',''),spin_to_read), 
-                    format_file=format_file
-                ))
-                mask += map_cos_sin
-                mask_detectors += np.int64(np.bool(map_cos_sin))
-                # print(name_file, np.int8(np.bool(map_cos_sin))[np.int8(np.bool(map_cos_sin))<0])
+            # print(name_file, np.int8(np.bool(map_cos_sin))[np.int8(np.bool(map_cos_sin))<0])
         
 
     if return_detectors_hits:
