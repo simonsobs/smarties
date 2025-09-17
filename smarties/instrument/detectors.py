@@ -1,3 +1,4 @@
+from copy import deepcopy
 import numpy as np
 import yaml
 import quaternionarray as qa
@@ -133,3 +134,51 @@ def get_ellipticities_values_from_yaml_file(
             ])
     
     return ellipticity_parameter, ellipticity_angle
+
+def get_detector_names_from_yaml_file(
+        path_yaml
+    ):
+
+    with open(path_yaml) as file:
+        dictionary_detector = yaml.safe_load(file)
+        
+    detector_features = []
+
+    def fill_pixels_interval(pixel_name):
+        if ':' in pixel_name:
+            first_last_pixels = pixel_name.split(':')
+            return ['p' + str(i).zfill(3) for i in range(
+                int(first_last_pixels[0].split('p')[-1]),
+                int(first_last_pixels[1].split('p')[-1]) + 1
+                )
+            ]
+        else:
+            return [pixel_name]
+
+    # The same pixels are assumed for all wafers 
+    default_pixels = dictionary_detector['detector_wafers']['default']
+    for wafer, pixels in dictionary_detector['detector_wafers'].items():
+        if wafer == 'default':
+            continue
+        if 'default' in pixels:
+            pixel_distribution_chosen = default_pixels
+        else:
+            pixel_distribution_chosen = pixels
+
+        if type(pixel_distribution_chosen) is str and ':' not in pixel_distribution_chosen:
+            pixel_distribution_chosen = [pixel_distribution_chosen]
+        if ':' in pixel_distribution_chosen:
+            pixel_distribution_chosen = fill_pixels_interval(pixel_distribution_chosen)
+        
+        count_size = 0
+        for j, pixel in enumerate(deepcopy(pixel_distribution_chosen)):
+            if ':' in pixel:
+                filled_pixels = fill_pixels_interval(pixel)
+                pixel_distribution_chosen = pixel_distribution_chosen[:j + count_size] + filled_pixels + pixel_distribution_chosen[j+1+count_size:]
+                count_size += len(filled_pixels) - 1
+            
+        for pixel in pixel_distribution_chosen:
+            for suffix in dictionary_detector['h_n']['list_suffix']:
+                str_detector_h_n = wafer + '_' + pixel + suffix
+                detector_features.append(str_detector_h_n)
+    return detector_features
