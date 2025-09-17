@@ -22,8 +22,9 @@ from smarties.hn import Spin_maps
 def read_file(
         name_file:str, 
         format_file:str='fits', 
-        mask:np.ndarray=None,
-        reorder: bool=False
+        boolean_mask:np.ndarray=None,
+        reorder: bool=False,
+        dtype=np.float64,
     ):
     """
     Read the $h_n$ maps as provided either in FITS, NPY or NPZ
@@ -39,7 +40,7 @@ def read_file(
     format_file: str
         String indicated the format of the file to be read, must be 
         either 'fits', 'npy' or 'npz' otherwise a ValueError is raised 
-    mask: array[bool] | Ellipsis
+    boolean_mask: array[bool] | Ellipsis
         Optional, boolean array corresponding to the selected pixels in 
         the array to retain after loading the file. By default, return 
         all pixels. Note that this option is not active for 'npz' format
@@ -50,19 +51,20 @@ def read_file(
         Array containing the $h_n$ map read, from which only the relevant
         pixels are possibly retained. 
     """
-    if mask is None:
-        mask_bool = ...
-    else:
-        mask_bool = mask != 0
+    if boolean_mask is None:
+        boolean_mask = ...
+    # else:
+    #     boolean_mask = mask != 0
 
     if format_file == 'fits':
         if not name_file.endswith('.fits'):
             name_file = name_file + '.fits'
-        return hp.read_map(name_file)[mask_bool]
+        return hp.read_map(name_file)[boolean_mask]
     elif format_file == 'npy':
         if not name_file.endswith('.npy'):
             name_file = name_file + '.npy'
-        return np.load(name_file)[mask_bool]
+        # return np.load(name_file)[boolean_mask]
+        return np.memmap(name_file, mode='r', dtype=dtype)[boolean_mask]
     elif format_file == 'npz':
         if not name_file.endswith('.npz'):
             name_file = name_file + '.npz'
@@ -72,7 +74,7 @@ def read_file(
             reorder_function = lambda x: hp.reorder(x, n2r=True)
         else:
             reorder_function = lambda x: x
-        return reorder_function(h5py.File(name_file+'.hdf5', "r")['map'])
+        return reorder_function(h5py.File(name_file+'.hdf5', "r")['map'][0])
     else:
         raise ValueError("Unknown format: {}".format(format_file))
 
@@ -164,16 +166,16 @@ def read_detectors_h_n_maps(
         list_weights = np.ones(n_det, dtype=float) / n_det
     
     if mask is None:
-        bool_mask = ...
+        boolean_mask = ...
     elif mask is not None:
-        bool_mask = np.array(mask, dtype=bool)
+        boolean_mask = np.array(mask, dtype=bool)
 
-    h_n_spin_dict = Spin_maps.from_dictionary(read_h_n_file(list_name_files[0], list_spin=list_spin, mask=bool_mask, format_file=format_file))
+    h_n_spin_dict = Spin_maps.from_dictionary(read_h_n_file(list_name_files[0], list_spin=list_spin, mask=boolean_mask, format_file=format_file))
     for spin in h_n_spin_dict.spins:
         h_n_spin_dict[spin] *= list_weights[0]
 
     for i, path_h_n_maps in enumerate(list_name_files[1:]):
-        h_n_spin_dict_to_add = Spin_maps.from_dictionary(read_h_n_file(path_h_n_maps, list_spin=list_spin, mask=bool_mask, format_file=format_file))
+        h_n_spin_dict_to_add = Spin_maps.from_dictionary(read_h_n_file(path_h_n_maps, list_spin=list_spin, mask=boolean_mask, format_file=format_file))
         for spin in h_n_spin_dict.spins:
             h_n_spin_dict[spin] = np.vstack((h_n_spin_dict[spin],h_n_spin_dict_to_add[spin]*list_weights[i+1]))
     return h_n_spin_dict
@@ -252,23 +254,13 @@ def read_detectors_h_n_file_dictionary(
         list_weights = np.ones(n_det, dtype=float) / n_det
     
     if mask is None:
-        bool_mask = ...
+        boolean_mask = ...
     elif mask is not None:
-        bool_mask = np.bool(mask)
+        boolean_mask = np.bool(mask)
 
     total_list_spin = list_spin + [-spin for spin in list_spin]
 
-    if mask is None:
-        if format_file != 'fits':
-            n_pix = read_file(list_name_files[0], format_file=format_file)[list_prefix[0]+'sin_{}'.format(list_spin[0])][bool_mask].size
-        else:
-            n_pix = read_file(
-                list_name_files[0]+'_{}_sin_{}'.format(list_prefix[0].replace('_',''), list_spin[0]), 
-                format_file=format_file,
-                mask=bool_mask
-            ).size
-    else:
-        n_pix = bool_mask[bool_mask].size
+    n_pix = boolean_mask[boolean_mask].size
 
     h_n_dictionary = Spin_maps.from_dictionary(
             {spin: np.zeros((n_det, n_pix), dtype=dtype) for spin in total_list_spin}
@@ -279,26 +271,24 @@ def read_detectors_h_n_file_dictionary(
         #     spin_h_n = read_file(name_file, format_file=format_file)
         # else:
         spin_h_n = dict()
-        if format_file == 'fits':
-            ellipsis_1 = ...
-        elif format_file == 'hdf5' or format_file == 'h5':
-            ellipsis_1 = 0
 
         for spin in list_spin:
             for prefix in list_prefix:
                 spin_h_n[prefix+'sin_{}'.format(spin)] = read_file(
                     name_file+'_{}_sin_{}'.format(prefix.replace('_',''),spin), 
-                    format_file=format_file
+                    format_file=format_file,
+                    boolean_mask=boolean_mask,
                 )
                 spin_h_n[prefix+'cos_{}'.format(spin)] = read_file(
                     name_file+'_{}_cos_{}'.format(prefix.replace('_',''),spin), 
-                    format_file=format_file
+                    format_file=format_file,
+                    boolean_mask=boolean_mask,
                 )
 
         for spin in list_spin:
             for count_prefix, prefix in enumerate(list_prefix):
-                sin_spin_h_n = spin_h_n[prefix+'sin_{}'.format(spin)][ellipsis_1][bool_mask]
-                cos_spin_h_n = spin_h_n[prefix+'cos_{}'.format(spin)][ellipsis_1][bool_mask]
+                sin_spin_h_n = spin_h_n[prefix+'sin_{}'.format(spin)]
+                cos_spin_h_n = spin_h_n[prefix+'cos_{}'.format(spin)]
                 # h_n_dictionary[spin].append((cos_spin_h_n + 1j * sin_spin_h_n)[np.newaxis,...] * list_weights[j])
                 # h_n_dictionary[-spin].append((cos_spin_h_n - 1j * sin_spin_h_n)[np.newaxis,...] * list_weights[j])
                 
@@ -390,13 +380,6 @@ def build_mask_from_h_n_maps(
 
     assert format_file == 'npz' or format_file in ['h5', 'hdf5', 'H5', 'hdf'] or format_file == 'fits'
 
-    
-    # if format_file != 'fits':
-    #     dict_spin_h_n = read_file(list_name_files[0], format_file=format_file)
-    #     mask = np.zeros_like(
-    #         dict_spin_h_n[list_prefix[0]+'cos_{}'.format(spin_to_read)], 
-    #         dtype=np.float64)
-    # else:
     mask = np.zeros_like(
         read_file(
             list_name_files[0]+'_{}_sin_{}'.format(list_prefix[0].replace('_',''),spin_to_read), format_file=format_file), 
@@ -405,12 +388,6 @@ def build_mask_from_h_n_maps(
 
     
     for name_file in tqdm(list_name_files):
-        # if format_file != 'fits':
-        #     dict_spin_h_n = read_file(name_file, format_file=format_file)
-        #     map_cos_sin += np.abs(dict_spin_h_n[prefix+'cos_{}'.format(spin_to_read)]) + np.abs(dict_spin_h_n[prefix+'sin_{}'.format(spin_to_read)])
-        #     mask += map_cos_sin
-        #     mask_detectors += np.int64(np.bool(map_cos_sin))
-        # else:
         for prefix in list_prefix:
             map_cos_sin = np.abs(read_file(
                 name_file+'_{}_sin_{}'.format(prefix.replace('_',''),spin_to_read), 
