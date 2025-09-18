@@ -201,7 +201,7 @@ class FrameworkSystematics(object):
         if spin_systematics_maps is not None:
             assert np.allclose([spin_systematics_maps[spin].ndim for spin in spin_systematics_maps.keys() if spin != 0 ], 2), 'The systematics maps must be 2D arrays of shape (n_det, n_pix)'
 
-        assert np.abs(h_n_spin_dict[0].sum() - 1) < 1e-14, 'The h_n maps must be normalized'
+        assert np.all(np.abs(h_n_spin_dict[0].sum(axis=0) - 1) < 1e-14), 'The h_n maps must be normalized'
 
         if mask is None:
             mask = np.ones(12 * self.nside ** 2, dtype=np.int8)
@@ -209,17 +209,20 @@ class FrameworkSystematics(object):
         # Masking the h_n maps, CMB maps and systematics maps
         observed_pixels_array = mask != 0
         if mask_input:
-            h_n_spin_dict = Spin_maps.from_dictionary({spin: h_n_spin_dict[spin][...,observed_pixels_array] if np.size(h_n_spin_dict[spin][0,...]) == mask.size else h_n_spin_dict[spin] for spin in h_n_spin_dict.keys()})
-            spin_sky_maps = Spin_maps.from_dictionary({spin: spin_sky_maps[spin][...,observed_pixels_array] if np.size(spin_sky_maps[spin]) == mask.size else spin_sky_maps[spin] for spin in spin_sky_maps.keys()})
+            h_n_spin_dict = Spin_maps.from_dictionary({spin: h_n_spin_dict[spin][...,observed_pixels_array] 
+                                                       if np.size(h_n_spin_dict[spin][0,...]) == mask.size else h_n_spin_dict[spin] for spin in h_n_spin_dict.keys()})
+            spin_sky_maps = Spin_maps.from_dictionary({spin: spin_sky_maps[spin][...,observed_pixels_array] 
+                                                       if np.size(spin_sky_maps[spin]) == mask.size else spin_sky_maps[spin] for spin in spin_sky_maps.keys()})
             if spin_systematics_maps is not None:
-                spin_systematics_maps = Spin_maps.from_dictionary({spin: spin_systematics_maps[spin][...,observed_pixels_array] if np.size(spin_systematics_maps[spin][0,...]) == mask.size else spin_systematics_maps[spin] for spin in spin_systematics_maps.keys()})
+                spin_systematics_maps = Spin_maps.from_dictionary({spin: spin_systematics_maps[spin][...,observed_pixels_array] 
+                                                                   if np.size(spin_systematics_maps[spin][0,...]) == mask.size else spin_systematics_maps[spin] for spin in spin_systematics_maps.keys()})
         # else: 
         #     spin_sky_maps = Spin_maps.from_dictionary(spin_sky_maps)
 
         if polar_angle is None:
             polar_angle_coeff = {spin: np.ones(h_n_spin_dict[0].shape[0], dtype=np.complex64) for spin in h_n_spin_dict.spins} # Default is to not apply any polar angle, i.e. the detectors are all aligned in the same direction
         else:
-            assert polar_angle.size == h_n_spin_dict[0].size, 'The polar angle map must have the same shape as the h_n maps'
+            assert polar_angle.size == h_n_spin_dict[0].shape[0], 'The polar angle map must have the same shape as the h_n maps'
             polar_angle_coeff = {spin: np.exp(spin * 1j * polar_angle) for spin in h_n_spin_dict.spins}
         
         if correct_polar_angle_h_n:
@@ -263,7 +266,7 @@ class FrameworkSystematics(object):
 
             # TODO: Remove print
             print(f'Coupled spins for spin {spin}: {coupled_spins}', flush=True)
-            
+
             # \sum_{k' = -\infty}^{\infty} h_{k-k'} S_{k'} on all (k-k', k') pairs
             for tuple_spins in coupled_spins:
                 spin_coupled_maps[...,i] += factor_dict[spin] * contract(
