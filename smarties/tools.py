@@ -84,7 +84,12 @@ def get_row_mapmaking_matrix(
 
     factor_func = lambda x: 1 if x == 0 else .5
 
-    mapmaking_matrix_row = np.zeros((h_n_spin_dict[2].shape[-1], len(list_spin_input)), dtype=dtype)
+    mapmaking_matrix_row = np.zeros(
+        (h_n_spin_dict[2].shape[-1], 
+         len(list_spin_input)
+        ), 
+        dtype=dtype
+    )
     for i, spin_name in enumerate(list_spin_input):
         mapmaking_matrix_row[:,i] = factor_func(reference_spin) * factor_func(spin_name) * contract('d...,d...->...', polar_angle_coeff[spin_name-reference_spin], h_n_spin_dict[spin_name-reference_spin])
 
