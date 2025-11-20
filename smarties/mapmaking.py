@@ -120,7 +120,12 @@ class FrameworkSystematics(object):
             # assert mask.size == 12 * self.nside **2, 'The mask must be a HEALPix map of the same size as the h_n maps'
             observed_pixels_array = mask != 0
             if mask_input:
-                h_n_spin_dict = Spin_maps.from_dictionary({spin: h_n_spin_dict[spin][...,observed_pixels_array] if np.size(h_n_spin_dict[spin][0,...]) == mask.size else h_n_spin_dict[spin] for spin in h_n_spin_dict.keys()})
+                h_n_spin_dict = Spin_maps.from_dictionary(
+                    {spin: h_n_spin_dict[spin][...,observed_pixels_array] 
+                     if np.size(h_n_spin_dict[spin][0,...]) == mask.size 
+                     else h_n_spin_dict[spin] 
+                     for spin in h_n_spin_dict.keys()}
+                    )
             
             npix = mask[observed_pixels_array].size
         else:    
@@ -153,7 +158,8 @@ class FrameworkSystematics(object):
             return_inverse_mapmaking_matrix: bool = False,
             mask_input: bool = True,
             polar_angle: np.ndarray = None,
-            correct_polar_angle_h_n: bool = False
+            correct_polar_angle_h_n: bool = False,
+            projector_h_n: np.ndarray = None
         ):
         """
         Compute the total maps from the $h_n$ maps, the spin CMB maps and the spin systematics maps
@@ -201,6 +207,17 @@ class FrameworkSystematics(object):
         if spin_systematics_maps is not None:
             assert np.allclose([spin_systematics_maps[spin].ndim for spin in spin_systematics_maps.keys() if spin != 0 ], 2), 'The systematics maps must be 2D arrays of shape (n_det, n_pix)'
 
+        if projector_h_n is not None:
+            assert np.all(
+                np.isin(np.unique(projector_h_n), np.arange(h_n_spin_dict[0].shape[-1]))
+            ), 'The projector_h_n must contain valid pixel indices'
+            assert projector_h_n.size == spin_systematics_maps[list(spin_systematics_maps.keys())[0]].shape[-1], 'The projector_h_n must have the same size as the number of pixels in the systematics maps'
+            assert issubclass(
+                projector_h_n.dtype.type, np.integer
+            ), 'The projector_h_n must be an array of integers'
+        else:
+            projector_h_n = ... # Use all pixels
+
         assert np.all(np.abs(h_n_spin_dict[0].sum(axis=0) - 1) < 1e-14), 'The h_n maps must be normalized'
 
         if mask is None:
@@ -209,18 +226,27 @@ class FrameworkSystematics(object):
         # Masking the h_n maps, CMB maps and systematics maps
         observed_pixels_array = mask != 0
         if mask_input:
-            h_n_spin_dict = Spin_maps.from_dictionary({spin: h_n_spin_dict[spin][...,observed_pixels_array] 
-                                                       if np.size(h_n_spin_dict[spin][0,...]) == mask.size else h_n_spin_dict[spin] for spin in h_n_spin_dict.keys()})
-            spin_sky_maps = Spin_maps.from_dictionary({spin: spin_sky_maps[spin][...,observed_pixels_array] 
-                                                       if np.size(spin_sky_maps[spin]) == mask.size else spin_sky_maps[spin] for spin in spin_sky_maps.keys()})
+            h_n_spin_dict = Spin_maps.from_dictionary(
+                {spin: h_n_spin_dict[spin][...,observed_pixels_array] 
+                 if np.size(h_n_spin_dict[spin][0,...]) == mask.size 
+                 else h_n_spin_dict[spin] for spin in h_n_spin_dict.keys()}
+            )
+            spin_sky_maps = Spin_maps.from_dictionary(
+                {spin: spin_sky_maps[spin][...,observed_pixels_array] 
+                 if np.size(spin_sky_maps[spin]) == mask.size 
+                 else spin_sky_maps[spin] for spin in spin_sky_maps.keys()}
+            )
             if spin_systematics_maps is not None:
-                spin_systematics_maps = Spin_maps.from_dictionary({spin: spin_systematics_maps[spin][...,observed_pixels_array] 
-                                                                   if np.size(spin_systematics_maps[spin][0,...]) == mask.size else spin_systematics_maps[spin] for spin in spin_systematics_maps.keys()})
+                spin_systematics_maps = Spin_maps.from_dictionary(
+                    {spin: spin_systematics_maps[spin][...,observed_pixels_array] 
+                     if np.size(spin_systematics_maps[spin][0,...]) == mask.size 
+                     else spin_systematics_maps[spin] for spin in spin_systematics_maps.keys()}
+                )
         # else: 
         #     spin_sky_maps = Spin_maps.from_dictionary(spin_sky_maps)
 
         if polar_angle is None:
-            polar_angle_coeff = {spin: np.ones(h_n_spin_dict[0].shape[0], dtype=np.complex64) for spin in h_n_spin_dict.spins} # Default is to not apply any polar angle, i.e. the detectors are all aligned in the same direction
+            polar_angle_coeff = {spin: np.ones(h_n_spin_dict[0].shape[0], dtype=complex) for spin in h_n_spin_dict.spins} # Default is to not apply any polar angle, i.e. the detectors are all aligned in the same direction
         else:
             assert polar_angle.size == h_n_spin_dict[0].shape[0], 'The polar angle map must have the same shape as the h_n maps'
             polar_angle_coeff = {spin: np.exp(spin * 1j * polar_angle) for spin in h_n_spin_dict.spins}
@@ -272,7 +298,7 @@ class FrameworkSystematics(object):
                 spin_coupled_maps[...,i] += factor_dict[spin] * contract(
                     'd,d...,d...->...', 
                     polar_angle_coeff[spin], 
-                    h_n_spin_dict[tuple_spins[0]], 
+                    h_n_spin_dict[tuple_spins[0]][projector_h_n], 
                     spin_systematics_maps[tuple_spins[1]] 
                     + contract(
                         'd,p->dp', 
@@ -293,7 +319,7 @@ class FrameworkSystematics(object):
 
         print("Computing the final CMB fields...", flush=True)
         # Finally, compute the final CMB fields
-        final_CMB_fields = contract('pij,pj->ip', inverse_mapmaking_matrix, spin_coupled_maps)
+        final_CMB_fields = contract('pij,pj->ip', inverse_mapmaking_matrix[projector_h_n], spin_coupled_maps)
 
         print("Final CMB fields computed, transforming them into Spin_maps...", flush=True)
         dict_final_CMB_fields = Spin_maps.from_list_maps(final_CMB_fields, self.list_spin_output)
