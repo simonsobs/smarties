@@ -19,6 +19,13 @@ from opt_einsum import contract
 
 from smarties.hn import Spin_maps
 
+list_conventions = [
+    'Third flattening', 
+    'Third eccentricity',
+    'Modified second flattening',
+    'Plus-Cross ellipticity'
+]
+
 def get_coupled_spin(reference_spin, available_h_n_spin, available_signal_spins):
     """
     Get the coupled spins for a reference spin $k$ given a set of $h_n$ and signal spin maps, involved in a typical sum: 
@@ -91,7 +98,14 @@ def get_row_mapmaking_matrix(
         dtype=dtype
     )
     for i, spin_name in enumerate(list_spin_input):
-        mapmaking_matrix_row[:,i] = factor_func(reference_spin) * factor_func(spin_name) * contract('d...,d...->...', polar_angle_coeff[spin_name-reference_spin], h_n_spin_dict[spin_name-reference_spin])
+        mapmaking_matrix_row[:,i] = (
+            factor_func(reference_spin) 
+            * factor_func(spin_name) 
+            * contract(
+                'd...,d...->...', 
+                polar_angle_coeff[spin_name-reference_spin], 
+                h_n_spin_dict[spin_name-reference_spin])
+            )
 
     return mapmaking_matrix_row
 
@@ -241,3 +255,149 @@ def save_partial_spin_maps_as_healpy(
 
     print("Saving map into", path_output)
     np.save(path_output, extended_final_maps[:,mask_mpi_from_total_mask!=0])
+
+
+def convert_ellipticities_conventions(
+        dictionary_ellipticities, 
+        sigma_FWHM,  # arcmin
+        input_ellipticity_convention='Third flattening',
+        output_ellipticity_convention='Third flattening'
+    ):
+    """
+    Convert ellipticity parameters from one convention to another.
+    The current supported conventions are:
+        * 'Third flattening': f = (a-b)/(a+b) = (sigma_maj - sigma_min)/(sigma_maj + sigma_min)
+        * 'Third eccentricity': e = sqrt((a^2 - b^2)/a^2) = sqrt(sigma_maj^2 - sigma_min^2)/(sigma_maj^2 + sigma_min^2)
+        * 'Modified second flattening': e = a/b = sigma_maj / sigma_min
+        * 'Plus-Cross ellipticity': dp = 2 f cos (2 theta), dc = 2 f sin (2 theta), with f the third flattening and theta the ellipticity angle.
+
+
+    Parameters
+    ----------
+    dictionary_ellipticities: dict
+        Dictionary containing the ellipticity parameters to convert.
+        The keys must be:
+            * 'ellipticity_value' and 'ellipticity_angle' for 'Third flattening', 
+            'Third eccentricity' and 'Modified second flattening' conventions.
+            * 'dp' and 'dc' for 'Plus-Cross ellipticity' convention.
+    sigma_FWHM: float or np.ndarray
+        Beam full-width at half-maximum (FWHM) in arcminutes.
+    input_ellipticity_convention: str
+        Convention of the input ellipticity parameters. Must be one of the following:
+            * 'Third flattening'
+            * 'Third eccentricity'
+            * 'Modified second flattening'
+            * 'Plus-Cross ellipticity'
+    output_ellipticity_convention: str
+        Convention of the output ellipticity parameters. Must be one of the following:
+            * 'Third flattening'
+            * 'Third eccentricity'
+            * 'Modified second flattening'
+            * 'Plus-Cross ellipticity'
+        
+    Returns
+    -------
+    converted_ellipticities: dict
+        Dictionary containing the converted ellipticity parameters in the desired convention.
+    """
+    assert input_ellipticity_convention in list_conventions, "ellipticity_parameter_convention must be an element of the list of supported conventions {list_conventions}"
+    assert output_ellipticity_convention in list_conventions, "ellipticity_parameter_convention must be an element of the list of supported conventions {list_conventions}"
+
+    sigma_cs = np.asarray(sigma_FWHM) / ((8 * np.log(2)) ** 0.5) * np.pi/(180*60)
+
+    for key, item in dictionary_ellipticities.items():
+        dictionary_ellipticities[key] = np.asarray(item)
+
+    # if input_ellipticity_convention == output_ellipticity_convention:
+    #     return dictionary_ellipticities
+
+    if input_ellipticity_convention == 'Plus-Cross ellipticity':
+        delta_sigma = np.sqrt(
+                dictionary_ellipticities['dc']**2 + dictionary_ellipticities['dp']**2
+            ) * sigma_cs / 2. 
+
+        ellipticity_angle = np.arctan2(
+            dictionary_ellipticities['dc'], 
+            dictionary_ellipticities['dp']
+        ) /2.
+
+    elif input_ellipticity_convention == 'Modified second flattening':
+        # Modified second flattening
+        # e = a/b = sigma_maj / sigma_min
+
+        assert np.all(dictionary_ellipticities['ellipticity_value'] >= 1), "For the Modified second flattening convention, ellipticity_value must be >= 1, with value 1 corresponding to a circular beam."
+
+        delta_sigma = sigma_cs * (dictionary_ellipticities['ellipticity_value'] - 1) / (dictionary_ellipticities['ellipticity_value'] + 1)
+
+        ellipticity_angle = dictionary_ellipticities['ellipticity_angle']
+
+    elif input_ellipticity_convention == 'Third flattening':
+        # Third flattening
+        # f = (a-b)/(a+b) = (sigma_maj - sigma_min)/(sigma_maj + sigma_min)
+
+        assert np.all(
+            np.logical_and(
+                dictionary_ellipticities['ellipticity_value'] >= 0, 
+                dictionary_ellipticities['ellipticity_value'] <= 1
+            )
+        ), "For the Third flattening convention, ellipticity_value must be between 0 and 1, with value 0 corresponding to a circular beam."
+        
+        delta_sigma = dictionary_ellipticities['ellipticity_value'] * sigma_cs
+        ellipticity_angle = dictionary_ellipticities['ellipticity_angle']
+        
+    elif input_ellipticity_convention == 'Third eccentricity':
+        # Third eccentricity
+        # e = sqrt((a^2 - b^2)/a^2) = sqrt(sigma_maj^2 - sigma_min^2)/(sigma_maj^2 + sigma_min^2)j
+
+        assert np.all(
+            np.logical_and(
+                dictionary_ellipticities['ellipticity_value'] >= 0, 
+                dictionary_ellipticities['ellipticity_value'] < 1
+            )
+        ), "For the Third eccentricity convention, ellipticity_value must be between 0 and 1, with value 0 corresponding to a circular beam."
+
+        delta_sigma = np.where(
+            dictionary_ellipticities['ellipticity_value'] != 0,
+            2 * sigma_cs * (1 - np.sqrt(1 - dictionary_ellipticities['ellipticity_value'] ** 2)) / dictionary_ellipticities['ellipticity_value'],
+            0
+        )/2. # the formula is not defined for ellipticity = 0, which correspond to a circular beam where the deviation is 0
+        ellipticity_angle = dictionary_ellipticities['ellipticity_angle']
+    else:
+        raise ValueError("input_ellipticity_convention must be an element of the list of supported conventions {list_conventions}")
+
+
+
+
+    if output_ellipticity_convention == 'Plus-Cross ellipticity':
+        ellipticity_value_dp = (delta_sigma * 2. / sigma_cs) * np.cos(2 * ellipticity_angle)
+        ellipticity_value_dc = (delta_sigma * 2. / sigma_cs) * np.sin(2 * ellipticity_angle)
+        
+        return {
+            'dc': ellipticity_value_dc,
+            'dp': ellipticity_value_dp
+        }
+    elif output_ellipticity_convention == 'Modified second flattening':
+        ellipticity_value = (sigma_cs + delta_sigma) / (sigma_cs - delta_sigma)
+        return {
+            'ellipticity_value': ellipticity_value,
+            'ellipticity_angle': ellipticity_angle
+        }
+    elif output_ellipticity_convention == 'Third flattening':
+        ellipticity_value = delta_sigma / sigma_cs
+        return {
+            'ellipticity_value': ellipticity_value,
+            'ellipticity_angle': ellipticity_angle
+        }
+    elif output_ellipticity_convention == 'Third eccentricity':
+        ellipticity_value = (
+            (sigma_cs + delta_sigma)**2 - (sigma_cs - delta_sigma)**2
+            ) / (
+                (sigma_cs + delta_sigma)**2 + (sigma_cs - delta_sigma)**2
+            )
+        return {
+            'ellipticity_value': ellipticity_value,
+            'ellipticity_angle': ellipticity_angle
+        }
+    else:
+        raise ValueError("output_ellipticity_convention must be an element of the list of supported conventions {list_conventions}")
+    
