@@ -14,6 +14,8 @@
 # You should have received a copy of the GNU General Public License
 # along with SMARTIES. If not, see <https://www.gnu.org/licenses/>.
 
+import os
+import yaml
 import numpy as np
 import healpy as hp
 from opt_einsum import contract
@@ -347,3 +349,46 @@ def build_mask_from_h_n_maps(
     if return_detectors_hits:
         return reorder_output(np.int8(np.bool(mask))), reorder_output(mask_detectors)
     return reorder_output(np.int8(np.bool(mask)))
+
+def read_ellipticity_values_from_yaml_file(
+        path_values_ellipticity: str,
+        transform_into_dict: bool=False,
+        detector_features_all: list[str]=None,
+    ):
+    if transform_into_dict:
+        assert detector_features_all is not None, "detector_features_all must be provided if transform_into_array is True"
+
+    with open(path_values_ellipticity) as file:
+        ellipticity_file = yaml.safe_load(file)
+    
+    if transform_into_dict:
+        ellipticity_parameters_dict = {
+            key: np.array([ellipticity_file[det_name][key]
+            for det_name in detector_features_all])
+            for key in ellipticity_file[
+                list(ellipticity_file.keys())[0]].keys()
+            if key != 'ellipticity_parameter_convention'
+        }
+        ellipticity_parameters_dict['ellipticity_parameter_convention'] = ellipticity_file['ellipticity_parameter_convention']
+        return ellipticity_parameters_dict
+    return ellipticity_file
+
+def read_spherical_derivatives_from_file(
+        path_spherical_derivatives
+    ):
+
+    if os.path.isfile(path_spherical_derivatives):
+
+        spherical_derivatives_array = hp.read_map(
+            path_spherical_derivatives, 
+            field=None
+        )
+        assert spherical_derivatives_array.shape[0] == (6), "The spherical derivatives file must contain 6 maps with shape (6, npix)."
+
+        return {
+            'theta': spherical_derivatives_array[1],
+            'phi': spherical_derivatives_array[2],
+            'theta_theta': spherical_derivatives_array[3],
+            'theta_phi': spherical_derivatives_array[4],
+            'phi_phi': spherical_derivatives_array[5]
+        }
