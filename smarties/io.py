@@ -363,11 +363,13 @@ def read_ellipticity_values_from_yaml_file(
     
     if transform_into_dict:
         ellipticity_parameters_dict = {
-            key: np.array([ellipticity_file[det_name][key]
-            for det_name in detector_features_all])
+            key: 
+            np.array(
+                [ellipticity_file[det_name][key] for det_name in detector_features_all]
+            )
             for key in ellipticity_file[
-                list(ellipticity_file.keys())[0]].keys()
-            if key != 'ellipticity_parameter_convention'
+                list(ellipticity_file.keys())[-1]
+            ].keys()
         }
         ellipticity_parameters_dict['ellipticity_parameter_convention'] = ellipticity_file['ellipticity_parameter_convention']
         return ellipticity_parameters_dict

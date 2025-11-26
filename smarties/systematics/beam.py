@@ -71,8 +71,9 @@ def get_differential_ellipticity_BICEP_TOAST(
 
     p_c_parameters_dict = convert_ellipticities_conventions(
         ellipticity_parameters_dict,
+        sigma_FWHM=sigma_FWHM,
         input_ellipticity_convention=ellipticity_parameters_dict['ellipticity_parameter_convention'],
-        target_ellipticity_parameter_convention='Plus-Cross ellipticity',
+        output_ellipticity_convention='Plus-Cross ellipticity',
     )
 
     parameter_p = p_c_parameters_dict['dp']
