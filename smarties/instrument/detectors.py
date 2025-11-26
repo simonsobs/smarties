@@ -4,57 +4,24 @@ import yaml
 import quaternionarray as qa
 
 
+def get_polarization_angles(
+        detector_features, 
+        telescope='LAT',
+        ):
+    if telescope in ['SAT1', 'SAT2', 'SAT3', 'LAT']:
+        try:
+            import sotodlib.sim_hardware
+        except ImportError:
+            raise ImportError("sotodlib.sim_hardware is required to run this function. Please install the sotodlib package.")
 
-# WARNING: Not working
-# def get_polarization_angles(detector_features, telescope='LAT'):
-#     # TODO: Recheck because a priori wrong!! 
-#     try:
-#         import sotodlib.sim_hardware
-#     except ImportError:
-#         raise ImportError("sotodlib.sim_hardware is required to run this function. Please install the sotodlib package.")
+        hardware = sotodlib.sim_hardware.sim_nominal()
+        sotodlib.sim_hardware.sim_detectors_toast(hardware, telescope)
 
+        data_detectors = hardware.data['detectors']
 
-
-#     hardware = sotodlib.sim_hardware.sim_nominal()
-#     sotodlib.sim_hardware.sim_detectors_toast(hardware, telescope)
-
-#     data_detectors = hardware.data['detectors']
-
-#     zaxis = np.array([0, 0, 1], dtype=np.float64)
-#     xaxis = np.array([1, 0, 0], dtype=np.float64)
-    
-#     array_polang = []
-#     list_suffix = ['_A', '_B']
-
-#     for d in detector_features:
-#         for suffix in list_suffix:
-#             quat = np.array(data_detectors[d+suffix]['quat']).astype(np.float64)
-#             rdir = qa.rotate(quat, zaxis).flatten()
-#             # ang = np.arctan2(rdir[1], rdir[0])
-#             orient = qa.rotate(quat, xaxis).flatten()
-#             polang = np.arctan2(orient[1], orient[0])
-#             # mag = np.arccos(rdir[2]) * 180.0 / np.pi
-#             # xpos.append(mag * np.cos(ang))
-#             # ypos.append(mag * np.sin(ang))
-#             # detectors.append(d)
-#             # detpol.append(polang)
-#             array_polang.append(polang)
-
-#     return np.array(array_polang)
-
-
-def get_polarization_angles(detector_features, telescope='LAT'):
-    try:
-        import sotodlib.sim_hardware
-    except ImportError:
-        raise ImportError("sotodlib.sim_hardware is required to run this function. Please install the sotodlib package.")
-
-    hardware = sotodlib.sim_hardware.sim_nominal()
-    sotodlib.sim_hardware.sim_detectors_toast(hardware, telescope)
-
-    data_detectors = hardware.data['detectors']
-
-    return np.array([np.deg2rad(data_detectors[det]['pol_ang']) for det in detector_features])
+        return np.array([np.deg2rad(data_detectors[det]['pol_ang']) for det in detector_features])
+    else:
+        raise ValueError(f"Telescope {telescope} not recognized. Supported telescopes are 'SAT1', 'SAT2', 'SAT3', and 'LAT'.")
 
 def save_extended_final_maps(
         final_spin_maps, 
