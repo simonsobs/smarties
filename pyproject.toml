@@ -33,7 +33,9 @@ dependencies = [
     'numpy',
     'scipy',
     'opt_einsum',
+    'ducc0',
 ]
+
 dynamic = ['version']
 
 [project.optional-dependencies]

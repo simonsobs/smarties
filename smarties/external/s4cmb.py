@@ -19,9 +19,94 @@
 """
 Routines taken from CMBS4 and readapted including diverse tools to manipulate alms and maps from the s4cmb package.
 """
+from os import cpu_count
 import numpy as np
 import healpy as hp
+import ducc0
 
+
+
+def _ducc_kwargs(
+        spin, 
+        nside, 
+        lmax, 
+        mmax=None):
+    
+    ducc_healpix_obj = ducc0.healpix.Healpix_Base(nside, 'RING')
+    if mmax is None:
+        mmax = lmax
+    m_array = np.arange(mmax + 1)
+    kwargs = {'spin': spin,
+              'lmax': lmax, 
+              'mmax': mmax,
+              'mstart': (m_array*(2*lmax+1-m_array)//2).astype(np.uint64, copy=False), 
+              **ducc_healpix_obj.sht_info()
+}
+    return kwargs
+
+def _alm2map_ducc0(alm, spin, nside, lmax=None, mmax=None, nthreads=-1):
+
+    if nthreads < 0:
+        nthreads = cpu_count()
+
+    if alm.ndim > 1:
+        alm_size = alm.shape[-1]
+    else:
+        alm_size = alm.size
+    if lmax is None:
+        lmax = hp.Alm.getlmax(alm.shape[-1])
+    else:
+        assert lmax <= hp.Alm.getlmax(alm.shape[-1]), (lmax, hp.Alm.getlmax(alm.shape[-1]))
+    if mmax is None:
+        mmax = lmax
+
+    maps = ducc0.sht.synthesis(
+        alm=np.atleast_2d(alm),
+        nthreads=nthreads,
+        **_ducc_kwargs(
+            spin, 
+            nside, 
+            lmax, 
+            mmax, 
+        )
+    )
+    return maps
+
+
+def _map2alm_ducc0(maps, spin, lmax=None, mmax=None, nthreads=-1):
+
+    nside = hp.npix2nside(maps.shape[-1])
+    
+    if lmax is None:
+        lmax = 3 * nside - 1
+
+    if mmax is None:
+        mmax = lmax
+
+    if nthreads < 0:
+        nthreads = cpu_count()
+
+    weight = 4*np.pi/(12 * nside**2)
+    alm = ducc0.sht.adjoint_synthesis(
+        map=np.atleast_2d(maps) * weight, 
+        nthreads=nthreads,
+        **_ducc_kwargs(
+            spin, 
+            nside, 
+            lmax, 
+            mmax, 
+        )
+    )
+    return alm
+
+def map2alm_ducc0_iter(maps, spin, lmax=None, mmax=None, iter=3):
+    
+    alms = _map2alm_ducc0(maps, spin, lmax=lmax, mmax=mmax)
+
+    for iter_ in range(iter):
+        residual_map = _alm2map_ducc0(alms, spin, lmax=lmax, mmax=mmax) - maps
+        alms -= _map2alm_ducc0(residual_map, spin, lmax=lmax, mmax=mmax)
+    return alms
 
 def get_healpix_ring_pixel_layout(nside, th_idx):
     """Healpix ring layout.
@@ -166,22 +251,22 @@ def get_first_spin_derivative(grad_curl_alms, nside, input_spin):
     # shape (2, 12 * nside ** 2),
 
     # First obtaining the application of the spin-lowering operator on the input alms
-    _gclm = [
+    _gclm = np.array([
         hp.almxfl(grad_curl_alms[0], get_alpha_raise(input_spin, lmax)),
         hp.almxfl(grad_curl_alms[1], get_alpha_raise(input_spin, lmax)),
-    ]
-    spin_raised_maps = np.array(hp.alm2map_spin(_gclm, nside, input_spin+1, lmax))
+    ])
+    spin_raised_maps = np.array(_alm2map_ducc0(_gclm, nside=nside, spin=input_spin+1, lmax=lmax))
 
     # Second obtaining the application of the spin-raising operator on the input alms
     if input_spin == 0:
         spin_lowered_maps = np.copy(spin_raised_maps)
         spin_lowered_maps[1] *= -1
     else:
-        _gclm = [
+        _gclm = np.array([
             hp.almxfl(grad_curl_alms[0], get_alpha_lower(input_spin, lmax)),
             hp.almxfl(grad_curl_alms[1], get_alpha_lower(input_spin, lmax)),
-            ]
-        spin_lowered_maps = np.array(hp.alm2map_spin(_gclm, nside, input_spin-1, lmax))
+            ])
+        spin_lowered_maps = np.array(_alm2map_ducc0(_gclm, nside=nside, spin=input_spin-1, lmax=lmax))
 
     
     return {
@@ -227,16 +312,17 @@ def get_second_spin_derivative(grad_curl_alms, nside, input_spin):
     # shape (2, 12 * nside ** 2),
 
     # First obtaining the application of two successsive spin-raising operators on the input alms
-    _gclm = [
+    _gclm = np.array([
         hp.almxfl(alms, get_alpha_lower(input_spin, lmax)*get_alpha_lower(input_spin-1, lmax)) for alms in grad_curl_alms
-    ]
+    ])
     if input_spin - 2 == 0:
-        spin_2_lowered_maps = -np.array([hp.alm2map(alms, nside) for alms in _gclm])
+        spin_2_lowered_maps = -np.array([_alm2map_ducc0(alms, nside=nside, spin=0, lmax=lmax) for alms in _gclm])
     elif input_spin - 2 < 0:
-        spin_2_lowered_maps = np.array(hp.alm2map_spin(_gclm, nside, np.abs(input_spin - 2), lmax))
+        spin_2_lowered_maps = _alm2map_ducc0(_gclm, nside=nside, spin=np.abs(input_spin - 2), lmax=lmax)
+        
         spin_2_lowered_maps[1] *= -1
     else:
-        spin_2_lowered_maps = np.array(hp.alm2map_spin(_gclm, nside, input_spin-2, lmax))
+        spin_2_lowered_maps = _alm2map_ducc0(_gclm, nside=nside, spin=input_spin-2, lmax=lmax)
 
     # Second obtaining the application of two successsive spin-lowering operators on the input alms
     _gclm = [
@@ -245,22 +331,22 @@ def get_second_spin_derivative(grad_curl_alms, nside, input_spin):
     spin_2_raised_maps = np.array(hp.alm2map_spin(_gclm, nside, input_spin+2, lmax))
 
     # Third obtaining the application of the spin-raising then the spin-lowering operators on the input alms
-    _gclm = [
+    _gclm = np.array([
         hp.almxfl(alms, get_alpha_raise(input_spin, lmax)*get_alpha_lower(input_spin+1, lmax)) for alms in grad_curl_alms
-    ]
+    ])
     if input_spin == 0:
-        spin_raised_lowered_maps = -np.array([hp.alm2map(alms, nside) for alms in _gclm])
+        spin_raised_lowered_maps = -np.array([_alm2map_ducc0(alms, nside=nside, spin=0, lmax=lmax) for alms in _gclm])
     else:
         spin_raised_lowered_maps = np.array(hp.alm2map_spin(_gclm, nside, input_spin, lmax))
 
     # Fourth obtaining the application of the spin-lowering then the spin-raising operators on the input alms
-    _gclm = [
+    _gclm = np.array([
         hp.almxfl(alms, get_alpha_lower(input_spin, lmax)*get_alpha_raise(input_spin-1, lmax)) for alms in grad_curl_alms
-    ]
+    ])
     if input_spin == 0:
-        spin_lowered_raised_maps = -np.array([hp.alm2map(alms, nside) for alms in _gclm])
+        spin_lowered_raised_maps = -np.array([_alm2map_ducc0(alms, nside=nside, spin=0, lmax=lmax) for alms in _gclm])
     else:
-        spin_lowered_raised_maps = np.array(hp.alm2map_spin(_gclm, nside, input_spin, lmax))
+        spin_lowered_raised_maps = np.array(_alm2map_ducc0(_gclm, nside=nside, spin=input_spin, lmax=lmax))
 
     return {
         input_spin+2: spin_2_raised_maps[0] + 1j * spin_2_raised_maps[1], 
@@ -378,7 +464,7 @@ def get_second_spherical_derivatives_from_spin_derivatives(
     if 'theta' not in spherical_derivatives_dict and 'phi' not in spherical_derivatives_dict:
         # Computing the first partial derivative with respect to theta
         if input_spin+1 not in spin_derivatives_dict or input_spin-1 not in spin_derivatives_dict:
-            input_alms = hp.map2alm(input_map, lmax=lmax, iter=10)
+            input_alms = map2alm_ducc0_iter(input_map, lmax=lmax, spin=0, iter=10)
             spin_derivatives_dict_ = get_first_spin_derivative(
                 -np.vstack([input_alms, np.zeros_like(input_alms)]), 
                 nside,
