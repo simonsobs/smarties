@@ -15,6 +15,7 @@
 # along with SMARTIES. If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
+import healpy as hp
 from opt_einsum import contract
 
 from smarties.hn import Spin_maps
@@ -238,23 +239,38 @@ def transform_spin_maps_into_array_maps(spin_maps):
 
 def save_partial_spin_maps_as_healpy(
         partial_spin_maps, 
-        mask_mpi_from_total_mask, 
         nstokes,
         nside,
-        path_output):
+        mask_on_full_map, 
+        path_output,
+        format_output='.npy'):
 
     extended_final_maps = np.zeros((nstokes,12*nside**2), dtype=complex)
     if nstokes == 3 or nstokes == 1:
-        extended_final_maps[0, mask_mpi_from_total_mask != 0] = partial_spin_maps[0]
+        extended_final_maps[0, mask_on_full_map != 0] = partial_spin_maps[0]
     if nstokes == 3 or nstokes == 2:
         final_Q_map = (partial_spin_maps[-2] + partial_spin_maps[2])/2.
         final_U_map = 1j*(partial_spin_maps[-2] - partial_spin_maps[2])/2.
 
-        extended_final_maps[-2, mask_mpi_from_total_mask != 0] = final_Q_map.real
-        extended_final_maps[-1, mask_mpi_from_total_mask != 0] = final_U_map.real
+        extended_final_maps[-2, mask_on_full_map != 0] = final_Q_map.real
+        extended_final_maps[-1, mask_on_full_map != 0] = final_U_map.real
 
-    print("Saving map into", path_output)
-    np.save(path_output, extended_final_maps[:,mask_mpi_from_total_mask!=0])
+    if format_output == '.npy' or path_output.endswith('.npy'):
+        if not path_output.endswith('.npy'):
+            path_output = path_output + '.npy'
+        print("Saving map into", path_output)
+        np.save(path_output, extended_final_maps[:,mask_on_full_map!=0])
+    elif format_output == '.fits' or path_output.endswith('.fits'):
+        if not path_output.endswith('.fits'):
+            path_output = path_output + '.fits'
+        print("Saving map into", path_output)
+        hp.write_map(
+            path_output, 
+            extended_final_maps, 
+            overwrite=True
+        )
+    else:
+        raise ValueError("Unsupported format_output. Supported formats are '.npy' and '.fits'.")
 
 
 def convert_ellipticities_conventions(
@@ -374,19 +390,22 @@ def convert_ellipticities_conventions(
         
         return {
             'dc': ellipticity_value_dc,
-            'dp': ellipticity_value_dp
+            'dp': ellipticity_value_dp,
+            'ellipticity_parameter_convention': 'Plus-Cross ellipticity'
         }
     elif output_ellipticity_convention == 'Modified second flattening':
         ellipticity_value = (sigma_cs + delta_sigma) / (sigma_cs - delta_sigma)
         return {
             'ellipticity_value': ellipticity_value,
-            'ellipticity_angle': ellipticity_angle
+            'ellipticity_angle': ellipticity_angle,
+            'ellipticity_parameter_convention': 'Modified second flattening'
         }
     elif output_ellipticity_convention == 'Third flattening':
         ellipticity_value = delta_sigma / sigma_cs
         return {
             'ellipticity_value': ellipticity_value,
-            'ellipticity_angle': ellipticity_angle
+            'ellipticity_angle': ellipticity_angle,
+            'ellipticity_parameter_convention': 'Third flattening'
         }
     elif output_ellipticity_convention == 'Third eccentricity':
         ellipticity_value = (
@@ -396,7 +415,8 @@ def convert_ellipticities_conventions(
             )
         return {
             'ellipticity_value': ellipticity_value,
-            'ellipticity_angle': ellipticity_angle
+            'ellipticity_angle': ellipticity_angle,
+            'ellipticity_parameter_convention': 'Third eccentricity'
         }
     else:
         raise ValueError("output_ellipticity_convention must be an element of the list of supported conventions {list_conventions}")
