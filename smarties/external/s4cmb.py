@@ -100,12 +100,12 @@ def _map2alm_ducc0(maps, spin, lmax=None, mmax=None, nthreads=-1):
     return alm
 
 def map2alm_ducc0_iter(maps, spin, lmax=None, mmax=None, iter=3):
-    
-    alms = _map2alm_ducc0(maps, spin, lmax=lmax, mmax=mmax)
+    nside = hp.npix2nside(maps.shape[-1])
+    alms = _map2alm_ducc0(maps, spin=spin, lmax=lmax, mmax=mmax)
 
     for iter_ in range(iter):
-        residual_map = _alm2map_ducc0(alms, spin, lmax=lmax, mmax=mmax) - maps
-        alms -= _map2alm_ducc0(residual_map, spin, lmax=lmax, mmax=mmax)
+        residual_map = _alm2map_ducc0(alms, spin=spin, nside=nside, lmax=lmax, mmax=mmax) - maps
+        alms -= _map2alm_ducc0(residual_map, spin=spin, lmax=lmax, mmax=mmax)
     return alms
 
 def get_healpix_ring_pixel_layout(nside, th_idx):
@@ -335,7 +335,7 @@ def get_second_spin_derivative(grad_curl_alms, nside, input_spin):
         hp.almxfl(alms, get_alpha_raise(input_spin, lmax)*get_alpha_lower(input_spin+1, lmax)) for alms in grad_curl_alms
     ])
     if input_spin == 0:
-        spin_raised_lowered_maps = -np.array([_alm2map_ducc0(alms, nside=nside, spin=0, lmax=lmax) for alms in _gclm])
+        spin_raised_lowered_maps = -np.array([_alm2map_ducc0(alms, nside=nside, spin=0, lmax=lmax) for alms in _gclm]).squeeze()
     else:
         spin_raised_lowered_maps = np.array(hp.alm2map_spin(_gclm, nside, input_spin, lmax))
 
@@ -344,7 +344,7 @@ def get_second_spin_derivative(grad_curl_alms, nside, input_spin):
         hp.almxfl(alms, get_alpha_lower(input_spin, lmax)*get_alpha_raise(input_spin-1, lmax)) for alms in grad_curl_alms
     ])
     if input_spin == 0:
-        spin_lowered_raised_maps = -np.array([_alm2map_ducc0(alms, nside=nside, spin=0, lmax=lmax) for alms in _gclm])
+        spin_lowered_raised_maps = -np.array([_alm2map_ducc0(alms, nside=nside, spin=0, lmax=lmax) for alms in _gclm]).squeeze()
     else:
         spin_lowered_raised_maps = np.array(_alm2map_ducc0(_gclm, nside=nside, spin=input_spin, lmax=lmax))
 
@@ -423,7 +423,7 @@ def multiply_tan_theta_power(input_map, nside, power=-1, zbounds=(-1., 1.)):
         startpix, nphi, kphi0, cth, sth = get_healpix_ring_pixel_layout(nside, iring)
         if zbounds[0] <= cth <= zbounds[1]:
             slic = slice(startpix, startpix + nphi)
-            output_map[slic] *= (sth / cth) ** power
+            output_map[slic] *= np.where(power>0, sth / cth, cth / sth) ** np.abs(power)
     return output_map
 
 def get_second_spherical_derivatives_from_spin_derivatives(
@@ -518,15 +518,15 @@ def get_second_spherical_derivatives_from_spin_derivatives(
             slic = slice(startpix, startpix + nphi)
 
             spherical_derivatives_dict['theta_phi'][slic] += 1j * (
-                (input_spin * (cth / sth) **2 + input_spin/2.)* input_map  
-                - input_spin * (cth / sth) * spherical_derivatives_dict['theta']
-            )[slic] + ((cth / sth) * spherical_derivatives_dict['phi'])[slic] 
+                (input_spin * (cth / sth) **2 + input_spin/2.)* input_map[slic]  
+                - input_spin * (cth / sth) * spherical_derivatives_dict['theta'][slic]
+            ) + ((cth / sth) * spherical_derivatives_dict['phi'][slic])
 
 
             spherical_derivatives_dict['phi_phi'][slic] -= (
-                - input_spin**2 * (cth / sth) ** 2 * input_map 
-                + (cth / sth) * spherical_derivatives_dict['theta'] 
-                + 1j * (2 * input_spin * (cth / sth) * spherical_derivatives_dict['phi']) 
-            )[slic]
+                - input_spin**2 * (cth / sth) ** 2 * input_map[slic] 
+                + (cth / sth) * spherical_derivatives_dict['theta'][slic] 
+                + 1j * (2 * input_spin * (cth / sth) * spherical_derivatives_dict['phi'][slic]) 
+            )
 
     return spherical_derivatives_dict
