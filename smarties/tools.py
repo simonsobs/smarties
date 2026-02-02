@@ -16,7 +16,9 @@
 
 import numpy as np
 import healpy as hp
+import h5py
 from opt_einsum import contract
+from pixell import enmap
 
 from smarties.hn import Spin_maps
 
@@ -93,8 +95,8 @@ def get_row_mapmaking_matrix(
     factor_func = lambda x: 1 if x == 0 else .5
 
     mapmaking_matrix_row = np.zeros(
-        (h_n_spin_dict[2].shape[-1], 
-         len(list_spin_input)
+        tuple(h_n_spin_dict[2].shape[1:]) + ( 
+         len(list_spin_input),
         ), 
         dtype=dtype
     )
@@ -135,7 +137,10 @@ def get_rotation_matrix(angle):
 
     return rotation_matrix
 
-def transform_array_maps_into_spin_maps(array_maps, n_stokes_output=None):
+def transform_array_maps_into_spin_maps(
+        array_maps, 
+        n_stokes_output=None
+    ):
     """
     Transform an array of maps into a Spin_maps object,
     inheriting from the dictionary structure as
@@ -148,7 +153,7 @@ def transform_array_maps_into_spin_maps(array_maps, n_stokes_output=None):
       
     Parameters
     ----------
-    array_maps: np.ndarray
+    array_maps: np.ndarray | enmap.ndmap
         Array of maps of shape (..., n_stokes, n_pix) with
         * if n_stokes = 1, the temperature field [T] is assumed to be provided (spin=0)
         * if n_stokes = 2, the polarization field [Q,U] is assumed to be provided (spin=2, -2)
@@ -161,7 +166,13 @@ def transform_array_maps_into_spin_maps(array_maps, n_stokes_output=None):
 
     """
     
+    # if type(array_maps) == np.ndarray:
     n_stokes = array_maps.shape[-2] if array_maps.ndim > 1 else 1
+    dimension_stokes = -2
+    # elif type(array_maps) == enmap.ndmap:
+    #     n_stokes = array_maps.shape[-3] if array_maps.ndim > 2 else 1
+    #     dimension_stokes = -3
+
     assert n_stokes in [1, 2, 3], 'The number of Stokes parameters must be 1 (only temperature), 2 (only polarization) or 3 (both temperature and polarization)'
 
     if n_stokes_output is not None:
@@ -179,12 +190,16 @@ def transform_array_maps_into_spin_maps(array_maps, n_stokes_output=None):
             # Only temperature field is provided
             index_T = (...,)
         else:
-            index_T = ...,0
-        output_spin_maps[0] = array_maps[*index_T,:] # [spin=0]
-    
+            index_T = tuple(array_maps.shape[:dimension_stokes]) + (0,)
+        output_spin_maps[0] = array_maps[*index_T] # [spin=0]
+
     if n_stokes >= 2:
-        output_spin_maps[-2] = .5*(array_maps[...,-2,:] - 1j * array_maps[...,-1,:]) # [spin=-2]
-        output_spin_maps[2] = .5*(array_maps[...,-2,:] + 1j * array_maps[...,-1,:]) # [spin=2]
+        output_spin_maps[-2] = .5*(
+            array_maps[...,dimension_stokes,:] - 1j * array_maps[...,dimension_stokes+1,:]
+        ) # [spin=-2]
+        output_spin_maps[2] = .5*(
+            array_maps[...,dimension_stokes,:] + 1j * array_maps[...,dimension_stokes+1,:]
+        ) # [spin=2]
     
     if n_stokes_output != n_stokes:
         if n_stokes == 1:
@@ -192,10 +207,19 @@ def transform_array_maps_into_spin_maps(array_maps, n_stokes_output=None):
             output_spin_maps[-2] = np.zeros_like(output_spin_maps[0], dtype=complex)
         elif n_stokes == 2:
             output_spin_maps[0] = np.zeros_like(output_spin_maps[-2], dtype=complex)
+    
+    if type(array_maps) == enmap.ndmap:
+        for spin in output_spin_maps.spins:
+            output_spin_maps[spin] = enmap.ndmap(
+                output_spin_maps[spin], 
+                wcs=array_maps.wcs
+            )
 
     return output_spin_maps
     
-def transform_spin_maps_into_array_maps(spin_maps):
+def transform_spin_maps_into_array_maps(
+        spin_maps
+    ):
     """
     Transform a Spin_maps object into an array of maps, 
     as:
@@ -219,13 +243,18 @@ def transform_spin_maps_into_array_maps(spin_maps):
     n_stokes = 0
     if 0 in spin_maps:
         n_stokes += 1
+        first_spin = 0
     if -2 in spin_maps and 2 in spin_maps:
         n_stokes += 2
+        first_spin = -2
     assert n_stokes in [1, 2, 3], 'The number of Stokes parameters must be 1 (only temperature), 2 (only polarization) or 3 (both temperature and polarization)'
-    n_pix = spin_maps[0].shape[-1] if n_stokes == 1 else spin_maps[-2].shape[-1]
-    dtype = spin_maps[0].dtype if n_stokes == 1 else spin_maps[-2].dtype
+    boolean_car_pixelization = type(spin_maps[first_spin]) == enmap.ndmap
+    dimension_pixels = -1 if not boolean_car_pixelization else -2
+    
+    shape_pix = (spin_maps[first_spin].shape[-dimension_pixels:],) 
+    dtype = spin_maps[first_spin].dtype
 
-    array_maps = np.zeros(spin_maps[0].shape[:-1] + (n_stokes, n_pix), dtype=dtype)
+    array_maps = np.zeros(spin_maps[first_spin].shape[:-dimension_pixels] + (n_stokes,) + shape_pix, dtype=dtype)
     
     if n_stokes == 1 or n_stokes == 3:
         # Only temperature field is provided
@@ -233,19 +262,22 @@ def transform_spin_maps_into_array_maps(spin_maps):
     if n_stokes >= 2:
         array_maps[...,1,:] = spin_maps[-2] + spin_maps[2]  # [Q, U] -> spin -2 and 2
         array_maps[...,2,:] = -1j * (spin_maps[2] - spin_maps[-2])
-        
+    
+    if boolean_car_pixelization:
+        array_maps = enmap.ndmap(array_maps, wcs=spin_maps[first_spin].wcs)
     return array_maps
 
 
-def save_partial_spin_maps_as_healpy(
+def save_partial_spin_maps(
         partial_spin_maps, 
         nstokes,
-        nside,
+        shape_pixels,
         mask_on_full_map, 
         path_output,
-        format_output='.npy'):
+        format_output='.npy'
+    ):
 
-    extended_final_maps = np.zeros((nstokes,12*nside**2), dtype=complex)
+    extended_final_maps = np.zeros((nstokes,)+(np.prod(shape_pixels),), dtype=complex)
     if nstokes == 3 or nstokes == 1:
         extended_final_maps[0, mask_on_full_map != 0] = partial_spin_maps[0]
     if nstokes == 3 or nstokes == 2:
@@ -255,7 +287,31 @@ def save_partial_spin_maps_as_healpy(
         extended_final_maps[-2, mask_on_full_map != 0] = final_Q_map.real
         extended_final_maps[-1, mask_on_full_map != 0] = final_U_map.real
 
-    if format_output == '.npy' or path_output.endswith('.npy'):
+    if extended_final_maps.shape[-len(shape_pixels):] != shape_pixels:
+        extended_final_maps = extended_final_maps.reshape(
+            extended_final_maps.shape[:-1] + shape_pixels
+        )
+    
+    is_car = False
+    first_spin = 0 if (nstokes == 1 or nstokes == 3) else -2
+    if type(partial_spin_maps[first_spin]) == enmap.ndmap:
+        extended_final_maps = enmap.ndmap(
+            extended_final_maps, 
+            wcs=partial_spin_maps[first_spin].wcs
+        )
+        is_car = True
+
+    if is_car:
+        if format_output == '.fits' and not path_output.endswith('.fits'):
+            path_output = path_output + '.fits'
+        elif format_output == '.hdf' and not path_output.endswith('.hdf'):
+            path_output = path_output + '.hdf'
+        enmap.write_map(
+                path_output, 
+                extended_final_maps,
+                extra={'BUNIT' : 'uK'}
+            )
+    elif format_output == '.npy' or path_output.endswith('.npy'):
         if not path_output.endswith('.npy'):
             path_output = path_output + '.npy'
         print("Saving map into", path_output)
@@ -264,11 +320,21 @@ def save_partial_spin_maps_as_healpy(
         if not path_output.endswith('.fits'):
             path_output = path_output + '.fits'
         print("Saving map into", path_output)
+        
         hp.write_map(
             path_output, 
             extended_final_maps, 
             overwrite=True
         )
+            
+    elif format_output in ['.hdf', '.hdf5'] or path_output.endswith('.hdf') or path_output.endswith('.hdf5'):
+        if not (path_output.endswith('.hdf') or path_output.endswith('.hdf5')):
+            path_output = path_output + '.hdf'
+        print("Saving map into", path_output)
+    
+        with h5py.File(path_output, 'w') as hf:
+            hf.create_dataset('maps', data=extended_final_maps)
+        hf.close()
     else:
         raise ValueError("Unsupported format_output. Supported formats are '.npy' and '.fits'.")
 
@@ -421,3 +487,10 @@ def convert_ellipticities_conventions(
     else:
         raise ValueError("output_ellipticity_convention must be an element of the list of supported conventions {list_conventions}")
     
+
+def flatten_CAR_maps(maps_CAR):
+    first_dimensions = maps_CAR.shape[:-2] if maps_CAR.shape[:-2] != (1,) else tuple()
+    return maps_CAR.reshape(first_dimensions + (np.prod(maps_CAR.shape[-2:]),))
+
+def unflatten_CAR_maps(maps_CAR_flatten, original_shape_pixels):
+    return maps_CAR_flatten.reshape(maps_CAR_flatten.shape[:-1] + original_shape_pixels)

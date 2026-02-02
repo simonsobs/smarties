@@ -16,6 +16,7 @@
 
 import numpy as np
 from opt_einsum import contract
+from pixell import enmap
 
 from smarties.tools import get_coupled_spin, get_row_mapmaking_matrix
 from smarties.sky.cmb import create_CMB_spin_maps
@@ -25,14 +26,14 @@ class FrameworkSystematics(object):
     Class to simulate systematics maps
     """
 
-    def __init__(self, nside, nstokes, lmax, list_spin_output=[-2,2]):
+    def __init__(self, map_shape, nstokes, lmax, list_spin_output=[-2,2]):
         """
         Initialize the FrameworkSystematics class allowing to simulate systematics maps
 
         Parameters
         ----------
-        nside: int
-            Nside of the maps
+        npix_shape: tuple[int]
+            Shape of the maps
         nstokes: int
             Number of Stokes parameters : 1 for the intensity only, 2 for the polarization only and 3 for the full Stokes parameters (T, Q, U)
         lmax: int
@@ -40,14 +41,13 @@ class FrameworkSystematics(object):
         list_spin: list[int]
             List of spins involved in the signal maps only (for CMB only, the spins are -2, 2 with polarization only)
         """
-        self.nside = nside
         assert np.unique(list_spin_output).size == np.array(list_spin_output).size, 'The list of spins must be unique'
         if not np.isin(list_spin_output, np.array([0,-2,2])).all():
             print('The output spins maps appeared to contain spin different than 0, -2 or 2, the package has not been tested in this case!', flush=True)
         self.list_spin_output = list_spin_output # list spins involved in the signal maps only (for CMB only, the spins are 0, -2, 2 if intensity is involved)
         self.nstokes = nstokes
         self.lmax = lmax
-        self.npix = 12*nside**2
+        self.map_shape = map_shape
 
     @property
     def list_spin_input(self):
@@ -77,8 +77,9 @@ class FrameworkSystematics(object):
         spin_sky_maps: dictionary of spin sky maps (CMB, ...)
             dictionary of spin sky maps, each of shape (n_spin, npix), with n_spin being 1 if nstokes=1 (spin=0), 2 if nstokes=2 (spin=-2, 2) and 3 if nstokes=3 (spin=0, -2, 2) 
         """
+        
         return create_CMB_spin_maps(
-            nside=self.nside, 
+            nside=self.nside, #TODO: Allow to simulate this in CAR
             nstokes=self.nstokes, 
             lmax=self.lmax, 
             fwhm=fwhm,
@@ -117,7 +118,6 @@ class FrameworkSystematics(object):
         list_spin = np.array(list(h_n_spin_dict.keys()))
         dtype = h_n_spin_dict[list_spin[list_spin != 0][0]].dtype
         if mask is not None:
-            # assert mask.size == 12 * self.nside **2, 'The mask must be a HEALPix map of the same size as the h_n maps'
             observed_pixels_array = mask != 0
             if mask_input:
                 h_n_spin_dict = Spin_maps.from_dictionary(
@@ -158,8 +158,8 @@ class FrameworkSystematics(object):
             return_inverse_mapmaking_matrix: bool = False,
             mask_input: bool = True,
             polar_angle: np.ndarray = None,
-            correct_polar_angle_h_n: bool = False,
-            projector_h_n: np.ndarray = None
+            projector_h_n: np.ndarray = None,
+            wcs_car=None
         ):
         """
         Compute the total maps from the $h_n$ maps, the spin CMB maps and the spin systematics maps
@@ -191,9 +191,6 @@ class FrameworkSystematics(object):
         polar_angle: np.ndarray (optional)
             The polar angle to use for the mapmaking, if None, the polar angle will be computed from the provided h_n maps.
             Must be provided in radians. Default is None.
-        correct_polar_angle_h_n: bool (optional)
-            If True, the h_n maps are supposed to be provided with the polar angle, so the polar angle will be removed from the h_n maps in-place 
-            before the mapmaking and re-applied in-place after. Default is False.
         
         Returns
         -------
@@ -221,7 +218,7 @@ class FrameworkSystematics(object):
         assert np.all(np.abs(h_n_spin_dict[0].sum(axis=0) - 1) < 1e-14), 'The h_n maps must be normalized'
 
         if mask is None:
-            mask = np.ones(12 * self.nside ** 2, dtype=np.int8)
+            mask = np.ones(self.map_shape, dtype=np.int8)
         
         # Masking the h_n maps, CMB maps and systematics maps
         observed_pixels_array = mask != 0
@@ -251,16 +248,7 @@ class FrameworkSystematics(object):
             assert polar_angle.size == h_n_spin_dict[0].shape[0], 'The polar angle map must have the same shape as the h_n maps'
             polar_angle_coeff = {spin: np.exp(spin * 1j * polar_angle) for spin in h_n_spin_dict.spins}
         
-        if correct_polar_angle_h_n:
-                # h_n maps are supposed to be provided with the polar angle, so we need to correct them here
-                print("Correcting the polarization angle in the input h_n maps!")
-                assert polar_angle is not None, 'The polar angle must be provided to correct the h_n maps'
-                # Remove the polar angle from the h_n maps, as it is already included in the spin_sky_maps
-                
-                h_n_spin_dict.divide_inplace_detectors_spin_maps(polar_angle_coeff, subscripts='d...,d...->d...') 
-                # Divide the h_n maps by the polar angle coefficient, to remove the polar angle from the h_n maps
-                # The division is done inplace to save memory 
-    
+
         if spin_systematics_maps is None:
             print("No systematics maps provided, assuming no systematics", flush=True)
             spin_systematics_maps = Spin_maps.from_dictionary({spin: np.zeros(1) for spin in spin_sky_maps.spins})
@@ -301,25 +289,26 @@ class FrameworkSystematics(object):
                     h_n_spin_dict[tuple_spins[0]][projector_h_n], 
                     spin_systematics_maps[tuple_spins[1]] 
                     + contract(
-                        'd,p->dp', 
+                        'd,...->d...', 
                         polar_angle_coeff[-tuple_spins[1]], 
                         spin_sky_maps[tuple_spins[1]]
                     ) # Polarization angle to remove for consistent modeling of the data
                 )
 
-        if correct_polar_angle_h_n:
-            # h_n maps are supposed to be provided with the polar angle, so we need to correct them here
-            print("Re-correcting the polarization angle in the input h_n maps")
-            assert polar_angle is not None, 'The polar angle must be provided to correct the h_n maps'
-            # Remove the polar angle from the h_n maps, as it is already included in the spin_sky_maps
-            h_n_spin_dict.multiply_inplace_detectors_spin_maps(polar_angle_coeff, subscripts='d...,d...->d...') 
-            # Multiply the h_n maps by the polar angle coefficient as it was removed before
-            # so that the h_n maps provided by the user are not modified permanently 
-
+        get_final_map = lambda x: x if wcs_car is None else enmap.ndmap(
+            x, 
+            wcs=wcs_car
+        )
 
         print("Computing the final CMB fields...", flush=True)
         # Finally, compute the final CMB fields
-        final_CMB_fields = contract('pij,pj->ip', inverse_mapmaking_matrix[projector_h_n], spin_coupled_maps)
+        final_CMB_fields = get_final_map(
+            contract(
+                '...ij,...j->i...', 
+                inverse_mapmaking_matrix[projector_h_n], 
+                spin_coupled_maps
+            )
+        )
 
         print("Final CMB fields computed, transforming them into Spin_maps...", flush=True)
         dict_final_CMB_fields = Spin_maps.from_list_maps(final_CMB_fields, self.list_spin_output)

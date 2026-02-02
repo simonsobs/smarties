@@ -18,6 +18,7 @@ from collections.abc import Iterable
 import numpy as np
 import healpy as hp
 from opt_einsum import contract
+from pixell import enmap
 
 class Spin_maps(dict):
     """
@@ -50,8 +51,9 @@ class Spin_maps(dict):
         """
         assert isinstance(list_spin, Iterable)
         result = cls()
+        transform_into_car = lambda x: x if type(maps) is not enmap.ndmap else enmap.ndmap(x, wcs=maps.wcs)
         for spin, map_ in zip(list_spin, maps):
-            result[spin] = map_
+            result[spin] = transform_into_car(map_)
         return result
     
     def __add__(self, other):
@@ -157,6 +159,10 @@ def ud_grade_hn(h_n_maps, nside_out):
     -----
     Currently the corresponding operations only work with HEALPix maps, so the input maps must be provided in the HEALPix format. 
     """
+
+    #TODO: Adapt in case h_n maps are not healpix or ful sky
+    
+    #TODO: Take gradient conjugate for the -spin?
     
     new_h_n = Spin_maps()
     for spin in h_n_maps.spins:
