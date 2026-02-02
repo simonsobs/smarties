@@ -1,3 +1,4 @@
+import os
 from copy import deepcopy
 import numpy as np
 import yaml
@@ -102,13 +103,11 @@ def get_ellipticities_values_from_yaml_file(
     
     return ellipticity_parameter, ellipticity_angle
 
-def get_detector_names_from_yaml_file(
-        path_yaml
+def get_detector_names_from_dictionary_detector(
+        dictionary_detector
     ):
 
-    with open(path_yaml) as file:
-        dictionary_detector = yaml.safe_load(file)
-        
+
     detector_features = []
 
     def fill_pixels_interval(pixel_name):
@@ -148,4 +147,36 @@ def get_detector_names_from_yaml_file(
             for suffix in dictionary_detector['h_n']['list_suffix']:
                 str_detector_h_n = wafer + '_' + pixel + suffix
                 detector_features.append(str_detector_h_n)
+    return detector_features
+
+def get_detector_names_from_yaml_file(path_yaml):
+    with open(path_yaml) as file:
+        dictionary_detector = yaml.safe_load(file)
+    return get_detector_names_from_dictionary_detector(dictionary_detector)
+
+def get_list_detectors_from_yaml_and_h_n(
+        path_yaml_detectors,
+        directory_h_n
+    ):
+    with open(path_yaml_detectors) as file:
+        dictionary_detectors = yaml.safe_load(file)
+
+    detector_features = get_detector_names_from_dictionary_detector(
+        dictionary_detectors
+    )
+    path_h_n = directory_h_n + dictionary_detectors['h_n']['file_prefix'][0]
+    
+    h_n_names_npz = []
+    list_detector_to_remove = []
+
+
+    _number_detectors = len(detector_features)
+    for i in range(_number_detectors):
+        if os.path.exists(path_h_n + detector_features[i] + '_' + dictionary_detectors['h_n']['detector_pair_names'][0] + '_cos_1.' + dictionary_detectors['h_n']['format_h_n']):
+            h_n_names_npz.append(path_h_n + detector_features[i])
+        else:
+            list_detector_to_remove.append(detector_features[i])
+
+    for det_features in list_detector_to_remove:
+            detector_features.remove(det_features)
     return detector_features
