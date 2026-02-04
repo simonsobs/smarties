@@ -20,6 +20,17 @@ import healpy as hp
 from opt_einsum import contract
 from pixell import enmap
 
+class Spin_nm(tuple):
+
+    def __neg__(self):
+        return Spin_nm([-item for item in self.__iter__()])
+    
+    def __add__(self, other):
+        return Spin_nm([item1 + item2 for item1,item2 in zip(self.__iter__(), other)])
+
+    def __sub__(self, other):
+        return Spin_nm([item1 - item2 for item1,item2 in zip(self.__iter__(), other)])
+
 class Spin_maps(dict):
     """
     Class to handle fundamental operations related to the spin maps
@@ -30,7 +41,9 @@ class Spin_maps(dict):
         """
         Returns the list of spins in the Spin_maps object
         """
-        return list(self.keys())
+        all_keys = self.keys() if len(self.keys()) > 1 else [self.keys()]
+        define_spins_func = lambda key: Spin_nm(key) if isinstance(key, Iterable) else key
+        return [define_spins_func(key) for key in all_keys]
 
     @classmethod
     def from_dictionary(cls, dictionary):
@@ -87,7 +100,11 @@ class Spin_maps(dict):
             else:
                 self[key] = value
     
-    def multiply_inplace_detectors_spin_maps(self, other, subscripts='d...,d...->d...'):
+    def multiply_inplace_detectors_spin_maps(
+            self, 
+            other, 
+            subscripts='d...,d...->d...'
+    ):
         """
         Multiply the spin maps by another Spin_maps object in place
 
@@ -105,7 +122,11 @@ class Spin_maps(dict):
             if key != 0:
                 self[key] = contract(subscripts, self[key], other[key])
 
-    def divide_inplace_detectors_spin_maps(self, other, subscripts='d...,d...->d...'):
+    def divide_inplace_detectors_spin_maps(
+            self, 
+            other, 
+            subscripts='d...,d...->d...'
+        ):
         """
         Multiply the spin maps in place, with each `spin` map multiplied
         by the corresponding `-spin` map of the other Spin_maps object.

@@ -20,7 +20,7 @@ import h5py
 from opt_einsum import contract
 from pixell import enmap
 
-from smarties.hn import Spin_maps
+from smarties.hn import Spin_maps, Spin_nm
 
 list_conventions = [
     'Third flattening', 
@@ -494,3 +494,58 @@ def flatten_CAR_maps(maps_CAR):
 
 def unflatten_CAR_maps(maps_CAR_flatten, original_shape_pixels):
     return maps_CAR_flatten.reshape(maps_CAR_flatten.shape[:-1] + original_shape_pixels)
+
+def reweight_h_maps(
+        h_dictionary: dict| Spin_maps,
+        list_weights: np.ndarray,
+        new_weighting_bool: bool,
+        error_precision: float,
+        list_spin: list[int],
+):
+    if 0 not in h_dictionary.spins and Spin_nm((0,0)) not in h_dictionary.spins:
+        spin_0 = Spin_nm((0,0)) if len(list(h_dictionary.spins)[0]) == 2 else 0
+
+        h_dictionary[spin_0] = list_weights[..., np.newaxis] if list_weights.ndim == 1 else list_weights
+        if new_weighting_bool:
+            print("--Applying new weighting to h_n dictionary...", flush=True)
+
+            array_hits_detector_pixel = np.int64(np.logical_or(
+                np.abs(h_dictionary[list_spin[0]]) > 10*error_precision,
+                np.abs(h_dictionary[-list_spin[0]]) > 10*error_precision
+                )
+            )
+            pixel_map_weighting_array = (array_hits_detector_pixel).sum(axis=0)
+            # pixel_map_weighting_array = np.sum(new_weighting_array, axis=0)
+
+            if 0 in pixel_map_weighting_array:
+                print("--Warning: some pixels are not observed by any detector, they will have their h maps values set to zero", flush=True)
+                print("--Number of unobserved pixels: {}".format(np.sum(pixel_map_weighting_array==0)), flush=True)
+                print("--Total number of pixels: {}".format(pixel_map_weighting_array.size), flush=True)
+                print("--Fraction of unobserved pixels: {:.2e}".format(np.sum(pixel_map_weighting_array==0)/pixel_map_weighting_array.size), flush=True)
+            
+            for spin in h_dictionary.spins:
+                if spin != spin_0:
+                    h_dictionary[spin][...,pixel_map_weighting_array!=0] = contract(
+                        'd...,d...,...->d...',
+                        h_dictionary[spin], 
+                        list_weights,
+                        1 / pixel_map_weighting_array[pixel_map_weighting_array!=0]
+                    )
+                
+            h_dictionary[spin_0] = np.where(array_hits_detector_pixel==0, 0, array_hits_detector_pixel / pixel_map_weighting_array )
+    else:
+        spin_0 = 0 if 0 in h_dictionary.spins else Spin_nm((0,0))
+        print("--Spin 0 in h maps dictionary, re-weighting applied.", flush=True)
+        cond_non_zero = h_dictionary[spin_0] != 0
+        print(h_dictionary[spin_0].shape, flush=True)
+        inverse_weights = 1 / list_weights[...,None] if list_weights.ndim == 1 else np.where(cond_non_zero, 1 / list_weights[...,cond_non_zero], 0)
+        
+        sum_hits = h_dictionary[spin_0].sum(axis=0)
+
+        for spin in h_dictionary.spins:
+            if spin != spin_0:
+                h_dictionary[spin][cond_non_zero] *= (inverse_weights * h_dictionary[spin_0] / sum_hits)[cond_non_zero]
+                    
+        
+        h_dictionary[spin_0] = np.where(cond_non_zero, h_dictionary[spin_0] / sum_hits, 0)
+    return h_dictionary

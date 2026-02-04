@@ -20,7 +20,7 @@ from pixell import enmap
 
 from smarties.tools import get_coupled_spin, get_row_mapmaking_matrix
 from smarties.sky.cmb import create_CMB_spin_maps
-from smarties.hn import Spin_maps
+from smarties.hn import Spin_maps, Spin_nm
 class FrameworkSystematics(object):
     """
     Class to simulate systematics maps
@@ -32,8 +32,9 @@ class FrameworkSystematics(object):
 
         Parameters
         ----------
-        npix_shape: tuple[int]
-            Shape of the maps
+        map_shape: tuple[int]
+            Total shape of the map (e.g. (n_pix,) for HEALPix maps, (ny, nx) for CAR maps), 
+            not reduced to the observed area
         nstokes: int
             Number of Stokes parameters : 1 for the intensity only, 2 for the polarization only and 3 for the full Stokes parameters (T, Q, U)
         lmax: int
@@ -58,7 +59,7 @@ class FrameworkSystematics(object):
         else:
             raise NotImplemented('The number of Stokes parameters must be 2 (polarization only) or 3 (intensity and polarization), other cases are not implemented yet')
 
-    def get_spin_sky_maps(self, fwhm=0., seed=42):
+    def get_spin_sky_maps(self, nside, fwhm=0., seed=42):
         """
         Get the spin CMB maps which are the following for intensity and polarization:
             * Spin 0: I
@@ -79,7 +80,7 @@ class FrameworkSystematics(object):
         """
         
         return create_CMB_spin_maps(
-            nside=self.nside, #TODO: Allow to simulate this in CAR
+            nside=nside, #TODO: Allow to simulate this in CAR
             nstokes=self.nstokes, 
             lmax=self.lmax, 
             fwhm=fwhm,
@@ -215,7 +216,9 @@ class FrameworkSystematics(object):
         else:
             projector_h_n = ... # Use all pixels
 
-        assert np.all(np.abs(h_n_spin_dict[0].sum(axis=0) - 1) < 1e-14), 'The h_n maps must be normalized'
+        # Check that the h_n maps are normalized
+        spin_0 = Spin_nm((0,0)) if np.array(h_n_spin_dict.spins)[0].size == 2 else 0
+        assert np.all(np.abs(h_n_spin_dict[spin_0].sum(axis=0) - 1) < 1e-14), 'The h_n maps must be normalized'
 
         if mask is None:
             mask = np.ones(self.map_shape, dtype=np.int8)
@@ -243,10 +246,12 @@ class FrameworkSystematics(object):
         #     spin_sky_maps = Spin_maps.from_dictionary(spin_sky_maps)
 
         if polar_angle is None:
-            polar_angle_coeff = {spin: np.ones(h_n_spin_dict[0].shape[0], dtype=complex) for spin in h_n_spin_dict.spins} # Default is to not apply any polar angle, i.e. the detectors are all aligned in the same direction
+            polar_angle_coeff = {spin: np.ones(h_n_spin_dict[spin].shape[0], dtype=complex) for spin in h_n_spin_dict.spins} # Default is to not apply any polar angle, i.e. the detectors are all aligned in the same direction
         else:
-            assert polar_angle.size == h_n_spin_dict[0].shape[0], 'The polar angle map must have the same shape as the h_n maps'
+            assert polar_angle.size == h_n_spin_dict[spin_0].shape[0], 'The polar angle map must have the same shape as the h_n maps'
+            
             polar_angle_coeff = {spin: np.exp(spin * 1j * polar_angle) for spin in h_n_spin_dict.spins}
+            #TODO: Generalize to m != 0 for HWP angles
         
 
         if spin_systematics_maps is None:
@@ -273,17 +278,19 @@ class FrameworkSystematics(object):
         print("Computing the spin coupled maps...", flush=True)
         spin_coupled_maps = np.zeros((npix, len(self.list_spin_output),), dtype=complex)
         list_spin_maps = spin_sky_maps.spins 
-        factor_dict = {0: 1, -2: .5, 2: .5}
+        
+        factor_func = lambda spin: 1 if np.sum(spin) == 0 else .5 
+        # Depends on the definition of the pointing matrix
+        
         for i, spin in enumerate(self.list_spin_input):
             # Get all combinations of spins (k-k', k') such that k-k' = spin
             coupled_spins = get_coupled_spin(spin, h_n_spin_dict.spins, list_spin_maps)
 
-            # TODO: Remove print
             print(f'Coupled spins for spin {spin}: {coupled_spins}', flush=True)
 
             # \sum_{k' = -\infty}^{\infty} h_{k-k'} S_{k'} on all (k-k', k') pairs
             for tuple_spins in coupled_spins:
-                spin_coupled_maps[...,i] += factor_dict[spin] * contract(
+                spin_coupled_maps[...,i] += factor_func(spin) * contract(
                     'd,d...,d...->...', 
                     polar_angle_coeff[spin], 
                     h_n_spin_dict[tuple_spins[0]][projector_h_n], 

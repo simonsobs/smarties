@@ -20,8 +20,7 @@ import healpy as hp
 from smarties.hn import Spin_maps
 
 def generate_power_spectra_CAMB(
-    nside,
-    lmax=None,
+    lmax,
     r=0,
     Alens=1,
     H0=67.5,
@@ -44,8 +43,6 @@ def generate_power_spectra_CAMB(
 
     Parameters
     ----------
-    nside: int
-        nside of the maps
     lmax: int
         maximum multipole
     r: float
@@ -89,12 +86,11 @@ def generate_power_spectra_CAMB(
     except ImportError:
         raise ImportError('camb is not installed. Please install it with "pip install camb"')
 
-    if lmax is None:
-        true_lmax = 2 * nside
-    if true_lmax < 128:
-        lmax_computation = 256
+    if lmax < 256:
+        lmax_computation = 512
     else:
-        lmax_computation = true_lmax
+        lmax_computation = lmax
+    
     # pars = camb.CAMBparams(max_l_tensor=lmax, parameterization='tensor_param_indeptilt')
     pars = camb.CAMBparams(max_l_tensor=lmax_computation)
     pars.WantTensors = True
@@ -113,8 +109,8 @@ def generate_power_spectra_CAMB(
 
     powers = results.get_cmb_power_spectra(pars, CMB_unit='muK', raw_cl=True, lmax=lmax_computation)
     if typeless_bool:
-        return {powers_type: powers[powers_type][:true_lmax+1, :] for powers_type in powers}
-    return powers[type_power][:true_lmax+1, :]
+        return {powers_type: powers[powers_type][:lmax+1, :] for powers_type in powers}
+    return powers[type_power][:lmax+1, :]
 
 
 def generate_CMB_map(nside, lmax, seed=42):
@@ -123,7 +119,7 @@ def generate_CMB_map(nside, lmax, seed=42):
     """
 
     # Generating the CMB power spectra
-    all_spectra = generate_power_spectra_CAMB(nside, typeless_bool=False).T
+    all_spectra = generate_power_spectra_CAMB(lmax, typeless_bool=False).T
 
     # Generating the CMB map
     np.random.seed(seed)
