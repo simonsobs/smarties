@@ -122,7 +122,8 @@ def get_differential_ellipticity_BICEP_TOAST(
             raise ValueError("The intensity_CMB map must be either a 1D array compatible with a full sky healpy map or a 2D array compatible with a CAR array")
 
         alms_I = map2alm_anypix(
-            intensity_CMB, 
+            intensity_CMB,
+            spin=0,
             lmax=lmax, 
             niter=10,
             shape_car=shape_fullsky_car
