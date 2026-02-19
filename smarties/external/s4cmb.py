@@ -100,7 +100,6 @@ def get_car_ring_layout(
 def compute_phi_1st_derivative(
         input_map,
         spin_derivatives_dict,
-        spherical_derivatives_dict,
         input_spin,
         shape_pixels_output=None,
         zbounds=(-1., 1.),
@@ -130,7 +129,7 @@ def compute_phi_1st_derivative(
             startpix, nphi, kphi0, cth, sth = get_healpix_ring_pixel_layout(nside, iring)
             if zbounds[0] <= cth <= zbounds[1]:
                 slic = slice(startpix, startpix + nphi)
-                spherical_derivatives_dict['phi'][slic] -= 1j * input_spin * (cth / sth) * input_map[slic]
+                spherical_derivatives_phi[slic] -= 1j * input_spin * (cth / sth) * input_map[slic]
     return spherical_derivatives_phi
 
 
@@ -180,7 +179,7 @@ def compute_phi_2nd_derivatives(
         for iring in range(4 * nside - 1):
             startpix, nphi, kphi0, cth, sth = get_healpix_ring_pixel_layout(nside, iring)
             if zbounds[0] <= cth <= zbounds[1]:
-                slic = slice(startpix, startpix + nphi)
+                slic = (...,slice(startpix, startpix + nphi))
 
                 spherical_derivatives_theta_phi[slic] += 1j * (
                     (input_spin * (cth / sth) **2 + input_spin/2.)* input_map[slic]  
@@ -428,13 +427,13 @@ def get_second_spin_derivative(
         hp.almxfl(alms, get_alpha_lower(input_spin, lmax)*get_alpha_lower(input_spin-1, lmax)) for alms in grad_curl_alms
     ])
     if input_spin - 2 == 0:
-        spin_2_lowered_maps = -alm2map_anypix(
-            _gclm, 
+        spin_2_lowered_maps = -np.array([alm2map_anypix(
+            alm, 
             map_output=map_output,
             shape_pixels_output=shape_pixels_output,
             spin=0, 
             lmax=lmax,
-        )
+        ) for alm in _gclm])
     elif input_spin - 2 < 0:
         spin_2_lowered_maps = alm2map_anypix(
             _gclm, 
@@ -471,13 +470,13 @@ def get_second_spin_derivative(
         hp.almxfl(alms, get_alpha_raise(input_spin, lmax)*get_alpha_lower(input_spin+1, lmax)) for alms in grad_curl_alms
     ])
     if input_spin == 0:
-        spin_raised_lowered_maps = -alm2map_anypix(
-            _gclm, 
+        spin_raised_lowered_maps = -np.array([alm2map_anypix(
+            alm, 
             map_output=map_output,
             shape_pixels_output=shape_pixels_output,
             spin=0, 
             lmax=lmax,
-        )
+        ) for alm in _gclm])
     else:
         spin_raised_lowered_maps = alm2map_anypix(
             _gclm, 
@@ -492,13 +491,13 @@ def get_second_spin_derivative(
         hp.almxfl(alms, get_alpha_lower(input_spin, lmax)*get_alpha_raise(input_spin-1, lmax)) for alms in grad_curl_alms
     ])
     if input_spin == 0:
-        spin_lowered_raised_maps = -alm2map_anypix(
-            _gclm, 
+        spin_lowered_raised_maps = -np.array([alm2map_anypix(
+            alm, 
             map_output=map_output,
             shape_pixels_output=shape_pixels_output, 
             spin=0, 
             lmax=lmax,
-        )
+        ) for alm in _gclm])
     else:
         spin_lowered_raised_maps = alm2map_anypix(
             _gclm, 
@@ -555,7 +554,6 @@ def get_first_spherical_derivatives_from_spin_derivatives(
     spherical_derivatives_dict['phi'] = compute_phi_1st_derivative(
         input_map=input_map,
         spin_derivatives_dict=spin_derivatives_dict,
-        spherical_derivatives_dict=spherical_derivatives_dict,
         input_spin=input_spin,
         shape_pixels_output=shape_pixels_output,
         zbounds=zbounds,

@@ -132,13 +132,13 @@ def get_differential_ellipticity_BICEP_TOAST(
         input_spin = 0
         intensity_spin_2_derivatives = get_second_spin_derivative(
             -np.vstack([alms_I, np.zeros_like(alms_I)]),
-            nside=nside,
+            shape_pixels_output=(intensity_CMB.size,),
             input_spin=input_spin,
         )
         spherical_derivatives = get_second_spherical_derivatives_from_spin_derivatives(
             input_map=intensity_CMB,
-            spin_derivatives_dict=intensity_spin_2_derivatives,
-            nside=nside,
+            spin_derivatives_dict=None,
+            shape_pixels_output=(intensity_CMB.size,),
             lmax=lmax,
             input_spin=input_spin
         )

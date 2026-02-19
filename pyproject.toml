@@ -34,6 +34,7 @@ dependencies = [
     'scipy',
     'opt_einsum',
     'ducc0',
+    'h5py'
 ]
 
 dynamic = ['version']

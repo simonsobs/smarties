@@ -23,24 +23,24 @@ def _ducc_dictionary(
               **ducc_healpix_obj.sht_info()
     }
 
-def _alm2map_ducc0(alm, spin, nside, lmax=None, mmax=None, nthreads=-1):
+def _alm2map_ducc0(alms, spin, nside, lmax=None, mmax=None, nthreads=-1):
 
     if nthreads < 0:
         nthreads = cpu_count()
 
-    if alm.ndim > 1:
-        alm_size = alm.shape[-1]
+    if alms.ndim > 1:
+        alm_size = alms.shape[-1]
     else:
-        alm_size = alm.size
+        alm_size = alms.size
     if lmax is None:
-        lmax = hp.Alm.getlmax(alm.shape[-1])
+        lmax = hp.Alm.getlmax(alms.shape[-1])
     else:
-        assert lmax <= hp.Alm.getlmax(alm.shape[-1]), (lmax, hp.Alm.getlmax(alm.shape[-1]))
+        assert lmax <= hp.Alm.getlmax(alms.shape[-1]), (lmax, hp.Alm.getlmax(alms.shape[-1]))
     if mmax is None:
         mmax = lmax
 
     maps = ducc0.sht.synthesis(
-        alm=np.atleast_2d(alm),
+        alm=np.atleast_2d(alms),
         nthreads=nthreads,
         **_ducc_dictionary(
             spin, 
@@ -79,7 +79,7 @@ def _map2alm_ducc0(maps, spin, lmax=None, mmax=None, nthreads=-1):
     return alm
 
 def map2alm_ducc0_iter(maps, spin, lmax=None, mmax=None, niter=3):
-    nside = hp.npix2nside(maps.shape[-1]) if type(maps) == enmap.ndmap else None
+    nside = hp.npix2nside(maps.shape[-1]) if type(maps) != enmap.ndmap else None
 
     alms_output = _map2alm_ducc0(maps, spin=spin, lmax=lmax, mmax=mmax)
 
@@ -124,8 +124,8 @@ def map2alm_anypix(
 def alm2map_anypix(
         alms,
         spin, 
+        shape_pixels_output,
         map_output=None,
-        shape_pixels_output=None,
         lmax=None, 
         mmax=None,
 ):
