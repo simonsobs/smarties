@@ -89,7 +89,7 @@ def get_differential_ellipticity_BICEP_TOAST(
     if mask is None:
         mask_bool = ...
     else:
-        mask_bool = mask != 0
+        mask_bool = ..., mask != 0
     
     take_box_function = lambda x: x#[mask_bool]
 
@@ -137,7 +137,7 @@ def get_differential_ellipticity_BICEP_TOAST(
         )
         spherical_derivatives = get_second_spherical_derivatives_from_spin_derivatives(
             input_map=intensity_CMB,
-            spin_derivatives_dict=None,
+            spin_derivatives_dict=intensity_spin_2_derivatives,
             shape_pixels_output=(intensity_CMB.size,),
             lmax=lmax,
             input_spin=input_spin
