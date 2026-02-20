@@ -174,7 +174,7 @@ def read_toast_h_maps(
                 )
         n_pix = np.prod(fake_h_n_map.shape)
     elif mask is not None:
-        boolean_mask = np.bool(mask)
+        boolean_mask = np.bool_(mask)
         n_pix = boolean_mask[boolean_mask].size
 
     total_list_spin = list_spin + [-spin for spin in list_spin]
@@ -328,7 +328,7 @@ def read_lbs_h_maps(
                 )['{},{}'.format(0,0)]['Re'].ravel()
         n_pix = np.prod(fake_h_n_map.shape)
     elif mask is not None:
-        boolean_mask = np.bool(mask)
+        boolean_mask = np.bool_(mask)
         n_pix = boolean_mask[boolean_mask].size
 
     total_list_spin = list_spin + [-spin for spin in list_spin if np.sum(spin) != 0]
@@ -437,7 +437,7 @@ def build_mask_from_toast_h_maps(
             list_name_files[0]+'_{}_sin_{}'.format(list_prefix[0].replace('_',''),spin_to_read), format_file=format_file,
             projection_pixel=projection_pixel,), 
         dtype=np.float64).ravel()
-    mask_detectors = np.int64(np.bool(mask))
+    mask_detectors = np.int64(np.bool_(mask))
 
     
     for name_file in tqdm(list_name_files):
@@ -452,8 +452,7 @@ def build_mask_from_toast_h_maps(
                 projection_pixel=projection_pixel,
             )[:]).ravel()
             mask += map_cos_sin
-            mask_detectors += np.int64(np.bool(map_cos_sin))
-            # print(name_file, np.int8(np.bool(map_cos_sin))[np.int8(np.bool(map_cos_sin))<0])
+            mask_detectors += np.int64(np.bool_(map_cos_sin))
 
     if format_file in ['h5', 'hdf5', 'H5', 'hdf']:
         reorder_output = lambda x: hp.reorder(x, n2r=True)
@@ -461,8 +460,8 @@ def build_mask_from_toast_h_maps(
         reorder_output = lambda x: x
 
     if return_detectors_hits:
-        return reorder_output(np.int8(np.bool(mask))), reorder_output(mask_detectors)
-    return reorder_output(np.int8(np.bool(mask)))
+        return reorder_output(np.int8(np.bool_(mask))), reorder_output(mask_detectors)
+    return reorder_output(np.int8(np.bool_(mask)))
 
 def build_mask_from_lbs_h_maps(
         list_name_files: list[str], 
@@ -519,7 +518,7 @@ def build_mask_from_lbs_h_maps(
             projection_pixel=projection_pixel
         )['{},{}'.format(*spin_to_read)]["Re"][:].ravel(), 
         dtype=np.float64).ravel()
-    mask_detectors = np.int64(np.bool(mask))
+    mask_detectors = np.int64(np.bool_(mask))
 
     
     for name_file in tqdm(list_name_files):
@@ -535,11 +534,11 @@ def build_mask_from_lbs_h_maps(
             0
         )
         mask += mask_contribution
-        mask_detectors += np.int64(np.bool(mask_contribution))
+        mask_detectors += np.int64(np.bool_(mask_contribution))
 
     if return_detectors_hits:
-        return np.int8(np.bool(mask)), mask_detectors
-    return np.int8(np.bool(mask))
+        return np.int8(np.bool_(mask)), mask_detectors
+    return np.int8(np.bool_(mask))
 
 def read_ellipticity_values_from_yaml_file(
         path_values_ellipticity: str,
