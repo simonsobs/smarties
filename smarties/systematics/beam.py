@@ -207,5 +207,8 @@ def get_differential_ellipticity_BICEP_TOAST(
                 differential_ellipticity_spin_maps[spin],
                 wcs=intensity_CMB.wcs
             )
+    else:
+        for spin in differential_ellipticity_spin_maps.spins:
+            differential_ellipticity_spin_maps[spin] = differential_ellipticity_spin_maps[spin].squeeze()
 
     return differential_ellipticity_spin_maps
