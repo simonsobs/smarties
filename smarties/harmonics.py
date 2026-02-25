@@ -158,6 +158,18 @@ def alm2map_anypix(
         ).reshape(map_output.shape[:-2] + (np.prod(shape_pixels_output),))
     else:
         # HEALPIX pixelization expected
+        if spin == 0:
+            return np.array([
+                _alm2map_ducc0(
+                alms=_alm, 
+                spin=spin,
+                nside=hp.npix2nside(np.prod(shape_pixels_output)),
+                lmax=lmax, 
+                mmax=mmax, 
+                )
+            for _alm in (alms if alms.ndim > 1 else [alms])
+        ])
+
         return _alm2map_ducc0(
             alms=alms, 
             spin=spin,

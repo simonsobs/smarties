@@ -427,13 +427,13 @@ def get_second_spin_derivative(
         hp.almxfl(alms, get_alpha_lower(input_spin, lmax)*get_alpha_lower(input_spin-1, lmax)) for alms in grad_curl_alms
     ])
     if input_spin - 2 == 0:
-        spin_2_lowered_maps = -np.array([alm2map_anypix(
-            alm, 
+        spin_2_lowered_maps = -alm2map_anypix(
+            _gclm, 
             map_output=map_output,
             shape_pixels_output=shape_pixels_output,
             spin=0, 
-            lmax=lmax,
-        ) for alm in _gclm])
+            lmax=lmax
+        )
     elif input_spin - 2 < 0:
         spin_2_lowered_maps = alm2map_anypix(
             _gclm, 
@@ -470,13 +470,13 @@ def get_second_spin_derivative(
         hp.almxfl(alms, get_alpha_raise(input_spin, lmax)*get_alpha_lower(input_spin+1, lmax)) for alms in grad_curl_alms
     ])
     if input_spin == 0:
-        spin_raised_lowered_maps = -np.array([alm2map_anypix(
-            alm, 
+        spin_raised_lowered_maps = -alm2map_anypix(
+            _gclm, 
             map_output=map_output,
             shape_pixels_output=shape_pixels_output,
             spin=0, 
-            lmax=lmax,
-        ) for alm in _gclm])
+            lmax=lmax
+        )
     else:
         spin_raised_lowered_maps = alm2map_anypix(
             _gclm, 
@@ -491,13 +491,13 @@ def get_second_spin_derivative(
         hp.almxfl(alms, get_alpha_lower(input_spin, lmax)*get_alpha_raise(input_spin-1, lmax)) for alms in grad_curl_alms
     ])
     if input_spin == 0:
-        spin_lowered_raised_maps = -np.array([alm2map_anypix(
-            alm, 
+        spin_lowered_raised_maps = -alm2map_anypix(
+            _gclm, 
             map_output=map_output,
             shape_pixels_output=shape_pixels_output, 
             spin=0, 
-            lmax=lmax,
-        ) for alm in _gclm])
+            lmax=lmax
+        )
     else:
         spin_lowered_raised_maps = alm2map_anypix(
             _gclm, 
