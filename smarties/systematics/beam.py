@@ -381,7 +381,7 @@ def get_differential_ellipticity_no_calibration(
 
     for key in derivatives_maps:
         derivatives_maps[key][-2] = np.conj(derivatives_maps[key][2])
-        print("####", derivatives_maps[key][2].shape)
+        # print("####", derivatives_maps[key][2].shape)
 
     differential_ellipticity_spin_maps = Spin_maps()
 
@@ -391,8 +391,8 @@ def get_differential_ellipticity_no_calibration(
             for idx_1, key_1 in enumerate(['x', 'y']):
                 if spin not in derivatives_maps[key_0+key_1]:
                     continue
-                print("---TEST",key_0+key_1,spin, derivatives_maps[key_0+key_1][spin].imag.mean())
-                print(differential_ellipticity_spin_maps[spin].dtype)
+                # print("---TEST",key_0+key_1,spin, derivatives_maps[key_0+key_1][spin].imag.mean())
+                # print(differential_ellipticity_spin_maps[spin].dtype)
                 differential_ellipticity_spin_maps[spin] += contract(
                     'd,p->dp', 
                     alpha_2[:,idx_0,idx_1], 
