@@ -259,6 +259,8 @@ def get_differential_ellipticity_no_calibration(
     if 'ellipticity_parameter_convention' not in ellipticity_parameters_dict:
         ellipticity_parameters_dict['ellipticity_parameter_convention'] = 'Plus-Cross ellipticity'
 
+    sigma_cs = np.asarray(sigma_FWHM) * np.pi/(180*60) / ((8 * np.log(2)) ** 0.5) 
+    
     parameters_elliptical = convert_ellipticities_conventions(
         ellipticity_parameters_dict,
         sigma_FWHM=sigma_FWHM,
@@ -266,7 +268,8 @@ def get_differential_ellipticity_no_calibration(
         output_ellipticity_convention='Third flattening',
     )
 
-    delta_sigma = parameters_elliptical['ellipticity_value'] * sigma_FWHM
+
+    delta_sigma = parameters_elliptical['ellipticity_value'] * sigma_cs
     ellipticity_angle = parameters_elliptical['ellipticity_angle']
     assert delta_sigma.ndim == 1, 'The parameter delta_sigma rebuilt provided must have shape (n_det)'
     assert ellipticity_angle.ndim == 1, 'The parameter ellipticity_angle provided must have shape (n_det)'
@@ -283,7 +286,7 @@ def get_differential_ellipticity_no_calibration(
                                                  np.vstack([delta_sigma, -delta_sigma]),
                                                  rotation_matrix_ellipse_angle
                                                 )
-    sigma_cs = np.asarray(sigma_FWHM) / ((8 * np.log(2)) ** 0.5) * np.pi/(180*60)
+    
     
     alpha_2 = contract('d, dxy->dxy', 
                        sigma_cs**3 / (sigma_cs ** 2 - delta_sigma ** 2), 
