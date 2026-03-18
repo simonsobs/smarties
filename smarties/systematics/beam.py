@@ -482,29 +482,6 @@ def get_differential_ellipticity_no_calibration_v2(
     assert ellipticity_angle.ndim == 1, 'The parameter ellipticity_angle provided must have shape (n_det)'
     assert delta_sigma.shape == ellipticity_angle.shape, 'The parameter p and c provided must have the same shape'
 
-    if bool_secondary_term:
-        coefficient_secondary_term = 1
-    else:
-        coefficient_secondary_term = 0
-
-    rotation_matrix_ellipse_angle = get_rotation_matrix(ellipticity_angle)
-    propagation_perturbation_ellipse = np.einsum('dxy, xd, dxa->dya',
-                                                 rotation_matrix_ellipse_angle,
-                                                 np.vstack([delta_sigma, -delta_sigma]),
-                                                 rotation_matrix_ellipse_angle
-                                                )
-    
-    
-    alpha_2 = contract('d, dxy->dxy', 
-                       sigma_cs**3 / (sigma_cs ** 2 - delta_sigma ** 2), 
-                       propagation_perturbation_ellipse
-                    ) - coefficient_secondary_term * np.broadcast_to(
-                        delta_sigma ** 2 * sigma_cs ** 2 / ((sigma_cs ** 2 - delta_sigma ** 2)), 
-                        (2, 2, sigma_cs.size)
-                    ).T * np.eye(2)
-
-    alpha_0 = sigma_cs**2 / (sigma_cs ** 2 - delta_sigma ** 2) + np.linalg.trace(alpha_2)/sigma_cs**2
-
     if mask is None:
         mask_bool = ...
     else:
@@ -578,7 +555,7 @@ def get_differential_ellipticity_no_calibration_v2(
         + 2 * 1j * spherical_derivatives['theta_phi'][mask_bool]
     )
 
-    detector_contribution = sigma_cs * delta_sigma * np.exp(-2 * 1j * ellipticity_angle) /2.
+    detector_contribution = sigma_cs * delta_sigma * np.exp(2 * 1j * ellipticity_angle) /2.
     
     differential_ellipticity_spin_maps = Spin_maps()
 
