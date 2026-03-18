@@ -130,10 +130,10 @@ def get_rotation_matrix(angle):
     angle = np.asarray(angle)
 
     rotation_matrix = np.zeros(angle.shape + (2, 2))
-    rotation_matrix[...,0,0] = np.cos(2 * angle)
-    rotation_matrix[...,0,1] = -np.sin(2 * angle)
-    rotation_matrix[...,1,0] = np.sin(2 * angle)
-    rotation_matrix[...,1,1] = np.cos(2 * angle)
+    rotation_matrix[...,0,0] = np.cos(angle)
+    rotation_matrix[...,0,1] = -np.sin(angle)
+    rotation_matrix[...,1,0] = np.sin(angle)
+    rotation_matrix[...,1,1] = np.cos(angle)
 
     return rotation_matrix
 
