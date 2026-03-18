@@ -371,19 +371,19 @@ def get_differential_ellipticity_no_calibration(
     
     derivatives_maps = {f'{i}{j}':Spin_maps() for i in ['x','y'] for j in ['x','y']}
 
-    derivatives_maps['xx'][2] = (d2phi_minus_d2theta + crossed_derivatives_imaginary_part)/4
+    derivatives_maps['xx'][-2] = (d2phi_minus_d2theta + crossed_derivatives_imaginary_part)/4
     derivatives_maps['xx'][0] = 0.5 * (spherical_derivatives['phi_phi'][mask_bool] + spherical_derivatives['theta_theta'][mask_bool])
 
-    derivatives_maps['yy'][2] = (-d2phi_minus_d2theta - crossed_derivatives_imaginary_part)/4
+    derivatives_maps['yy'][-2] = (-d2phi_minus_d2theta - crossed_derivatives_imaginary_part)/4
     derivatives_maps['yy'][0] = 0.5 * (spherical_derivatives['phi_phi'][mask_bool] + spherical_derivatives['theta_theta'][mask_bool])
 
-    derivatives_maps['xy'][2] = (-d2phi_minus_d2theta - crossed_derivatives_imaginary_part)/(4 * 1j)
+    derivatives_maps['xy'][-2] = (-d2phi_minus_d2theta - crossed_derivatives_imaginary_part)/(4 * 1j)
     derivatives_maps['yx'][2] = derivatives_maps['xy'][2]
 
     
 
     for key in derivatives_maps:
-        derivatives_maps[key][-2] = np.conj(derivatives_maps[key][2])
+        derivatives_maps[key][2] = np.conj(derivatives_maps[key][-2])
         # print("####", derivatives_maps[key][2].shape)
 
     differential_ellipticity_spin_maps = Spin_maps()
@@ -582,14 +582,14 @@ def get_differential_ellipticity_no_calibration_v2(
     
     differential_ellipticity_spin_maps = Spin_maps()
 
-    differential_ellipticity_spin_maps[2] = contract(
+    differential_ellipticity_spin_maps[-2] = contract(
                 'd,p->dp',
                 detector_contribution,
                 central_term.squeeze(),
                 memory_limit='max_input'
             )
     
-    differential_ellipticity_spin_maps[-2] = np.conj(differential_ellipticity_spin_maps[2])
+    differential_ellipticity_spin_maps[2] = np.conj(differential_ellipticity_spin_maps[-2])
     
     if 0 not in differential_ellipticity_spin_maps:
         differential_ellipticity_spin_maps[0] = np.zeros_like(differential_ellipticity_spin_maps[2])
