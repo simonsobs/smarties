@@ -292,7 +292,7 @@ def get_differential_ellipticity_no_calibration(
                        sigma_cs**3 / (sigma_cs ** 2 - delta_sigma ** 2), 
                        propagation_perturbation_ellipse
                     ) - coefficient_secondary_term * np.broadcast_to(
-                        delta_sigma ** 2 * sigma_cs ** 2 / ((sigma_cs ** 2 - delta_sigma ** 2)), 
+                        0.5 * delta_sigma ** 2 * sigma_cs ** 2 / ((sigma_cs ** 2 - delta_sigma ** 2)), 
                         (2, 2, sigma_cs.size)
                     ).T * np.eye(2)
 
