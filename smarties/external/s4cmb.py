@@ -427,7 +427,7 @@ def get_second_spin_derivative(
         hp.almxfl(alms, get_alpha_lower(input_spin, lmax)*get_alpha_lower(input_spin-1, lmax)) for alms in grad_curl_alms
     ])
     if input_spin - 2 == 0:
-        spin_2_lowered_maps = -alm2map_anypix(
+        spin_2_lowered_maps = alm2map_anypix(
             _gclm, 
             map_output=map_output,
             shape_pixels_output=shape_pixels_output,
@@ -470,7 +470,7 @@ def get_second_spin_derivative(
         hp.almxfl(alms, get_alpha_raise(input_spin, lmax)*get_alpha_lower(input_spin+1, lmax)) for alms in grad_curl_alms
     ])
     if input_spin == 0:
-        spin_raised_lowered_maps = -alm2map_anypix(
+        spin_raised_lowered_maps = alm2map_anypix(
             _gclm, 
             map_output=map_output,
             shape_pixels_output=shape_pixels_output,
@@ -491,7 +491,7 @@ def get_second_spin_derivative(
         hp.almxfl(alms, get_alpha_lower(input_spin, lmax)*get_alpha_raise(input_spin-1, lmax)) for alms in grad_curl_alms
     ])
     if input_spin == 0:
-        spin_lowered_raised_maps = -alm2map_anypix(
+        spin_lowered_raised_maps = alm2map_anypix(
             _gclm, 
             map_output=map_output,
             shape_pixels_output=shape_pixels_output, 
@@ -570,6 +570,7 @@ def get_second_spherical_derivatives_from_spin_derivatives(
         lmax,
         zbounds=(-1., 1.),
         spherical_derivatives_dict: dict = dict(),
+        niter=10
     ):
     """
     Function to obtain the spherical derivatives from the spin derivatives.
@@ -604,7 +605,7 @@ def get_second_spherical_derivatives_from_spin_derivatives(
                 input_map, 
                 lmax=lmax, 
                 spin=0, 
-                niter=10,
+                niter=niter,
                 shape_car=shape_pixels_output
             )
 

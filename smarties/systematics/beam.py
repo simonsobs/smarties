@@ -131,7 +131,7 @@ def get_differential_ellipticity_BICEP_TOAST(
 
         input_spin = 0
         intensity_spin_2_derivatives = get_second_spin_derivative(
-            -np.vstack([alms_I, np.zeros_like(alms_I)]),
+            np.vstack([alms_I, np.zeros_like(alms_I)]),
             shape_pixels_output=(intensity_CMB.size,),
             input_spin=input_spin,
         )
@@ -344,7 +344,7 @@ def get_differential_ellipticity_no_calibration(
 
         input_spin = 0
         intensity_spin_2_derivatives = get_second_spin_derivative(
-            -np.vstack([alms_I, np.zeros_like(alms_I)]),
+            np.vstack([alms_I, np.zeros_like(alms_I)]),
             shape_pixels_output=(intensity_CMB.size,),
             input_spin=input_spin,
         )
@@ -378,9 +378,7 @@ def get_differential_ellipticity_no_calibration(
     derivatives_maps['yy'][0] = 0.5 * (spherical_derivatives['phi_phi'][mask_bool] + spherical_derivatives['theta_theta'][mask_bool])
 
     derivatives_maps['xy'][-2] = (-d2phi_minus_d2theta - crossed_derivatives_imaginary_part)/(4 * 1j)
-    derivatives_maps['yx'][2] = derivatives_maps['xy'][2]
-
-    
+    derivatives_maps['yx'][-2] = derivatives_maps['xy'][-2]
 
     for key in derivatives_maps:
         derivatives_maps[key][2] = np.conj(derivatives_maps[key][-2])
@@ -528,7 +526,7 @@ def get_differential_ellipticity_no_calibration_v2(
 
         input_spin = 0
         intensity_spin_2_derivatives = get_second_spin_derivative(
-            -np.vstack([alms_I, np.zeros_like(alms_I)]),
+            np.vstack([alms_I, np.zeros_like(alms_I)]),
             shape_pixels_output=(intensity_CMB.size,),
             input_spin=input_spin,
         )
