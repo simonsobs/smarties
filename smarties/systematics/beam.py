@@ -275,28 +275,31 @@ def get_differential_ellipticity_no_calibration(
     assert ellipticity_angle.ndim == 1, 'The parameter ellipticity_angle provided must have shape (n_det)'
     assert delta_sigma.shape == ellipticity_angle.shape, 'The parameter p and c provided must have the same shape'
 
-    if bool_secondary_term:
-        coefficient_secondary_term = 1
-    else:
-        coefficient_secondary_term = 0
+    # if bool_secondary_term:
+    #     coefficient_secondary_term = 1
+    # else:
+    #     coefficient_secondary_term = 0
 
     rotation_matrix_ellipse_angle = get_rotation_matrix(ellipticity_angle)
-    propagation_perturbation_ellipse = np.einsum('dxy, xd, dxa->dya',
+    propagation_perturbation_ellipse = np.einsum('dxy, xz, dza->dya',
                                                  rotation_matrix_ellipse_angle,
-                                                 np.vstack([delta_sigma, -delta_sigma]),
+                                                 np.diag([1, -1]),
                                                  rotation_matrix_ellipse_angle
                                                 )
     
-    
-    alpha_2 = contract('d, dxy->dxy', 
-                       sigma_cs**3 / (sigma_cs ** 2 - delta_sigma ** 2), 
-                       propagation_perturbation_ellipse
-                    ) - coefficient_secondary_term * np.broadcast_to(
-                        0.5 * delta_sigma ** 2 * sigma_cs ** 2 / ((sigma_cs ** 2 - delta_sigma ** 2)), 
+    ratio_term = delta_sigma / sigma_cs
+    prefactor = 1 / (sigma_cs ** 2 - delta_sigma ** 2)
+    alpha_2 = 0.5 * (np.broadcast_to(
+                        sigma_cs ** 4 * ratio_term ** 2 * (ratio_term ** 2 - 3) / (ratio_term ** 2 - 1)**2 * prefactor, 
                         (2, 2, sigma_cs.size)
-                    ).T * np.eye(2)
+                    ).T * np.eye(2) + contract(
+                        'd, dxy->dxy', 
+                        sigma_cs ** 4 * 2 * ratio_term / (ratio_term ** 2 - 1)**2  * prefactor, 
+                        propagation_perturbation_ellipse
+                    )
+    )
 
-    alpha_0 = sigma_cs**2 / (sigma_cs ** 2 - delta_sigma ** 2) + np.linalg.trace(alpha_2)/sigma_cs**2
+    alpha_0 = 0.5 * (sigma_cs**2 + np.linalg.trace(alpha_2)) * prefactor
 
     if mask is None:
         mask_bool = ...
@@ -392,8 +395,6 @@ def get_differential_ellipticity_no_calibration(
             for idx_1, key_1 in enumerate(['x', 'y']):
                 if spin not in derivatives_maps[key_0+key_1]:
                     continue
-                # print("---TEST",key_0+key_1,spin, derivatives_maps[key_0+key_1][spin].imag.mean())
-                # print(differential_ellipticity_spin_maps[spin].dtype)
                 differential_ellipticity_spin_maps[spin] += contract(
                     'd,p->dp', 
                     alpha_2[:,idx_0,idx_1], 
