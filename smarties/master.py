@@ -267,7 +267,7 @@ def uncouple_spectra_all(
 
     field_spin0 = nmt.NmtField(
         mask=mask_apodized, 
-        maps=input_map[0], 
+        maps=[input_map[0]], 
         spin=0,
         wcs=wcs,
         lmax=lmax,
