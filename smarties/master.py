@@ -302,7 +302,8 @@ def uncouple_spectra_all(
     nmt_workspace_output.compute_coupling_matrix(
         field_spin0, 
         field_spin2, 
-        binning_scheme
+        binning_scheme,
+        is_teb=True
     )
 
     cl_coupled_00 = nmt.compute_coupled_cell(
