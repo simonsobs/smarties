@@ -323,6 +323,6 @@ def uncouple_spectra_all(
     return (
         binning_scheme.get_effective_ells(), 
         nmt_workspace_output.decouple_cell(
-            np.array([cl_coupled_00, cl_coupled_02, cl_coupled_22])
+            np.vstack([cl_coupled_00, cl_coupled_02, cl_coupled_22])
         )
     )
