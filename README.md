@@ -28,7 +28,7 @@ The easiest way to install and use `smarties` is the following
 For any solicitation, please contact `magdy.morshed at fe.infn.it`.
 
 ## License
-This code is released under the GPLv3 license, which can be found in the [LICENSE](LICENSE) file.
+This code is released under the MIT license, which can be found in the [LICENSE](LICENSE) file.
 
 ## Citation
 Please contact `magdy.morshed at fe.infn.it`.
