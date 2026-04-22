@@ -1,5 +1,5 @@
 # S4CMB
-# Copyright (c) 2016-2021 Julien Peloton, Giulio Fabbian.
+# Copyright (c) 2016-2021, 2025-2026 Julien Peloton, Giulio Fabbian, Magdy Morshed
 #
 # This file is part of s4cmb
 #
