@@ -4,3 +4,4 @@
 
 from smarties.smarties.systematics.ellipticity import *
 from smarties.systematics.pointing import *
+from smarties.systematics.beamwidth import *
