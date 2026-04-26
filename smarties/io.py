@@ -554,6 +554,39 @@ def read_ellipticity_values_from_yaml_file(
         return ellipticity_parameters_dict
     return ellipticity_file
 
+
+def read_values_from_yaml_file(
+        path_yaml: str,
+        transform_into_dict: bool=False,
+        detector_features_all: list[str]=None,
+    ):
+    if transform_into_dict:
+        assert detector_features_all is not None, "detector_features_all must be provided if transform_into_array is True"
+
+    with open(path_yaml) as file:
+        dictionary_yaml = yaml.safe_load(file)
+
+    if not transform_into_dict:
+        return dictionary_yaml
+    
+    else:
+        list_keys_parameter_values = dictionary_yaml[detector_features_all[0]].keys()
+        output_parameters_dict = {
+            key: 
+            np.array(
+                [dictionary_yaml[det_name][key] for det_name in detector_features_all]
+            )
+            for key in list_keys_parameter_values
+        }
+        other_parameters = list(dictionary_yaml.keys())
+        other_parameters.remove(detector_features_all)
+
+        for key in other_parameters:
+            output_parameters_dict[key] = dictionary_yaml[key]
+        return output_parameters_dict
+
+
+
 def read_spherical_derivatives_from_file(
         path_spherical_derivatives,
         is_car: bool=False,

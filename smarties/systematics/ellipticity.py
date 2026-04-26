@@ -20,7 +20,7 @@ from smarties.tools import convert_ellipticities_conventions, get_rotation_matri
 def get_differential_ellipticity_BICEP(
         intensity_CMB,
         ellipticity_parameters_dict,
-        sigma_FWHM,
+        sigma_fwhm,
         lmax=None,
         mask=None,
         spherical_derivatives=None,
@@ -44,7 +44,7 @@ def get_differential_ellipticity_BICEP(
         Dictionary of the ellipticity parameters provided for each detector, see
         must contain keys 'ellipticity_parameter_convention', see the function
         `convert_ellipticities_conventions` in `tools.py` for more details
-    sigma_FWHM: np.ndarray | float
+    sigma_fwhm: np.ndarray | float
         Full width at half maximum of the beam in arcmin, provided for each detector
         or as a float, assumed to have been used to compute the circularly-symmetric 
         beam smoothing the intensity_CMB map, and around which the Taylor expansion 
@@ -73,7 +73,7 @@ def get_differential_ellipticity_BICEP(
     -----
     Currently, the input intensity_CMB map is assumed to be a full sky map, 
     i.e. it must have a dimension of 12 * nside^2 or the full sky car dimension, 
-    and smoothed with the circularly-symmetric beam defined by the sigma_FWHM parameter. 
+    and smoothed with the circularly-symmetric beam defined by the sigma_fwhm parameter. 
     """
 
     assert 'ellipticity_parameter_convention' in ellipticity_parameters_dict or ('dp' in ellipticity_parameters_dict and 'dc' in ellipticity_parameters_dict), "The provided ellipticity_parameters_dict must contain the 'ellipticity_parameter_convention' key to specify the ellipticity parameter convention used to compute the dp and dc parameters"
@@ -82,7 +82,7 @@ def get_differential_ellipticity_BICEP(
 
     p_c_parameters_dict = convert_ellipticities_conventions(
         ellipticity_parameters_dict,
-        sigma_FWHM=sigma_FWHM,
+        sigma_fwhm=sigma_fwhm,
         input_ellipticity_convention=ellipticity_parameters_dict['ellipticity_parameter_convention'],
         output_ellipticity_convention='Plus-Cross ellipticity',
     )
@@ -101,7 +101,7 @@ def get_differential_ellipticity_BICEP(
     take_box_function = lambda x: x#[mask_bool]
 
     
-    sigma_cs = np.asarray(sigma_FWHM) / ((8 * np.log(2)) ** 0.5) * np.pi/(180*60)  # convert from FWHM to sigma_cs, in radians
+    sigma_cs = np.asarray(sigma_fwhm) / ((8 * np.log(2)) ** 0.5) * np.pi/(180*60)  # convert from FWHM to sigma_cs, in radians
     if spherical_derivatives is None:
         print("Computing spherical derivatives from the temperature map", flush=True)
 
@@ -218,7 +218,7 @@ def get_differential_ellipticity_BICEP(
 def old_get_differential_ellipticity_BICEP(
         intensity_CMB,
         ellipticity_parameters_dict,
-        sigma_FWHM,
+        sigma_fwhm,
         lmax=None,
         mask=None,
         spherical_derivatives=None,
@@ -249,7 +249,7 @@ def old_get_differential_ellipticity_BICEP(
         Dictionary of the ellipticity parameters provided for each detector, see
         must contain keys 'ellipticity_parameter_convention', see the function
         `convert_ellipticities_conventions` in `tools.py` for more details
-    sigma_FWHM: np.ndarray | float
+    sigma_fwhm: np.ndarray | float
         Full width at half maximum of the beam in arcmin, provided for each detector
         or as a float, assumed to have been used to compute the circularly-symmetric 
         beam smoothing the intensity_CMB map, and around which the Taylor expansion 
@@ -278,7 +278,7 @@ def old_get_differential_ellipticity_BICEP(
     -----
     Currently, the input intensity_CMB map is assumed to be a full sky map, 
     i.e. it must have a dimension of 12 * nside^2 or the full sky car dimension, 
-    and smoothed with the circularly-symmetric beam defined by the sigma_FWHM parameter. 
+    and smoothed with the circularly-symmetric beam defined by the sigma_fwhm parameter. 
     """
 
     assert 'ellipticity_parameter_convention' in ellipticity_parameters_dict or (
@@ -289,7 +289,7 @@ def old_get_differential_ellipticity_BICEP(
 
     p_c_parameters_dict = convert_ellipticities_conventions(
         ellipticity_parameters_dict,
-        sigma_FWHM=sigma_FWHM,
+        sigma_fwhm=sigma_fwhm,
         input_ellipticity_convention=ellipticity_parameters_dict['ellipticity_parameter_convention'],
         output_ellipticity_convention='Plus-Cross ellipticity',
     )
@@ -308,7 +308,7 @@ def old_get_differential_ellipticity_BICEP(
     take_box_function = lambda x: x#[mask_bool]
 
     
-    sigma_cs = np.asarray(sigma_FWHM) / ((8 * np.log(2)) ** 0.5) * np.pi/(180*60)  # convert from FWHM to sigma_cs, in radians
+    sigma_cs = np.asarray(sigma_fwhm) / ((8 * np.log(2)) ** 0.5) * np.pi/(180*60)  # convert from FWHM to sigma_cs, in radians
     if spherical_derivatives is None:
         print("Computing spherical derivatives from the temperature map", flush=True)
 
@@ -428,7 +428,7 @@ def old_get_differential_ellipticity_BICEP(
 def get_differential_ellipticity_no_calibration(
         intensity_CMB,
         ellipticity_parameters_dict,
-        sigma_FWHM,
+        sigma_fwhm,
         lmax=None,
         mask=None,
         spherical_derivatives=None,
@@ -447,7 +447,7 @@ def get_differential_ellipticity_no_calibration(
         Ellipticity parameter provided for each detector, defined as the ratio of the difference between the squares of the major and minor axes of the ellipse to their sum, i.e. $\epsilon = (\sigma_{\rm maj}^2 - \sigma_{\rm min}^2) / (\sigma_{\rm maj}^2 + \sigma_{\rm min}^2)$, which is also two times the third eccentricity parameter
     ellipse_angle: np.ndarray
         Angle of the ellipse in radians, defined as the angle between the major axis and the x-axis, for each detector
-    sigma_FWHM: np.ndarray
+    sigma_fwhm: np.ndarray
         Full width at half maximum of the beam in arcmin, for each detector, used to compute the circularly-symmetric (cs) beam width $\sigma_{\rm cs}$ as $\sigma_{\rm cs} = \frac{\rm FWHM}{\sqrt{8 \ln(2)}}$
     lmax: int
         Maximum multipole for the computation of the spin derivatives of the intensity CMB map
@@ -464,18 +464,18 @@ def get_differential_ellipticity_no_calibration(
 
     Notes
     -----
-    Currently, the input intensity_CMB map is assumed to be a full sky map, i.e. it must have a dimension of 12 * nside^2, where nside is the HEALPix nside parameter, and smooth with the circularly-symmetric beam defined by the sigma_FWHM parameter. 
+    Currently, the input intensity_CMB map is assumed to be a full sky map, i.e. it must have a dimension of 12 * nside^2, where nside is the HEALPix nside parameter, and smooth with the circularly-symmetric beam defined by the sigma_fwhm parameter. 
     """
 
     assert 'ellipticity_parameter_convention' in ellipticity_parameters_dict or ('dp' in ellipticity_parameters_dict and 'dc' in ellipticity_parameters_dict), "The provided ellipticity_parameters_dict must contain the 'ellipticity_parameter_convention' key to specify the ellipticity parameter convention used to compute the dp and dc parameters"
     if 'ellipticity_parameter_convention' not in ellipticity_parameters_dict:
         ellipticity_parameters_dict['ellipticity_parameter_convention'] = 'Plus-Cross ellipticity'
 
-    sigma_cs = np.asarray(sigma_FWHM) * np.pi/(180*60) / ((8 * np.log(2)) ** 0.5) 
+    sigma_cs = np.asarray(sigma_fwhm) * np.pi/(180*60) / ((8 * np.log(2)) ** 0.5) 
     
     parameters_elliptical = convert_ellipticities_conventions(
         ellipticity_parameters_dict,
-        sigma_FWHM=sigma_FWHM,
+        sigma_fwhm=sigma_fwhm,
         input_ellipticity_convention=ellipticity_parameters_dict['ellipticity_parameter_convention'],
         output_ellipticity_convention='Third flattening',
     )
