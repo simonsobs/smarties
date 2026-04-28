@@ -103,8 +103,8 @@ def build_central_term_pointing_leakage(
         )
         
         
-        central_term = take_box_function(
-            intensity_spin_1_derivatives[input_spin+1],
+        central_term = 1j * take_box_function(
+            intensity_spin_1_derivatives[input_spin-1],
         )[mask_bool]
 
     else:
@@ -118,9 +118,9 @@ def build_central_term_pointing_leakage(
                 if spherical_derivatives[spin].shape != np.prod(shape_car):
                     raise ValueError(f"The provided spherical_derivatives for spin {spin} have a shape {spherical_derivatives[spin].shape} that is not compatible with the expected shape of the flattened CAR maps {np.prod(shape_car)}")
 
-        central_term = (
-            spherical_derivatives['theta'][mask_bool] 
-            - 1j * spherical_derivatives['phi'][mask_bool]
+        central_term = -(
+            1j * spherical_derivatives['theta'][mask_bool] 
+            +  spherical_derivatives['phi'][mask_bool]
         )
 
     return central_term
@@ -284,7 +284,7 @@ def create_pointing_spin_leakage_map_BICEP(
     # Spin -1
     pointing_leakage_spin_maps[-1] = contract(
         'd,p->dp', 
-        (1j * delta_x + delta_y) / 2., 
+        (delta_x - 1j * delta_y) / 2., 
         central_term
     ) 
 

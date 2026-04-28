@@ -330,7 +330,7 @@ def save_partial_spin_maps(
 
 def convert_ellipticities_conventions(
         dictionary_ellipticities, 
-        sigma_FWHM,  # arcmin
+        sigma_fwhm,  # arcmin
         input_ellipticity_convention='Third flattening',
         output_ellipticity_convention='Third flattening'
     ):
@@ -351,7 +351,7 @@ def convert_ellipticities_conventions(
             * 'ellipticity_value' and 'ellipticity_angle' for 'Third flattening', 
             'Third eccentricity' and 'Modified second flattening' conventions.
             * 'dp' and 'dc' for 'Plus-Cross ellipticity' convention.
-    sigma_FWHM: float or np.ndarray
+    sigma_fwhm: float or np.ndarray
         Beam full-width at half-maximum (FWHM) in arcminutes.
     input_ellipticity_convention: str
         Convention of the input ellipticity parameters. Must be one of the following:
@@ -374,7 +374,7 @@ def convert_ellipticities_conventions(
     assert input_ellipticity_convention in list_conventions, "ellipticity_parameter_convention must be an element of the list of supported conventions {list_conventions}"
     assert output_ellipticity_convention in list_conventions, "ellipticity_parameter_convention must be an element of the list of supported conventions {list_conventions}"
 
-    sigma_cs = np.asarray(sigma_FWHM) / ((8 * np.log(2)) ** 0.5) * np.pi/(180*60)
+    sigma_cs = np.asarray(sigma_fwhm) / ((8 * np.log(2)) ** 0.5) * np.pi/(180*60)
 
     for key, item in dictionary_ellipticities.items():
         dictionary_ellipticities[key] = np.asarray(item)

@@ -31,7 +31,7 @@ class Spin_maps(dict):
         Returns the list of spins in the Spin_maps object
         """
         all_keys = self.keys() if len(self.keys()) > 1 else [self.keys()]
-        define_spins_func = lambda key: Spin_nm(key) if isinstance(key, Iterable) else key
+        define_spins_func = lambda key: Spin_nm(key) if (isinstance(key, Iterable) and len(key) != 1) else key
         return [define_spins_func(key) for key in all_keys]
 
     @classmethod

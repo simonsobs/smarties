@@ -242,15 +242,24 @@ class FrameworkSystematics(object):
             polar_angle_coeff = {spin: np.exp(spin * 1j * polar_angle) for spin in h_n_spin_dict.spins}
             #TODO: Generalize to m != 0 for HWP angles
         
+        npix = mask[observed_pixels_array].size
 
         if spin_systematics_maps is None:
             print("No systematics maps provided, assuming no systematics", flush=True)
             spin_systematics_maps = Spin_maps.from_dictionary({spin: np.zeros(1) for spin in spin_sky_maps.spins})
-
+        
         assert np.all(sum(spin_sky_maps.values()).imag < 1e-14), 'The sum of the input sky maps must be real, the imaginary part is not expected to be non-zero'
         assert np.all(sum(spin_systematics_maps.values()).imag < 1e-14), 'The sum of the input systematics maps must be real, the imaginary part is not expected to be non-zero'
 
-        npix = mask[observed_pixels_array].size
+
+        for spin in set(spin_sky_maps.spins):
+            if spin not in spin_systematics_maps:
+                spin_systematics_maps[spin] = np.zeros(1) # If a spin is not provided in the systematics maps, we assume that the systematics maps for this spin are zero
+
+        for spin in set(spin_systematics_maps.spins):
+            if spin not in spin_sky_maps:
+                spin_sky_maps[spin] = np.zeros(1) # If a spin is not provided in the sky maps, we assume that the sky maps for this spin are zero
+        
         if inverse_mapmaking_matrix is None:
             inverse_mapmaking_matrix = self.get_inverse_mapmaking_matrix(
                 h_n_spin_dict, 
@@ -266,14 +275,18 @@ class FrameworkSystematics(object):
        
         print("Computing the spin coupled maps...", flush=True)
         spin_coupled_maps = np.zeros((npix, len(self.list_spin_output),), dtype=complex)
-        list_spin_maps = spin_sky_maps.spins 
-        
+        list_spin_maps = list(np.unique(spin_sky_maps.spins + spin_systematics_maps.spins))
+
         factor_func = lambda spin: 1 if np.sum(spin) == 0 else .5 
         # Depends on the definition of the pointing matrix
         
         for i, spin in enumerate(self.list_spin_input):
             # Get all combinations of spins (k-k', k') such that k-k' = spin
-            coupled_spins = get_coupled_spin(spin, h_n_spin_dict.spins, list_spin_maps)
+            coupled_spins = get_coupled_spin(
+                reference_spin=spin, 
+                available_h_n_spin=h_n_spin_dict.spins, 
+                available_signal_spins=list_spin_maps
+            )
 
             print(f'Coupled spins for spin {spin}: {coupled_spins}', flush=True)
 
