@@ -117,6 +117,7 @@ def uncouple_spectra_TT(
             spin=0,
             wcs=wcs,
             lmax=lmax,
+            lmax_mask=lmax,
             masked_on_input=False
         )
         cl_coupled = nmt.compute_coupled_cell(
@@ -171,6 +172,7 @@ def uncouple_spectra_pol(
         spin=2,
         wcs=wcs,
         lmax=lmax,
+        lmax_mask=lmax,
         masked_on_input=False,
         purify_e=purify_e,
         purify_b=purify_b
@@ -185,6 +187,7 @@ def uncouple_spectra_pol(
             spin=2,
             wcs=wcs,
             lmax=lmax,
+            lmax_mask=lmax,
             masked_on_input=False,
             purify_e=purify_e,
             purify_b=purify_b
