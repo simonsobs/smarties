@@ -9,8 +9,24 @@ from smarties.harmonics import _alm2map_ducc0
 
 
 def convert_alm_plusminus_to_spin(
-    alm_plus, alm_minus, spin=2
-):  # convert lbs alms from [alm_0, alm_plus, alm_minus] to [alm_0, alm_spin, alm_-spin]
+    alm_plus: np.ndarray, alm_minus: np.ndarray, spin: int = 2
+):
+    """Convert +/- basis harmonic coefficients to spin-weighted coefficients.
+
+    Parameters
+    ----------
+    alm_plus, alm_minus : np.ndarray
+        Complex harmonic coefficients in the +/- basis. Must have identical
+        shape.
+    spin : int, optional
+        Target spin. Defaults to 2.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray]
+        ``(alm_pos_spin, alm_neg_spin)``, the +spin and -spin coefficients using
+        the phase convention implemented here.
+    """
     alms_pos_spin = -1 * (alm_plus + 1j * alm_minus)  # |spin| component
     alms_neg_spin = (alm_plus - 1j * alm_minus) * (-1.0) ** (
         -1 - spin
@@ -19,11 +35,97 @@ def convert_alm_plusminus_to_spin(
     return alms_pos_spin, alms_neg_spin
 
 
-def convert_alm_spin_to_plusminus(alm_pos_spin, alm_neg_spin, spin=2):
+def convert_alm_spin_to_plusminus(
+    alm_pos_spin: np.ndarray, alm_neg_spin: np.ndarray, spin: int = 2
+):
+    """Convert spin-weighted coefficients to the +/- basis.
+
+    This is the inverse transform of
+    :func:`convert_alm_plusminus_to_spin` for the same ``spin``.
+
+    Parameters
+    ----------
+    alm_pos_spin, alm_neg_spin : np.ndarray
+        Complex harmonic coefficients for +spin and -spin. Must have identical
+        shape.
+    spin : int, optional
+        Spin of the input coefficients. Defaults to 2.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray]
+        ``(alm_plus, alm_minus)`` in the +/- basis using the phase convention
+        implemented here.
+    """
 
     alm_plus = -1 * (alm_pos_spin + (-1) ** (spin) * alm_neg_spin) / (2)
     alm_minus = -1 * (alm_pos_spin - (-1) ** (spin) * alm_neg_spin) / (2j)
     return alm_plus, alm_minus
+
+
+def gaussian_symmetric_beam_alms(
+    fwhm_rad: float,
+    lmax: int,
+    mmax: int,
+    pol_angle_rad: float | None = None,
+):
+    """Compute spherical harmonic coefficients of a circular Gaussian beam.
+
+    Parameters
+    ----------
+    fwhm_rad : float
+        Full-width at half-maximum in radians.
+    lmax, mmax : int
+        Maximum multipole and azimuthal index.
+    pol_angle_rad : float or None, optional
+        Detector polarization angle in radians. If provided, polarized beam
+        coefficients are returned; otherwise only intensity is returned.
+
+    Returns
+    -------
+    np.ndarray
+        Complex array of shape ``(ncomp, nalm)``, where ``ncomp=1`` for
+        intensity-only output and ``ncomp=3`` when polarized output is
+        requested. Component 0 holds the m=0 intensity coefficients; components
+        1 and 2 hold the m=2 polarized E,B coefficients following the healpix convention.
+
+    Notes
+    -----
+    Uses the analytic Gaussian beam coefficients from Challinor et al. (2000,
+    astro-ph/0008228), includes the polarization-angle phase factor in the alms.
+    """
+    is_polarized = pol_angle_rad is not None
+
+    nval = hp.Alm.getsize(lmax, mmax)
+
+    if mmax > lmax:
+        raise ValueError("lmax value too small")
+    if is_polarized and mmax < 2:
+        raise ValueError("mmax must be 2 or more for polarized output")
+    ncomp = 3 if is_polarized else 1
+    alms = np.zeros((ncomp, nval), dtype=np.complex128)
+    sigmasq = fwhm_rad * fwhm_rad / (8 * np.log(2.0))
+
+    ell_intensity = np.arange(lmax + 1)  # Only m=0 for intensity
+
+    alms[0, hp.Alm.getidx(lmax, ell_intensity, 0)] = np.sqrt(
+        (2 * ell_intensity + 1) / (4.0 * np.pi)
+    ) * np.exp(-0.5 * sigmasq * ell_intensity * (ell_intensity + 1))
+
+    if is_polarized:
+        pol_angle_factor = np.exp(-2j * pol_angle_rad)
+        ell_polarisation = np.arange(2, lmax + 1)  # Only m=2 for polarization
+
+        alms[1, hp.Alm.getidx(lmax, ell_polarisation, 2)] = (
+            np.sqrt((2 * ell_polarisation + 1) / (32 * np.pi))
+            * np.exp(-0.5 * sigmasq * ell_polarisation * (ell_polarisation + 1))
+            * pol_angle_factor
+            * np.exp(2 * sigmasq)  # accounting for polarization angle of the detector
+            * (-1 * np.sqrt(2))  # norm factor when going from +- 2 alms to almE almB
+        )
+        alms[2] = 1j * alms[1]
+
+    return alms
 
 
 def get_systematic_maps_from_alms_blms(
@@ -32,13 +134,52 @@ def get_systematic_maps_from_alms_blms(
     fwhm: list[float],
     det_names: list,
     lmax: int,
-    nside: int,
     mmax: int,
-    pol_angles: np.ndarray,
+    nside: int,
+    pol_angles_rad: np.ndarray,
     spins: np.ndarray | None = None,
 ):
-    """
-    Computes the systematic spin maps associeted to some blms, considering blms-blms_gauss(fwhm) to do so
+    """Compute systematic spin maps from sky and beam harmonic coefficients.
+
+    For each detector, this subtracts a symmetric Gaussian beam (computed from
+    ``fwhm``) from the provided beam coefficients and then constructs the
+    spin-weighted harmonic coefficients and maps for the requested spins.
+
+    Parameters
+    ----------
+    alms : dict[str, np.ndarray]
+        Sky harmonic coefficients per detector. Each value is expected to be a
+        complex array with shape ``(3, nalm)`` following the component ordering
+        used throughout this module.
+    blms : dict[str, np.ndarray]
+        Beam harmonic coefficients per detector with the same shape and
+        ordering as ``alms``.
+    fwhm : list[float]
+        Beam full-width at half-maximum values in arcminutes, one per detector.
+    det_names : list
+        Detector identifiers; used to index ``alms``/``blms`` and to define the
+        detector loop order.
+    lmax, mmax : int
+        Maximum multipole and azimuthal index.
+    nside : int
+        HEALPix ``nside`` for the output maps.
+    pol_angles_rad : np.ndarray
+        Polarization angles (radians) for each detector.
+    spins : np.ndarray or None, optional
+        Spins to compute. If ``None``, all spins from ``-mmax`` to ``mmax`` are
+        computed.
+
+    Returns
+    -------
+    dict[int, np.ndarray]
+        Mapping from spin to complex maps with shape ``(n_det, npix)``. Positive
+        and negative spins are both returned; spin-0 maps are real-valued but
+        stored in a complex array.
+
+    Notes
+    -----
+    The beam arrays in ``blms`` are modified in place when subtracting the
+    symmetric Gaussian component.
     """
     n_det = len(det_names)
     if spins is None:
@@ -46,7 +187,7 @@ def get_systematic_maps_from_alms_blms(
     else:
         spins_needed = np.array(spins)
     spins_needed_pos = spins_needed[spins_needed >= 0]
-    assert np.max(spins_needed_pos) <= mmax
+    assert np.max(spins_needed_pos) <= mmax, "The spin wanted must be smaller than mmax"
     dict_spin_maps = {
         spin: np.zeros((n_det, hp.nside2npix(nside)), dtype=np.complex128)
         for spin in spins_needed
@@ -60,20 +201,12 @@ def get_systematic_maps_from_alms_blms(
         alms_det = alms[det_name]
         blms_det = blms[det_name]
 
-        gaussian_blms = hp.blm_gauss(fwhm=fwhm_rad[idet], lmax=lmax, pol=True)
-        gaussian_blms[1:, :] *= (
-            np.exp(
-                -2j * pol_angles[idet]
-            )  # accounting for polarization angle of the detector
-            * np.exp(
-                2 * fwhm_rad[idet] ** 2 / (8 * np.log(2.0))
-            )  # challinor polarisation
-            * (-1 * np.sqrt(2))
+        gaussian_blms = gaussian_symmetric_beam_alms(
+            fwhm_rad=fwhm_rad[idet],
+            lmax=lmax,
+            mmax=mmax,
+            pol_angle_rad=pol_angles_rad[idet],
         )
-        gaussian_blms_full = np.zeros_like(alms_det)
-        for m in range(2 + 1):
-            indexes = hp.Alm.getidx(lmax, np.arange(lmax + 1), m)
-            gaussian_blms_full[:, indexes] = gaussian_blms[:, indexes]
 
         # print("Gaussian blms for detector", det_name, ":", gaussian_blms.values[1])
 
@@ -93,8 +226,6 @@ def get_systematic_maps_from_alms_blms(
 
         for spin in spins_needed:
             # pol_factor = np.exp(1j * (spin) * pol_angles[idet])
-
-            output_alms = np.zeros(hp.Alm.getsize(lmax), dtype=np.complex128)
 
             m_beam = -spin  # W_{spin} uses b*_{ell,-spin}
 
