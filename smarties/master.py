@@ -328,9 +328,11 @@ def uncouple_spectra_all(
         field_spin2
     )
 
+    indices_reordering = [0, 3, 6, 1, 2, 4, 5]
+
     return (
         binning_scheme.get_effective_ells(), 
         nmt_workspace_output.decouple_cell(
             np.vstack([cl_coupled_00, cl_coupled_02, cl_coupled_22])
-        )
+        )[indices_reordering]
     )

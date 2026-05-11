@@ -6,8 +6,6 @@ import os
 from copy import deepcopy
 import numpy as np
 import yaml
-import quaternionarray as qa
-
 
 def get_polarization_angles(
         detector_features, 
@@ -25,6 +23,32 @@ def get_polarization_angles(
         data_detectors = hardware.data['detectors']
 
         return np.array([np.deg2rad(data_detectors[det]['pol_ang']) for det in detector_features])
+    else:
+        raise ValueError(f"Telescope {telescope} not recognized. Supported telescopes are 'SAT1', 'SAT2', 'SAT3', and 'LAT'.")
+
+def get_quantities_from_sotodlib(
+        detector_features, 
+        list_keys_to_get,
+        telescope='LAT',
+        ):
+    if telescope in ['SAT1', 'SAT2', 'SAT3', 'LAT']:
+        try:
+            import sotodlib.sim_hardware
+        except ImportError:
+            raise ImportError("sotodlib.sim_hardware is required to run this function. Please install the sotodlib package.")
+
+        hardware = sotodlib.sim_hardware.sim_nominal()
+        sotodlib.sim_hardware.sim_detectors_toast(hardware, telescope)
+
+        data_detectors = hardware.data['detectors']
+
+        for key in list_keys_to_get:
+            if key not in data_detectors[detector_features[0]]:
+                raise ValueError(
+                    f"Key {key} not found in the detector data. Available keys are: {list(data_detectors[detector_features[0]].keys())}"
+                )
+
+        return {key: np.array([data_detectors[det][key] for det in detector_features]) for key in list_keys_to_get}
     else:
         raise ValueError(f"Telescope {telescope} not recognized. Supported telescopes are 'SAT1', 'SAT2', 'SAT3', and 'LAT'.")
 
@@ -144,7 +168,11 @@ def get_detector_names_from_dictionary_detector(
         for j, pixel in enumerate(deepcopy(pixel_distribution_chosen)):
             if ':' in pixel:
                 filled_pixels = fill_pixels_interval(pixel)
-                pixel_distribution_chosen = pixel_distribution_chosen[:j + count_size] + filled_pixels + pixel_distribution_chosen[j+1+count_size:]
+                pixel_distribution_chosen = pixel_distribution_chosen[
+                        :j + count_size
+                    ] + filled_pixels + pixel_distribution_chosen[
+                        j+1+count_size:
+                    ]
                 count_size += len(filled_pixels) - 1
             
         for pixel in pixel_distribution_chosen:
@@ -176,7 +204,11 @@ def get_list_detectors_from_yaml_and_h_n(
 
     _number_detectors = len(detector_features)
     for i in range(_number_detectors):
-        if os.path.exists(path_h_n + detector_features[i] + '_' + dictionary_detectors['h_n']['detector_pair_names'][0] + '_cos_1.' + dictionary_detectors['h_n']['format_h_n']):
+        if os.path.exists(
+            path_h_n + detector_features[i] + '_' 
+            + dictionary_detectors['h_n']['detector_pair_names'][0] + '_cos_1.' 
+            + dictionary_detectors['h_n']['format_h_n']
+        ):
             h_n_names_npz.append(path_h_n + detector_features[i])
         else:
             list_detector_to_remove.append(detector_features[i])
