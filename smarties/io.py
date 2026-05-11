@@ -68,7 +68,10 @@ def read_file(
     elif format_file in ['h5', 'hdf5', 'H5', 'hdf']:
         if not name_file.endswith(format_file):
             name_file = name_file + '.' + format_file
-        return h5py.File(name_file, "r")
+        if projection_pixel == 'healpix':
+            return h5py.File(name_file, "r")
+        else:
+            return flatten_CAR_maps(enmap.read_map(name_file))[boolean_mask]
     else:
         raise ValueError("Unknown format: {}".format(format_file))
 
@@ -131,7 +134,7 @@ def read_toast_h_maps(
     assert np.unique(list_spin).size == np.array(list_spin).size, 'The list of spins must be unique'
     assert (np.array(list_spin) >= 0).all(), 'The spins provided must be positive, their negative counterpart will be computed from the components read'
 
-    assert format_file in ['npy', 'npz', 'fits'], "Format file must be 'fits', 'npy' or 'npz' for TOAST h maps"
+    assert format_file in ['npy', 'npz', 'h5', 'hdf5', 'H5', 'hdf', 'fits'], "Format file must be 'fits', 'npy', 'h5', 'hdf5', 'H5', 'hdf' or 'npz' for TOAST h maps"
 
     if single_precision:
         dtype = np.complex64
@@ -161,7 +164,7 @@ def read_toast_h_maps(
                     boolean_mask=boolean_mask,
                     projection_pixel=projection_pixel,
                 )
-        n_pix = np.prod(fake_h_n_map.shape)
+        n_pix = np.prod(fake_h_n_map[boolean_mask].shape)
     elif mask is not None:
         boolean_mask = np.bool_(mask)
         n_pix = boolean_mask[boolean_mask].size
@@ -443,7 +446,7 @@ def build_mask_from_toast_h_maps(
             mask += map_cos_sin
             mask_detectors += np.int64(np.bool_(map_cos_sin))
 
-    if format_file in ['h5', 'hdf5', 'H5', 'hdf']:
+    if format_file in ['h5', 'hdf5', 'H5', 'hdf'] and projection_pixel == 'healpix':
         reorder_output = lambda x: hp.reorder(x, n2r=True)
     else:
         reorder_output = lambda x: x
