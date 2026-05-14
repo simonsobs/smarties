@@ -492,7 +492,7 @@ def reweight_h_maps(
         list_spin: list[int],
 ):
     if 0 not in h_dictionary.spins and Spin_nm((0,0)) not in h_dictionary.spins:
-        spin_0 = Spin_nm((0,0)) if len(list(h_dictionary.spins)[0]) == 2 else 0
+        spin_0 = Spin_nm((0,0)) if np.size((h_dictionary.spins)[0]) == 2 else 0
 
         h_dictionary[spin_0] = list_weights[..., np.newaxis] if list_weights.ndim == 1 else list_weights
         if new_weighting_bool:

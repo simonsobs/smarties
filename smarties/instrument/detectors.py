@@ -206,7 +206,7 @@ def get_list_detectors_from_yaml_and_h_n(
     for i in range(_number_detectors):
         if os.path.exists(
             path_h_n + detector_features[i] + '_' 
-            + dictionary_detectors['h_n']['detector_pair_names'][0] + '_cos_1.' 
+            + dictionary_detectors['h_n']['list_prefix'][0] + '_cos_1.' 
             + dictionary_detectors['h_n']['format_h_n']
         ):
             h_n_names_npz.append(path_h_n + detector_features[i])
