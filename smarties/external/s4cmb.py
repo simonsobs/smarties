@@ -27,6 +27,20 @@ from pixell import enmap
 
 from smarties.harmonics import alm2map_anypix, map2alm_anypix
 
+__all__ = [
+    'get_healpix_ring_pixel_layout',
+    'get_car_ring_layout',
+    'compute_phi_1st_derivative',
+    'compute_phi_2nd_derivatives',
+    'multiply_tan_theta_power',
+    'get_alpha_raise',
+    'get_alpha_lower',
+    'get_first_spin_derivative',
+    'get_second_spin_derivative',
+    'get_first_spherical_derivatives_from_spin_derivatives',
+    'get_second_spherical_derivatives_from_spin_derivatives'
+]
+
 def get_healpix_ring_pixel_layout(nside, th_idx):
     """Healpix ring layout.
 

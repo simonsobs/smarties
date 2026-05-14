@@ -15,7 +15,11 @@ from smarties.external.s4cmb import (
     multiply_tan_theta_power
 )
 
-def build_central_term_beamwidth_leakage(
+__all__ = [
+    'create_beamwidth_spin_leakage_map_BICEP'
+]
+
+def _build_central_term_pointing_leakage(
         intensity_CMB,
         lmax=None,
         mask=None,
@@ -211,7 +215,7 @@ def create_beamwidth_spin_leakage_map_BICEP(
     # convert from FWHM to sigma_cs, in radians
 
 
-    central_term = build_central_term_beamwidth_leakage(
+    central_term = _build_central_term_pointing_leakage(
         intensity_CMB,
         lmax=lmax,
         mask=mask,

@@ -17,6 +17,11 @@ from smarties.external.s4cmb import (
 )
 from smarties.tools import convert_ellipticities_conventions, get_rotation_matrix
 
+__all__ = [
+    'get_differential_ellipticity_BICEP',
+    'get_differential_ellipticity_no_calibration'
+]
+
 def get_differential_ellipticity_BICEP(
         intensity_CMB,
         ellipticity_parameters_dict,

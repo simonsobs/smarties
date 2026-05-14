@@ -10,6 +10,11 @@ from pixell import enmap
 from smarties.tools import get_coupled_spin, get_row_mapmaking_matrix
 from smarties.sky.cmb import create_CMB_spin_maps
 from smarties.hn import Spin_maps, Spin_nm
+
+__all__ = [
+    'FrameworkSystematics'
+]
+
 class FrameworkSystematics(object):
     """
     Class to simulate systematics maps

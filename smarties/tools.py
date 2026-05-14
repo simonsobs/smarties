@@ -11,6 +11,20 @@ from pixell import enmap
 
 from smarties.hn import Spin_maps, Spin_nm
 
+__all__ = [
+    'get_coupled_spin',
+    'get_row_mapmaking_matrix',
+    'get_rotation_matrix',
+    'transform_array_maps_into_spin_maps',
+    'transform_spin_maps_into_array_maps',
+    'save_partial_spin_maps',
+    'convert_ellipticities_conventions',
+    'flatten_CAR_maps',
+    'unflatten_CAR_maps',
+    'reweight_h_maps',
+    'list_conventions'
+]
+
 list_conventions = [
     'Third flattening', 
     'Third eccentricity',

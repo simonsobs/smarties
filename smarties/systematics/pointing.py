@@ -11,7 +11,12 @@ from smarties.harmonics import map2alm_anypix
 from smarties.hn import Spin_maps
 from smarties.external.s4cmb import get_first_spin_derivative
 
-def build_central_term_pointing_leakage(
+__all__ = [
+    'create_pointing_spin_leakage_map',
+    'create_pointing_spin_leakage_map_BICEP'
+]
+
+def _build_central_term_pointing_leakage(
         intensity_CMB,
         lmax=None,
         mask=None,
@@ -174,7 +179,7 @@ def create_pointing_spin_leakage_map(
     assert np.array(amplitude_offset).ndim == 1, 'The dimension of the amplitude_offset must be (n_det,)'
     assert amplitude_offset.shape == angle_offset.shape, 'The amplitude offset must have the same shape as the angle offset'
 
-    central_term = build_central_term_pointing_leakage(
+    central_term = _build_central_term_pointing_leakage(
         intensity_CMB,
         lmax=lmax,
         mask=mask,
@@ -269,7 +274,7 @@ def create_pointing_spin_leakage_map_BICEP(
     # else:
     #     sigma_cs = 1.
 
-    central_term = build_central_term_pointing_leakage(
+    central_term = _build_central_term_pointing_leakage(
         intensity_CMB,
         lmax=lmax,
         mask=mask,

@@ -8,6 +8,12 @@ import healpy as hp
 
 from smarties.hn import Spin_maps
 
+__all__ = [
+    'generate_power_spectra_CAMB',
+    'generate_CMB_map',
+    'create_CMB_spin_maps'
+]
+
 def generate_power_spectra_CAMB(
     lmax,
     r=0,

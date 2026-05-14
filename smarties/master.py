@@ -6,6 +6,13 @@ import os
 import numpy as np
 from pixell import enmap, curvedsky
 
+__all__ = [
+    'filter_map_ell_cut',
+    'uncouple_spectra_TT',
+    'uncouple_spectra_pol',
+    'uncouple_spectra_all'
+]
+
 def filter_map_ell_cut(
         input_map, 
         mask_apodized,

@@ -9,6 +9,11 @@ from pixell import enmap, curvedsky
 import ducc0
 
 
+__all__ = [
+    'map2alm_anypix',
+    'alm2map_anypix'
+]
+
 
 def _ducc_dictionary(
         spin, 
