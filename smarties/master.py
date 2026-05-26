@@ -10,6 +10,7 @@ __all__ = [
     'filter_map_ell_cut',
     'uncouple_spectra_TT',
     'uncouple_spectra_pol',
+    'uncouple_cross_spectra',
     'uncouple_spectra_all'
 ]
 
@@ -226,6 +227,180 @@ def uncouple_spectra_pol(
 
 
 
+def uncouple_cross_spectra(
+        input_map,
+        input_map_2,
+        mask_apodized, 
+        lmax,
+        delta_ell,
+        purify_e=False,
+        purify_b=False,
+    ):
+    """Compute the uncoupled power spectra in temperature of one enmap maps.
+
+    Parameters
+    ----------
+    input_map : enmap
+        First input enmap map.
+    mask_apodized : enmap
+        Apodized mask to be applied to the maps.
+    delta_ell : int
+        Width of the bins for the power spectrum.
+    input_map2 : enmap
+        Second input enmap map.
+    
+    Returns
+    -------
+    binned_cls : array
+        Binned power spectra between the two maps.
+    """
+
+    try:
+        import pymaster as nmt
+    except ImportError:
+        raise ImportError("pymaster is not installed. Please install it to use this function.")
+    
+    
+    wcs = input_map.wcs
+
+    intensity_map_1 = input_map[0] if input_map.ndim == 3 else input_map
+    if input_map_2 is not None:
+        intensity_map_2 = input_map_2[0] if input_map_2.ndim == 3 else input_map_2
+    
+
+    polarization_map_1 = input_map[1:] if input_map.ndim == 3 else input_map
+    if input_map_2 is not None:
+        polarization_map_2 = input_map_2[1:] if input_map_2.ndim == 3 else input_map_2
+    
+    binning_scheme = nmt.NmtBin.from_lmax_linear(lmax, delta_ell)
+
+    field_spin0_map1 = nmt.NmtField(
+        mask=mask_apodized, 
+        maps=[intensity_map_1], 
+        spin=0,
+        wcs=wcs,
+        lmax=lmax,
+        lmax_mask=lmax,
+        masked_on_input=False
+    )
+
+    field_spin2_map1 = nmt.NmtField(
+        mask=mask_apodized, 
+        maps=polarization_map_1, 
+        spin=2,
+        wcs=wcs,
+        lmax=lmax,
+        lmax_mask=lmax,
+        masked_on_input=False,
+        purify_e=purify_e,
+        purify_b=purify_b
+    )
+
+    field_spin0_map2 = nmt.NmtField(
+        mask=mask_apodized, 
+        maps=[intensity_map_2], 
+        spin=0,
+        wcs=wcs,
+        lmax=lmax,
+        lmax_mask=lmax,
+        masked_on_input=False
+    )
+
+    field_spin2_map2 = nmt.NmtField(
+        mask=mask_apodized, 
+        maps=polarization_map_2, 
+        spin=2,
+        wcs=wcs,
+        lmax=lmax,
+        lmax_mask=lmax,
+        masked_on_input=False,
+        purify_e=purify_e,
+        purify_b=purify_b
+    )
+    
+
+    nmt_workspace_00_output = nmt.workspaces.NmtWorkspace(
+        fl1=field_spin0_map1, 
+        fl2=field_spin0_map2, 
+        bins=binning_scheme
+    )
+
+
+    nmt_workspace_22_output = nmt.workspaces.NmtWorkspace(
+        fl1=field_spin2_map1, 
+        fl2=field_spin2_map2, 
+        bins=binning_scheme
+    )
+
+    nmt_workspace_02_map12_output = nmt.workspaces.NmtWorkspace(
+        fl1=field_spin0_map1, 
+        fl2=field_spin2_map2, 
+        bins=binning_scheme
+    )
+
+
+    nmt_workspace_02_map21_output = nmt.workspaces.NmtWorkspace(
+        fl1=field_spin0_map2, 
+        fl2=field_spin2_map1, 
+        bins=binning_scheme
+    )
+
+    cl_coupled_00 = nmt.compute_coupled_cell(
+        field_spin0_map1,
+        field_spin0_map2
+    )
+
+    cl_coupled_22 = nmt.compute_coupled_cell(
+        field_spin2_map1,
+        field_spin2_map2
+    )
+
+    cl_coupled_02_map12 = nmt.compute_coupled_cell(
+        field_spin0_map1,
+        field_spin2_map2
+    )
+
+    cl_coupled_02_map21 = nmt.compute_coupled_cell(
+        field_spin0_map2,
+        field_spin2_map1
+    )
+
+    nmt_workspace_00_output.compute_coupling_matrix(
+        field_spin0_map1, 
+        field_spin0_map2, 
+        binning_scheme
+    )
+
+    nmt_workspace_22_output.compute_coupling_matrix(
+        field_spin2_map1, 
+        field_spin2_map2, 
+        binning_scheme
+    )
+
+    nmt_workspace_02_map12_output.compute_coupling_matrix(
+        field_spin0_map1, 
+        field_spin2_map2, 
+        binning_scheme
+    )
+
+    nmt_workspace_02_map21_output.compute_coupling_matrix(
+        field_spin0_map2, 
+        field_spin2_map1, 
+        binning_scheme
+    )
+
+
+    dictionary_decoupled_spectra = {
+        '00': nmt_workspace_00_output.decouple_cell(cl_coupled_00),
+        '22': nmt_workspace_22_output.decouple_cell(cl_coupled_22),
+        '02_map12': nmt_workspace_02_map12_output.decouple_cell(cl_coupled_02_map12),
+        '02_map21': nmt_workspace_02_map21_output.decouple_cell(cl_coupled_02_map21),
+    }
+
+    return binning_scheme.get_effective_ells(), dictionary_decoupled_spectra
+
+
+
 def uncouple_spectra_all(
         input_map,
         mask_apodized, 
@@ -335,6 +510,7 @@ def uncouple_spectra_all(
         field_spin2
     )
 
+    # Ordering: TT, EE, BB, TE, TB, EB, BE
     indices_reordering = [0, 3, 6, 1, 2, 4, 5]
 
     return (
