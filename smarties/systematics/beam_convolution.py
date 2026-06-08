@@ -138,6 +138,7 @@ def get_systematic_maps_from_alms_blms(
     nside: int,
     pol_angles_rad: np.ndarray,
     spins: np.ndarray | None = None,
+    substract_gaussian_beam=True,
 ):
     """Compute systematic spin maps from sky and beam harmonic coefficents.
 
@@ -166,7 +167,8 @@ def get_systematic_maps_from_alms_blms(
         Polarization angles in radians.
     spins: np.ndarray or None (optional)
         Spins to compute. If ``None``, use ``-mmax..mmax``.
-
+    substract_gaussian_beam: bool
+        Wether to substract a gaussian beam or not, default to True.
     Returns
     -------
     dict[int, np.ndarray]
@@ -194,12 +196,6 @@ def get_systematic_maps_from_alms_blms(
         alms_det = alms[det_name]
         blms_det = blms[det_name]
 
-        gaussian_blms = gaussian_circular_beam_alms(
-            fwhm_rad=fwhm_rad[idet],
-            lmax=lmax,
-            mmax=mmax_beam,
-            pol_angle_rad=pol_angles_rad[idet],
-        )
 
         # print("Gaussian blms for detector", det_name, ":", gaussian_blms.values[1])
 
@@ -210,17 +206,23 @@ def get_systematic_maps_from_alms_blms(
         blm0 = blms_det[0].copy()
         blmE = blms_det[1].copy()
         blmB = blms_det[2].copy()
+        if substract_gaussian_beam:
+            gaussian_blms = gaussian_circular_beam_alms(
+                fwhm_rad=fwhm_rad[idet],
+                lmax=lmax,
+                mmax=mmax_beam,
+                pol_angle_rad=pol_angles_rad[idet],
+            )
 
-        for m in range(min(2 + 1, mmax_beam + 1)):
-            idx = hp.Alm.getidx(lmax, np.arange(m, lmax + 1), m)
-            blm0[idx] -= gaussian_blms[0, idx]
-            blmE[idx] -= gaussian_blms[1, idx]
-            blmB[idx] -= gaussian_blms[2, idx]
+            for m in range(min(2 + 1, mmax_beam + 1)):
+                idx = hp.Alm.getidx(lmax, np.arange(m, lmax + 1), m)
+                blm0[idx] -= gaussian_blms[0, idx]
+                blmE[idx] -= gaussian_blms[1, idx]
+                blmB[idx] -= gaussian_blms[2, idx]
 
         for spin in spins_needed:
-            # pol_factor = np.exp(1j * (spin) * pol_angles[idet])
 
-            m_beam = -spin  # W_{spin} uses b*_{ell,-spin}
+            m_beam = -spin  # Z_{spin} uses b*_{ell,-spin}
 
             ell_array = np.arange(
                 0, lmax + 1
