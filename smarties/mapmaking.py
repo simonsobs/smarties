@@ -83,8 +83,9 @@ class FrameworkSystematics(object):
     def get_inverse_mapmaking_matrix(
             self, 
             h_n_spin_dict: dict | Spin_maps,
-            mask: np.ndarray = None,
-            mask_input: bool = False,
+            npix: int = None,
+            # mask: np.ndarray = None,
+            # mask_input: bool = False, #TODO: Replace simply with npix!!!
             polar_angle_coeff: np.ndarray = None
         ):
         """
@@ -94,10 +95,8 @@ class FrameworkSystematics(object):
         ----------
         h_n_spin_dict: dict or Spin_maps
             Dictionary of the summed $h_n$ maps, with the keys being the spins and the values the $h_n$ maps
-        mask: np.ndarray
-            Mask of the maps, only the pixels in the observed area will be considered for the inversion, default is None, then all the pixels are considered
-        mask_input: bool
-            If True, the input $h_n$ maps will be copied and masked, otherwise the input $h_n$ maps will not be masked and assumed to be provided in the right format. Default is False.
+        npix: int
+            Number of pixels in the observed area, default is None, then the number of pixels is inferred from the input maps
 
         Returns
         -------
@@ -112,18 +111,8 @@ class FrameworkSystematics(object):
 
         list_spin = np.array(list(h_n_spin_dict.keys()))
         dtype = h_n_spin_dict[list_spin[list_spin != 0][0]].dtype
-        if mask is not None:
-            observed_pixels_array = mask != 0
-            if mask_input:
-                h_n_spin_dict = Spin_maps.from_dictionary(
-                    {spin: h_n_spin_dict[spin][...,observed_pixels_array] 
-                     if np.size(h_n_spin_dict[spin][0,...]) == mask.size 
-                     else h_n_spin_dict[spin] 
-                     for spin in h_n_spin_dict.keys()}
-                    )
-            
-            npix = mask[observed_pixels_array].size
-        else:    
+
+        if npix is None:
             npix = h_n_spin_dict[list_spin[list_spin != 0][0]].shape[-1]
         
         # First, form the mapmaking matrix composed of the h_n map
@@ -268,8 +257,7 @@ class FrameworkSystematics(object):
         if inverse_mapmaking_matrix is None:
             inverse_mapmaking_matrix = self.get_inverse_mapmaking_matrix(
                 h_n_spin_dict, 
-                mask=mask, 
-                mask_input=mask_input,
+                npix=npix,
                 polar_angle_coeff=polar_angle_coeff
             )
         else: 
