@@ -5,6 +5,7 @@
 import os
 import numpy as np
 from pixell import enmap, curvedsky
+import pspy
 
 __all__ = [
     'filter_map_ell_cut',
@@ -518,4 +519,120 @@ def uncouple_spectra_all(
         nmt_workspace_output.decouple_cell(
             np.vstack([cl_coupled_00, cl_coupled_02, cl_coupled_22])
         )[indices_reordering]
+    )
+
+def uncouple_spectra_pspy(
+        input_map,
+        input_map_2,
+        mask_apodized, 
+        lmax,
+        delta_ell,
+        niter=0,
+        spectra: list | None = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"],
+        type_output: str = "Cl"
+    ):
+    """Compute the uncoupled power spectra in temperature of one enmap maps.
+
+    Parameters
+    ----------
+    input_map : enmap
+        First input enmap map.
+    mask_apodized : enmap
+        Apodized mask to be applied to the maps.
+    delta_ell : int
+        Width of the bins for the power spectrum.
+    input_map2 : enmap
+        Second input enmap map.
+    
+    Returns
+    -------
+    binned_cls : array
+        Binned power spectra between the two maps.
+    """
+
+    try:
+        import pspy
+    except ImportError:
+        raise ImportError("pspy is not installed. Please install it to use this function.")
+    
+    if type(input_map) == enmap.ndmap:
+        assert input_map.shape[1:] == mask_apodized.shape, "The input map and the mask should have the same last two dimensions as two enmaps."
+        assert input_map.ndim == 3 and mask_apodized.ndim == 2, "The input map should have three dimensions (T, Q, U) and the mask should have two dimensions for enmaps."
+        
+    else:
+        assert input_map.shape[-1] == mask_apodized.shape[-1], "The input map and the mask should have the same last dimension as two healpix maps."
+        assert input_map.ndim == 2 and mask_apodized.ndim == 1, "The input map should have two dimensions (3, Npix) and the mask should have one dimension for healpix maps."
+        
+    
+    boolean_different_map_2 = False
+    if input_map_2 is not None:
+        assert input_map_2.shape == input_map.shape, "The two input maps should have the same shape."
+        if type(input_map) == enmap.ndmap:
+            assert input_map_2.wcs == input_map.wcs, "The two input enmaps should have the same WCS."
+        boolean_different_map_2 = True
+
+
+    window = pspy.so_map.from_enmap(mask_apodized)
+
+    window.data[:] = mask_apodized
+
+    # binning_scheme = nmt.NmtBin.from_lmax_linear(lmax, delta_ell)
+    
+    # dict_ell_binning = {
+    #     'bin_lo': binning_scheme.get_effective_ells() - (binning_scheme.get_nell_list()-1) / 2, 
+    #     'bin_hi': binning_scheme.get_effective_ells() + (binning_scheme.get_nell_list()-1) / 2, 
+    #     'bin_c': binning_scheme.get_effective_ells(), 
+    #     'bin_size': binning_scheme.get_nell_list()
+    # }
+    
+    binning_file="binning.dat"
+
+    n_bins = (lmax-2) // delta_ell
+    pspy.pspy_utils.create_binning_file(
+        bin_size=delta_ell, 
+        n_bins=n_bins, 
+        file_name=binning_file
+    )
+    
+    mbb_inv, Bbl = pspy.so_mcm.mcm_and_bbl_spin0and2(
+        (window, window), 
+        # **dict_ell_binning, 
+        binning_file=binning_file,
+        lmax=lmax, 
+        type=type_output, 
+        niter=niter
+    )
+
+    
+    alms_input_map = pspy.sph_tools.get_alms(
+        pspy.so_map.from_enmap(input_map), 
+        (window, window), 
+        niter, 
+        lmax
+    )
+    if boolean_different_map_2:
+        alm_input_map_2 = pspy.sph_tools.get_alms(
+            pspy.so_map.from_enmap(input_map_2), 
+            (window, window), 
+            niter, 
+            lmax
+        )
+    else:
+        alm_input_map_2 = alms_input_map
+
+    
+    ells, cl_coupled = pspy.so_spectra.get_spectra(
+        alms_input_map, 
+        alm_input_map_2, 
+        spectra=spectra
+    )
+
+    return pspy.so_spectra.bin_spectra(
+        ells,
+        cl_coupled,
+        binning_file,
+        lmax,
+        type=type_output,
+        mbb_inv=mbb_inv,
+        spectra=spectra
     )
