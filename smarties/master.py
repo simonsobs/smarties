@@ -2,10 +2,16 @@
 # Copyright (c) 2024-2026 bers of the Simons Simons Observatory Collaboration.
 # lease refer to the LICENSE file in the root of this repository.
 
+from copy import deepcopy
 import os
+
+
 import numpy as np
-from pixell import enmap, curvedsky
+import healpy as hp
+from pixell import enmap, curvedsky, wcsutils
 import pspy
+import ducc0
+from pspy._mcm_fortran import mcm_compute as mcm_fortran
 
 __all__ = [
     'filter_map_ell_cut',
@@ -523,13 +529,14 @@ def uncouple_spectra_all(
 
 def uncouple_spectra_pspy(
         input_map,
-        input_map_2,
         mask_apodized, 
         lmax,
         delta_ell,
+        input_map_2=None,
         niter=0,
-        spectra: list | None = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"],
-        type_output: str = "Cl"
+        spectra_ordering_output: list | None = ["TT", "TE", "TB", "ET", "BT", "EE", "EB", "BE", "BB"],
+        type_output: str = "Cl",
+        return_dictionary: bool = False
     ):
     """Compute the uncoupled power spectra in temperature of one enmap maps.
 
@@ -568,9 +575,10 @@ def uncouple_spectra_pspy(
     if input_map_2 is not None:
         assert input_map_2.shape == input_map.shape, "The two input maps should have the same shape."
         if type(input_map) == enmap.ndmap:
-            assert input_map_2.wcs == input_map.wcs, "The two input enmaps should have the same WCS."
+            assert wcsutils.is_compatible(input_map.wcs, input_map_2.wcs), "The two input enmaps should have the same WCS."
         boolean_different_map_2 = True
 
+    spectra_ordering_pspy = ['TT','TE','TB','ET','BT','EE','EB','BE','BB']
 
     window = pspy.so_map.from_enmap(mask_apodized)
 
@@ -624,15 +632,19 @@ def uncouple_spectra_pspy(
     ells, cl_coupled = pspy.so_spectra.get_spectra(
         alms_input_map, 
         alm_input_map_2, 
-        spectra=spectra
+        spectra=spectra_ordering_pspy
     )
 
-    return pspy.so_spectra.bin_spectra(
+    output = pspy.so_spectra.bin_spectra(
         ells,
         cl_coupled,
         binning_file,
         lmax,
         type=type_output,
         mbb_inv=mbb_inv,
-        spectra=spectra
+        spectra=spectra_ordering_pspy
     )
+    if return_dictionary:
+        return output
+
+    return output[0], np.array([output[1][spec] for spec in spectra_ordering_output])
