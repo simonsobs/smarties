@@ -84,9 +84,8 @@ class FrameworkSystematics(object):
             self, 
             h_n_spin_dict: dict | Spin_maps,
             npix: int = None,
-            # mask: np.ndarray = None,
-            # mask_input: bool = False, #TODO: Replace simply with npix!!!
-            polar_angle_coeff: np.ndarray = None
+            polar_angle_coeff: np.ndarray = None,
+            slice_to_apply: slice = None
         ):
         """
         Compute the inverse of the mapmaking matrix from the h_n maps
@@ -112,8 +111,13 @@ class FrameworkSystematics(object):
         list_spin = np.array(list(h_n_spin_dict.keys()))
         dtype = h_n_spin_dict[list_spin[list_spin != 0][0]].dtype
 
+        if slice_to_apply is None:
+            slice_to_apply = ...
+        elif np.all(... not in np.array(slice_to_apply)):
+            slice_to_apply = ..., slice_to_apply
+
         if npix is None:
-            npix = h_n_spin_dict[list_spin[list_spin != 0][0]].shape[-1]
+            npix = h_n_spin_dict[list_spin[list_spin != 0][0]][slice_to_apply].shape[-1]
         
         # First, form the mapmaking matrix composed of the h_n map
         mapmaking_matrix = np.zeros(
@@ -126,7 +130,8 @@ class FrameworkSystematics(object):
                 h_n_spin_dict=h_n_spin_dict, 
                 list_spin_input=self.list_spin_input, 
                 dtype=dtype,
-                polar_angle_coeff=polar_angle_coeff
+                polar_angle_coeff=polar_angle_coeff,
+                slice_to_apply=slice_to_apply
             )
         # Then, compute the inverse of the mapmaking matrix
         return np.linalg.pinv(mapmaking_matrix)
@@ -140,7 +145,7 @@ class FrameworkSystematics(object):
             inverse_mapmaking_matrix : np.ndarray = None,
             return_Q_U: bool = False,
             return_inverse_mapmaking_matrix: bool = False,
-            mask_input: bool = True,
+            mask_input: bool = False,
             polar_angle: np.ndarray = None,
             projector_h_n: np.ndarray = None,
             wcs_car=None
