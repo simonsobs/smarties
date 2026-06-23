@@ -11,7 +11,7 @@ from opt_einsum import contract
 import h5py
 from pixell import enmap
 from smarties.hn import Spin_maps, Spin_nm
-from smarties.tools import flatten_CAR_maps, reweight_hmaps_by_hits
+from smarties.utils.tools import flatten_CAR_maps, reweight_hmaps_by_hits
 
 __all__ = [
     'build_mask_from_toast_h_maps',
@@ -20,6 +20,7 @@ __all__ = [
     'read_lbs_h_maps',
     'read_spherical_derivatives_from_file',
     'read_values_from_yaml_file',
+    'save_partial_spin_maps'
 ]
 
 def read_file(
@@ -657,3 +658,75 @@ def read_spherical_derivatives_from_file(
             derivative: get_final_map(spherical_derivatives_array[i+1]) 
             for i, derivative in enumerate(list_derivatives)
         }
+
+
+def save_partial_spin_maps(
+        partial_spin_maps, 
+        nstokes,
+        shape_pixels,
+        mask_on_full_map, 
+        path_output,
+        format_output='.npy'
+    ):
+
+    extended_final_maps = np.zeros((nstokes,)+(np.prod(shape_pixels),), dtype=complex)
+    if nstokes == 3 or nstokes == 1:
+        extended_final_maps[0, mask_on_full_map != 0] = partial_spin_maps[0]
+    if nstokes == 3 or nstokes == 2:
+        final_Q_map = (partial_spin_maps[-2] + partial_spin_maps[2])/2.
+        final_U_map = 1j*(partial_spin_maps[-2] - partial_spin_maps[2])/2.
+
+        extended_final_maps[-2, mask_on_full_map != 0] = final_Q_map.real
+        extended_final_maps[-1, mask_on_full_map != 0] = final_U_map.real
+
+    if extended_final_maps.shape[-len(shape_pixels):] != shape_pixels:
+        extended_final_maps = extended_final_maps.reshape(
+            extended_final_maps.shape[:-1] + shape_pixels
+        )
+    
+    is_car = False
+    first_spin = 0 if (nstokes == 1 or nstokes == 3) else -2
+    if type(partial_spin_maps[first_spin]) == enmap.ndmap:
+        extended_final_maps = enmap.ndmap(
+            extended_final_maps, 
+            wcs=partial_spin_maps[first_spin].wcs
+        )
+        is_car = True
+
+    if is_car:
+        if format_output == '.fits' and not path_output.endswith('.fits'):
+            path_output = path_output + '.fits'
+        elif format_output == '.hdf' and not path_output.endswith('.hdf'):
+            path_output = path_output + '.hdf'
+        enmap.write_map(
+                path_output, 
+                extended_final_maps,
+                extra={'BUNIT' : 'uK'}
+            )
+    elif format_output == '.npy' or path_output.endswith('.npy'):
+        if not path_output.endswith('.npy'):
+            path_output = path_output + '.npy'
+        print("Saving map into", path_output)
+        np.save(path_output, extended_final_maps[:,mask_on_full_map!=0])
+    elif format_output == '.fits' or path_output.endswith('.fits'):
+        if not path_output.endswith('.fits'):
+            path_output = path_output + '.fits'
+        print("Saving map into", path_output)
+        
+        hp.write_map(
+            path_output, 
+            extended_final_maps, 
+            overwrite=True
+        )
+            
+    elif format_output in ['.hdf', '.hdf5'] or path_output.endswith('.hdf') or path_output.endswith('.hdf5'):
+        if not (path_output.endswith('.hdf') or path_output.endswith('.hdf5')):
+            path_output = path_output + '.hdf'
+        print("Saving map into", path_output)
+    
+        with h5py.File(path_output, 'w') as hf:
+            hf.create_dataset('maps', data=extended_final_maps)
+        hf.close()
+    else:
+        raise ValueError("Unsupported format_output. Supported formats are '.npy' and '.fits'.")
+

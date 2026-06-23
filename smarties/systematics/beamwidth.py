@@ -7,7 +7,7 @@ import healpy as hp
 from pixell import enmap
 from opt_einsum import contract
 
-from smarties.harmonics import map2alm_anypix
+from smarties.utils.harmonics import map2alm_anypix
 from smarties.hn import Spin_maps
 from smarties.external.s4cmb import (
     get_first_spin_derivative, 

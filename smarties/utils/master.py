@@ -9,9 +9,8 @@ import os
 import numpy as np
 import healpy as hp
 from pixell import enmap, curvedsky, wcsutils
-import pspy
 import ducc0
-from pspy._mcm_fortran import mcm_compute as mcm_fortran
+
 
 __all__ = [
     'filter_map_ell_cut',
@@ -559,6 +558,7 @@ def uncouple_spectra_pspy(
 
     try:
         import pspy
+        from pspy._mcm_fortran import mcm_compute as mcm_fortran
     except ImportError:
         raise ImportError("pspy is not installed. Please install it to use this function.")
     

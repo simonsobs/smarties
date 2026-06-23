@@ -25,7 +25,7 @@ import healpy as hp
 
 from pixell import enmap
 
-from smarties.harmonics import alm2map_anypix, map2alm_anypix
+from smarties.utils.harmonics import alm2map_anypix, map2alm_anypix
 
 __all__ = [
     'get_healpix_ring_pixel_layout',

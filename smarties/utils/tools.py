@@ -17,7 +17,6 @@ __all__ = [
     'get_rotation_matrix',
     'transform_array_maps_into_spin_maps',
     'transform_spin_maps_into_array_maps',
-    'save_partial_spin_maps',
     'convert_ellipticities_conventions',
     'flatten_CAR_maps',
     'unflatten_CAR_maps',
@@ -275,77 +274,6 @@ def transform_spin_maps_into_array_maps(
     return array_maps
 
 
-def save_partial_spin_maps(
-        partial_spin_maps, 
-        nstokes,
-        shape_pixels,
-        mask_on_full_map, 
-        path_output,
-        format_output='.npy'
-    ):
-
-    extended_final_maps = np.zeros((nstokes,)+(np.prod(shape_pixels),), dtype=complex)
-    if nstokes == 3 or nstokes == 1:
-        extended_final_maps[0, mask_on_full_map != 0] = partial_spin_maps[0]
-    if nstokes == 3 or nstokes == 2:
-        final_Q_map = (partial_spin_maps[-2] + partial_spin_maps[2])/2.
-        final_U_map = 1j*(partial_spin_maps[-2] - partial_spin_maps[2])/2.
-
-        extended_final_maps[-2, mask_on_full_map != 0] = final_Q_map.real
-        extended_final_maps[-1, mask_on_full_map != 0] = final_U_map.real
-
-    if extended_final_maps.shape[-len(shape_pixels):] != shape_pixels:
-        extended_final_maps = extended_final_maps.reshape(
-            extended_final_maps.shape[:-1] + shape_pixels
-        )
-    
-    is_car = False
-    first_spin = 0 if (nstokes == 1 or nstokes == 3) else -2
-    if type(partial_spin_maps[first_spin]) == enmap.ndmap:
-        extended_final_maps = enmap.ndmap(
-            extended_final_maps, 
-            wcs=partial_spin_maps[first_spin].wcs
-        )
-        is_car = True
-
-    if is_car:
-        if format_output == '.fits' and not path_output.endswith('.fits'):
-            path_output = path_output + '.fits'
-        elif format_output == '.hdf' and not path_output.endswith('.hdf'):
-            path_output = path_output + '.hdf'
-        enmap.write_map(
-                path_output, 
-                extended_final_maps,
-                extra={'BUNIT' : 'uK'}
-            )
-    elif format_output == '.npy' or path_output.endswith('.npy'):
-        if not path_output.endswith('.npy'):
-            path_output = path_output + '.npy'
-        print("Saving map into", path_output)
-        np.save(path_output, extended_final_maps[:,mask_on_full_map!=0])
-    elif format_output == '.fits' or path_output.endswith('.fits'):
-        if not path_output.endswith('.fits'):
-            path_output = path_output + '.fits'
-        print("Saving map into", path_output)
-        
-        hp.write_map(
-            path_output, 
-            extended_final_maps, 
-            overwrite=True
-        )
-            
-    elif format_output in ['.hdf', '.hdf5'] or path_output.endswith('.hdf') or path_output.endswith('.hdf5'):
-        if not (path_output.endswith('.hdf') or path_output.endswith('.hdf5')):
-            path_output = path_output + '.hdf'
-        print("Saving map into", path_output)
-    
-        with h5py.File(path_output, 'w') as hf:
-            hf.create_dataset('maps', data=extended_final_maps)
-        hf.close()
-    else:
-        raise ValueError("Unsupported format_output. Supported formats are '.npy' and '.fits'.")
-
-
 def convert_ellipticities_conventions(
         dictionary_ellipticities, 
         sigma_fwhm,  # arcmin
@@ -505,10 +433,11 @@ def unflatten_CAR_maps(maps_CAR_flatten, original_shape_pixels):
 def reweight_hmaps_by_hits(
         h_dictionary: dict| Spin_maps,
         list_weights: np.ndarray,
-        error_precision: float,
         list_spin: list[int],
+        error_precision: float = None,
 ):
     if 0 not in h_dictionary.spins and Spin_nm((0,0)) not in h_dictionary.spins:
+        error_precision = 1e-8 if error_precision is None else error_precision
         spin_0 = Spin_nm((0,0)) if np.size((h_dictionary.spins)[0]) == 2 else 0
 
         h_dictionary[spin_0] = list_weights[..., np.newaxis] if list_weights.ndim == 1 else list_weights

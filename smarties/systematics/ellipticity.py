@@ -7,7 +7,7 @@ import healpy as hp
 from pixell import enmap
 from opt_einsum import contract
 
-from smarties.harmonics import map2alm_anypix
+from smarties.utils.harmonics import map2alm_anypix
 from smarties.hn import Spin_maps
 from smarties.external.s4cmb import (
     get_first_spin_derivative,
@@ -15,7 +15,7 @@ from smarties.external.s4cmb import (
     get_second_spherical_derivatives_from_spin_derivatives, 
     multiply_tan_theta_power
 )
-from smarties.tools import convert_ellipticities_conventions, get_rotation_matrix
+from smarties.utils.tools import convert_ellipticities_conventions, get_rotation_matrix
 
 __all__ = [
     'get_differential_ellipticity_BICEP',
