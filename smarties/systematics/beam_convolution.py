@@ -267,7 +267,6 @@ def get_systematic_maps_from_alms_blms(
             output_alms = spin_0_term + 0.5 * (spin_plus_2_term + spin_minus_2_term)
 
             dict_harm_coeff[spin][idet] = output_alms
-
     for spin in spins_needed_pos:
         for idet in range(n_det):
             if spin == 0:
@@ -280,8 +279,8 @@ def get_systematic_maps_from_alms_blms(
                     dict_harm_coeff[-spin][idet],
                     spin,
                 )
-                maps = hp.alm2map_spin(
-                    np.array([alm_plus, alm_minus]), nside, spin, lmax=lmax
+                maps =  _alm2map_ducc0(
+                    np.array([alm_plus, alm_minus]), spin,nside, lmax=lmax
                 )
                 dict_spin_maps[spin][idet] = maps[0] + 1j * maps[1]
                 dict_spin_maps[-spin][idet] = maps[0] - 1j * maps[1]
