@@ -3,6 +3,7 @@
 # lease refer to the LICENSE file in the root of this repository.
 
 
+from matplotlib.pylab import polar
 import numpy as np
 import healpy as hp
 import h5py
@@ -12,7 +13,7 @@ from pixell import enmap
 from smarties.hn import Spin_maps, Spin_nm
 
 list_conventions = [
-    'Third flattening', 
+    'Third flattening',
     'Third eccentricity',
     'Modified second flattening',
     'Plus-Cross ellipticity'
@@ -20,9 +21,9 @@ list_conventions = [
 
 def get_coupled_spin(reference_spin, available_h_n_spin, available_signal_spins):
     """
-    Get the coupled spins for a reference spin $k$ given a set of $h_n$ and signal spin maps, involved in a typical sum: 
+    Get the coupled spins for a reference spin $k$ given a set of $h_n$ and signal spin maps, involved in a typical sum:
         $ sum_{k' = -\infty}^{\infty} h_{k-k'} S_{k'}$
-        
+
     Parameters
     ----------
     reference_spin: int
@@ -31,7 +32,7 @@ def get_coupled_spin(reference_spin, available_h_n_spin, available_signal_spins)
         List of available $h_n$ spins, typically [-4, -2, 2, 4]
     available_signal_spins: list[int]
         List of available signal spins, typically [-2, 2]
-    
+
     Returns
     -------
     coupled_spin: list[tuple]
@@ -49,10 +50,11 @@ def get_coupled_spin(reference_spin, available_h_n_spin, available_signal_spins)
 
 
 def get_row_mapmaking_matrix(
-        reference_spin, 
-        h_n_spin_dict, 
+        reference_spin,
+        h_n_spin_dict,
         list_spin_input,
         polar_angle_coeff=None,
+        polar_efficiency_coeff=None,
         dtype=complex
     ):
     """
@@ -71,7 +73,7 @@ def get_row_mapmaking_matrix(
         Dictionary of the summed $h_n$ maps, with the keys being the spins and the values the $h_n$ maps
     list_spin_input: list[int]
         List of spins involved in the input signal maps, typically [-2, 2] for polarization maps
-    
+
     Returns
     -------
     mapmaking_matrix_row: np.ndarray
@@ -82,21 +84,31 @@ def get_row_mapmaking_matrix(
         polar_angle_coeff = {spin:np.ones(h_n_spin_dict[0].shape[0]) for spin in h_n_spin_dict.spins}
 
     factor_func = lambda x: 1 if x == 0 else .5
+    if polar_efficiency_coeff is None:
+        polar_efficiency_coeff = {spin:np.ones(h_n_spin_dict[0].shape[0]) for spin in h_n_spin_dict.spins}
+
+    polar_eff_row = np.ones((h_n_spin_dict[0].shape[0],len(list_spin_input)))
+    for idet in range(h_n_spin_dict[0].shape[0]):
+        polar_eff_row[idet,1:] *= polar_angle_coeff[idet]
+        if reference_spin != 0:
+            polar_eff_row[idet] *= polar_angle_coeff[idet]
+    print(np.shape(polar_eff_row))
 
     mapmaking_matrix_row = np.zeros(
-        tuple(h_n_spin_dict[2].shape[1:]) + ( 
+        tuple(h_n_spin_dict[2].shape[1:]) + (
          len(list_spin_input),
-        ), 
+        ),
         dtype=dtype
     )
     for i, spin_name in enumerate(list_spin_input):
         mapmaking_matrix_row[:,i] = (
-            factor_func(reference_spin) 
-            * factor_func(spin_name) 
+            factor_func(reference_spin)
+            * factor_func(spin_name)
             * contract(
-                'd...,d...->...', 
-                polar_angle_coeff[spin_name-reference_spin], 
-                h_n_spin_dict[spin_name-reference_spin])
+                'd...,d...,d...->...',
+                polar_angle_coeff[spin_name-reference_spin],
+                h_n_spin_dict[spin_name-reference_spin],
+                polar_efficiency_coeff[spin_name])
             )
 
     return mapmaking_matrix_row
@@ -104,7 +116,7 @@ def get_row_mapmaking_matrix(
 def get_rotation_matrix(angle):
     """
     Get the rotation matrix for a given angle.
-    
+
     Parameters
     ----------
     angle: np.ndarray
@@ -127,7 +139,7 @@ def get_rotation_matrix(angle):
     return rotation_matrix
 
 def transform_array_maps_into_spin_maps(
-        array_maps, 
+        array_maps,
         n_stokes_output=None
     ):
     """
@@ -139,7 +151,7 @@ def transform_array_maps_into_spin_maps(
         * The spin -2 field is assumed to be given by $0.5 * (Q - iU)$
         * The spin 2 field is assumed to be given by $0.5 * (Q + iU)$
     where Q and U are the second and third Stokes parameters, respectively, if n_stokes = 2 or 3.
-      
+
     Parameters
     ----------
     array_maps: np.ndarray | enmap.ndmap
@@ -154,7 +166,7 @@ def transform_array_maps_into_spin_maps(
         Spin_maps object with keys being the spins and values being the corresponding maps
 
     """
-    
+
     # if type(array_maps) == np.ndarray:
     n_stokes = array_maps.shape[-2] if array_maps.ndim > 1 else 1
     dimension_stokes = -2
@@ -171,10 +183,10 @@ def transform_array_maps_into_spin_maps(
         n_stokes_output = n_stokes
 
     output_spin_maps = Spin_maps()
-    
-    
+
+
     if n_stokes == 1 or n_stokes == 3:
-        
+
         if array_maps.ndim == 1:
             # Only temperature field is provided
             index_T = (...,)
@@ -189,34 +201,34 @@ def transform_array_maps_into_spin_maps(
         output_spin_maps[2] = .5*(
             array_maps[...,dimension_stokes,:] + 1j * array_maps[...,dimension_stokes+1,:]
         ) # [spin=2]
-    
+
     if n_stokes_output != n_stokes:
         if n_stokes == 1:
             output_spin_maps[2] = np.zeros_like(output_spin_maps[0], dtype=complex)
             output_spin_maps[-2] = np.zeros_like(output_spin_maps[0], dtype=complex)
         elif n_stokes == 2:
             output_spin_maps[0] = np.zeros_like(output_spin_maps[-2], dtype=complex)
-    
+
     if type(array_maps) == enmap.ndmap:
         for spin in output_spin_maps.spins:
             output_spin_maps[spin] = enmap.ndmap(
-                output_spin_maps[spin], 
+                output_spin_maps[spin],
                 wcs=array_maps.wcs
             )
 
     return output_spin_maps
-    
+
 def transform_spin_maps_into_array_maps(
         spin_maps
     ):
     """
-    Transform a Spin_maps object into an array of maps, 
+    Transform a Spin_maps object into an array of maps,
     as:
         * the spin 0 field is assumed to be the first Stokes parameter (temperature).
         * the spin -2 field is assumed to be given by $0.5 * (Q - iU)$
         * the spin 2 field is assumed to be given by $0.5 * (Q + iU)$
-    where Q and U are the second and third Stokes parameters, respectively, if n_stokes = 2 or 3. 
-    
+    where Q and U are the second and third Stokes parameters, respectively, if n_stokes = 2 or 3.
+
     Parameters
     ----------
     spin_maps: Spin_maps
@@ -228,7 +240,7 @@ def transform_spin_maps_into_array_maps(
     array_maps: np.ndarray
         Array of maps of shape (..., n_stokes, n_pix)
     """
-    
+
     n_stokes = 0
     if 0 in spin_maps:
         n_stokes += 1
@@ -239,29 +251,29 @@ def transform_spin_maps_into_array_maps(
     assert n_stokes in [1, 2, 3], 'The number of Stokes parameters must be 1 (only temperature), 2 (only polarization) or 3 (both temperature and polarization)'
     boolean_car_pixelization = type(spin_maps[first_spin]) == enmap.ndmap
     dimension_pixels = -1 if not boolean_car_pixelization else -2
-    
-    shape_pix = (spin_maps[first_spin].shape[-dimension_pixels:],) 
+
+    shape_pix = (spin_maps[first_spin].shape[-dimension_pixels:],)
     dtype = spin_maps[first_spin].dtype
 
     array_maps = np.zeros(spin_maps[first_spin].shape[:-dimension_pixels] + (n_stokes,) + shape_pix, dtype=dtype)
-    
+
     if n_stokes == 1 or n_stokes == 3:
         # Only temperature field is provided
         array_maps[...,0,:] = spin_maps[0]
     if n_stokes >= 2:
         array_maps[...,1,:] = spin_maps[-2] + spin_maps[2]  # [Q, U] -> spin -2 and 2
         array_maps[...,2,:] = -1j * (spin_maps[2] - spin_maps[-2])
-    
+
     if boolean_car_pixelization:
         array_maps = enmap.ndmap(array_maps, wcs=spin_maps[first_spin].wcs)
     return array_maps
 
 
 def save_partial_spin_maps(
-        partial_spin_maps, 
+        partial_spin_maps,
         nstokes,
         shape_pixels,
-        mask_on_full_map, 
+        mask_on_full_map,
         path_output,
         format_output='.npy'
     ):
@@ -280,12 +292,12 @@ def save_partial_spin_maps(
         extended_final_maps = extended_final_maps.reshape(
             extended_final_maps.shape[:-1] + shape_pixels
         )
-    
+
     is_car = False
     first_spin = 0 if (nstokes == 1 or nstokes == 3) else -2
     if type(partial_spin_maps[first_spin]) == enmap.ndmap:
         extended_final_maps = enmap.ndmap(
-            extended_final_maps, 
+            extended_final_maps,
             wcs=partial_spin_maps[first_spin].wcs
         )
         is_car = True
@@ -296,7 +308,7 @@ def save_partial_spin_maps(
         elif format_output == '.hdf' and not path_output.endswith('.hdf'):
             path_output = path_output + '.hdf'
         enmap.write_map(
-                path_output, 
+                path_output,
                 extended_final_maps,
                 extra={'BUNIT' : 'uK'}
             )
@@ -309,18 +321,18 @@ def save_partial_spin_maps(
         if not path_output.endswith('.fits'):
             path_output = path_output + '.fits'
         print("Saving map into", path_output)
-        
+
         hp.write_map(
-            path_output, 
-            extended_final_maps, 
+            path_output,
+            extended_final_maps,
             overwrite=True
         )
-            
+
     elif format_output in ['.hdf', '.hdf5'] or path_output.endswith('.hdf') or path_output.endswith('.hdf5'):
         if not (path_output.endswith('.hdf') or path_output.endswith('.hdf5')):
             path_output = path_output + '.hdf'
         print("Saving map into", path_output)
-    
+
         with h5py.File(path_output, 'w') as hf:
             hf.create_dataset('maps', data=extended_final_maps)
         hf.close()
@@ -329,7 +341,7 @@ def save_partial_spin_maps(
 
 
 def convert_ellipticities_conventions(
-        dictionary_ellipticities, 
+        dictionary_ellipticities,
         sigma_fwhm,  # arcmin
         input_ellipticity_convention='Third flattening',
         output_ellipticity_convention='Third flattening'
@@ -348,7 +360,7 @@ def convert_ellipticities_conventions(
     dictionary_ellipticities: dict
         Dictionary containing the ellipticity parameters to convert.
         The keys must be:
-            * 'ellipticity_value' and 'ellipticity_angle' for 'Third flattening', 
+            * 'ellipticity_value' and 'ellipticity_angle' for 'Third flattening',
             'Third eccentricity' and 'Modified second flattening' conventions.
             * 'dp' and 'dc' for 'Plus-Cross ellipticity' convention.
     sigma_fwhm: float or np.ndarray
@@ -365,7 +377,7 @@ def convert_ellipticities_conventions(
             * 'Third eccentricity'
             * 'Modified second flattening'
             * 'Plus-Cross ellipticity'
-        
+
     Returns
     -------
     converted_ellipticities: dict
@@ -385,10 +397,10 @@ def convert_ellipticities_conventions(
     if input_ellipticity_convention == 'Plus-Cross ellipticity':
         delta_sigma = np.sqrt(
                 dictionary_ellipticities['dc']**2 + dictionary_ellipticities['dp']**2
-            ) * sigma_cs / 2. 
+            ) * sigma_cs / 2.
 
         ellipticity_angle = np.arctan2(
-            dictionary_ellipticities['dc'], 
+            dictionary_ellipticities['dc'],
             dictionary_ellipticities['dp']
         ) /2.
 
@@ -408,21 +420,21 @@ def convert_ellipticities_conventions(
 
         assert np.all(
             np.logical_and(
-                dictionary_ellipticities['ellipticity_value'] >= 0, 
+                dictionary_ellipticities['ellipticity_value'] >= 0,
                 dictionary_ellipticities['ellipticity_value'] <= 1
             )
         ), "For the Third flattening convention, ellipticity_value must be between 0 and 1, with value 0 corresponding to a circular beam."
-        
+
         delta_sigma = dictionary_ellipticities['ellipticity_value'] * sigma_cs
         ellipticity_angle = dictionary_ellipticities['ellipticity_angle']
-        
+
     elif input_ellipticity_convention == 'Third eccentricity':
         # Third eccentricity
         # e = sqrt((a^2 - b^2)/a^2) = sqrt(sigma_maj^2 - sigma_min^2)/(sigma_maj^2 + sigma_min^2)j
 
         assert np.all(
             np.logical_and(
-                dictionary_ellipticities['ellipticity_value'] >= 0, 
+                dictionary_ellipticities['ellipticity_value'] >= 0,
                 dictionary_ellipticities['ellipticity_value'] < 1
             )
         ), "For the Third eccentricity convention, ellipticity_value must be between 0 and 1, with value 0 corresponding to a circular beam."
@@ -442,7 +454,7 @@ def convert_ellipticities_conventions(
     if output_ellipticity_convention == 'Plus-Cross ellipticity':
         ellipticity_value_dp = (delta_sigma * 2. / sigma_cs) * np.cos(2 * ellipticity_angle)
         ellipticity_value_dc = (delta_sigma * 2. / sigma_cs) * np.sin(2 * ellipticity_angle)
-        
+
         return {
             'dc': ellipticity_value_dc,
             'dp': ellipticity_value_dp,
@@ -475,7 +487,7 @@ def convert_ellipticities_conventions(
         }
     else:
         raise ValueError("output_ellipticity_convention must be an element of the list of supported conventions {list_conventions}")
-    
+
 
 def flatten_CAR_maps(maps_CAR):
     first_dimensions = maps_CAR.shape[:-2] if maps_CAR.shape[:-2] != (1,) else tuple()
@@ -511,16 +523,16 @@ def reweight_h_maps(
                 print("--Number of unobserved pixels: {}".format(np.sum(pixel_map_weighting_array==0)), flush=True)
                 print("--Total number of pixels: {}".format(pixel_map_weighting_array.size), flush=True)
                 print("--Fraction of unobserved pixels: {:.2e}".format(np.sum(pixel_map_weighting_array==0)/pixel_map_weighting_array.size), flush=True)
-            
+
             for spin in h_dictionary.spins:
                 if spin != spin_0:
                     h_dictionary[spin][...,pixel_map_weighting_array!=0] = contract(
                         'd...,d...,...->d...',
-                        h_dictionary[spin], 
+                        h_dictionary[spin],
                         list_weights,
                         1 / pixel_map_weighting_array[pixel_map_weighting_array!=0]
                     )
-                
+
             h_dictionary[spin_0] = np.where(array_hits_detector_pixel==0, 0, array_hits_detector_pixel / pixel_map_weighting_array )
     else:
         spin_0 = 0 if 0 in h_dictionary.spins else Spin_nm((0,0))
@@ -528,13 +540,13 @@ def reweight_h_maps(
         cond_non_zero = h_dictionary[spin_0] != 0
         print(h_dictionary[spin_0].shape, flush=True)
         inverse_weights = 1 / list_weights[...,None] if list_weights.ndim == 1 else np.where(cond_non_zero, 1 / list_weights[...,cond_non_zero], 0)
-        
+
         sum_hits = h_dictionary[spin_0].sum(axis=0)
 
         for spin in h_dictionary.spins:
             if spin != spin_0:
                 h_dictionary[spin][cond_non_zero] *= (inverse_weights * h_dictionary[spin_0] / sum_hits)[cond_non_zero]
-                    
-        
+
+
         h_dictionary[spin_0] = np.where(cond_non_zero, h_dictionary[spin_0] / sum_hits, 0)
     return h_dictionary
