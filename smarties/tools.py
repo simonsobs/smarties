@@ -108,7 +108,7 @@ def get_row_mapmaking_matrix(
                 'd...,d...,d...->...',
                 polar_angle_coeff[spin_name-reference_spin],
                 h_n_spin_dict[spin_name-reference_spin],
-                polar_efficiency_coeff[spin_name])
+                polar_efficiency_coeff)
             )
 
     return mapmaking_matrix_row
