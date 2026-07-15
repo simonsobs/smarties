@@ -89,9 +89,9 @@ def get_row_mapmaking_matrix(
 
     polar_eff_row = np.ones((h_n_spin_dict[0].shape[0],len(list_spin_input)))
     for idet in range(h_n_spin_dict[0].shape[0]):
-        polar_eff_row[idet,1:] *= polar_angle_coeff[idet]
+        polar_eff_row[idet,1:] *= polar_efficiency_coeff[idet]
         if reference_spin != 0:
-            polar_eff_row[idet] *= polar_angle_coeff[idet]
+            polar_eff_row[idet] *= polar_efficiency_coeff[idet]
     print(np.shape(polar_eff_row))
 
     mapmaking_matrix_row = np.zeros(
