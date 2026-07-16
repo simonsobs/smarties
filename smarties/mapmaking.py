@@ -285,6 +285,11 @@ class FrameworkSystematics(object):
 
         factor_func = lambda spin: 1 if np.sum(spin) == 0 else .5
         # Depends on the definition of the pointing matrix
+        def polar_efficiency_func(spin):
+            if spin in [-2, 2]:
+                return polar_efficiency_coeff
+            else:
+                return np.ones_like(polar_efficiency_coeff, dtype=int)
 
         for i, spin in enumerate(self.list_spin_input):
             # Get all combinations of spins (k-k', k') such that k-k' = spin
@@ -299,7 +304,8 @@ class FrameworkSystematics(object):
             # \sum_{k' = -\infty}^{\infty} h_{k-k'} S_{k'} on all (k-k', k') pairs
             for tuple_spins in coupled_spins:
                 spin_coupled_maps[...,i] += factor_func(spin) * contract(
-                    'd,d...,d...->...',
+                    'd,d,d...,d...->...',
+                    polar_efficiency_func(spin),
                     polar_angle_coeff[spin],
                     h_n_spin_dict[tuple_spins[0]][projector_h_n],
                     spin_systematics_maps[tuple_spins[1]]
