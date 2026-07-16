@@ -90,12 +90,11 @@ def get_row_mapmaking_matrix(
         }
 
     factor_func = lambda x: 1 if x == 0 else 0.5
-
-    def polar_efficiency_func(x):
-        if x == 0:
-            return np.ones_like(polar_efficiency_coeff)
-        else:
+    def polar_efficiency_func(spin):
+        if spin in [-2, 2]:
             return polar_efficiency_coeff
+        else:
+            return np.ones_like(polar_efficiency_coeff, dtype=int)
     print(polar_efficiency_func(1).dtype)
     if polar_efficiency_coeff is None:
         polar_efficiency_coeff = np.ones(h_n_spin_dict[0].shape[0])
