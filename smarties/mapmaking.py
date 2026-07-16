@@ -246,7 +246,8 @@ class FrameworkSystematics(object):
             #TODO: Generalize to m != 0 for HWP angles
         if polar_efficiency_coeff is not None:
             assert polar_efficiency_coeff.size == h_n_spin_dict[spin_0].shape[0], 'The polar efficiency map must have the same shape as the h_n maps'
-
+        else:
+            polar_efficiency_coeff = np.ones(h_n_spin_dict[spin_0].shape[0])
         npix = mask[observed_pixels_array].size
 
         if spin_systematics_maps is None:
