@@ -131,7 +131,7 @@ def gaussian_circular_beam_alms(
 def get_systematic_maps_from_alms_blms(
     alms: dict[str, np.ndarray],
     blms: dict[str, np.ndarray],
-    fwhm: list[float],
+    fwhm: np.ndarray,
     det_names: list,
     lmax: int,
     mmax_beam: int,
