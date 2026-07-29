@@ -3,17 +3,25 @@
 # lease refer to the LICENSE file in the root of this repository.
 
 
-import numpy as np
 import healpy as hp
+import numpy as np
 import scipy.constants
 
-boltzmann_constant = scipy.constants.k # J/K
+__all__ = [
+    "convert_flux_mJy_to_muK",
+    "get_coordinates_from_healpix_mask",
+    "generate_circular_profile_point_sources",
+    "generate_point_source_map",
+]
+
+boltzmann_constant = scipy.constants.k  # J/K
 planck_constant = scipy.constants.h  # J.s
 light_speed = scipy.constants.c  # m/s
 
+
 def convert_flux_mJy_to_muK(flux_mJy, frequency, beam_fwhm):
     """
-    Convert flux density in mJy to temperature in K 
+    Convert flux density in mJy to temperature in K
     using the Rayleigh-Jeans approximation.
 
     Parameters
@@ -30,13 +38,17 @@ def convert_flux_mJy_to_muK(flux_mJy, frequency, beam_fwhm):
     temperature: float
         Temperature in muK.
     """
-    
+
     # Convert beam FWHM from arcminutes to radians
     beam_fwhm_rad = np.radians(beam_fwhm / 60.0)
-    
+
     # Convert flux density to temperature using the conversion formula
-    temperature = (flux_mJy * 1e-3 * 1e-26) * (light_speed ** 2) / (2 * (frequency * 1e9) ** 2 * boltzmann_constant * beam_fwhm_rad ** 2)
-    
+    temperature = (
+        (flux_mJy * 1e-3 * 1e-26)
+        * (light_speed**2)
+        / (2 * (frequency * 1e9) ** 2 * boltzmann_constant * beam_fwhm_rad**2)
+    )
+
     return temperature * 1e6
 
 
@@ -63,20 +75,23 @@ def get_coordinates_from_healpix_mask(mask, degree_output=True, nest=False):
     phi: np.ndarray
         Array of phi coordinates in radians.
     """
-    
+
     npix = mask.shape[-1]
     nside = hp.npix2nside(npix)
     phi, theta = hp.pix2ang(nside, np.arange(npix), nest=nest, lonlat=degree_output)
 
     booleran_array = mask != 0
 
-    
-    return theta[booleran_array].min(), theta[booleran_array].max(), phi[booleran_array].min(), phi[booleran_array].max()
+    return (
+        theta[booleran_array].min(),
+        theta[booleran_array].max(),
+        phi[booleran_array].min(),
+        phi[booleran_array].max(),
+    )
+
 
 def generate_circular_profile_point_sources(
-        radius_max,
-        fwhm_pointsrcs,
-        n_points_profile=1000
+    radius_max, fwhm_pointsrcs, n_points_profile=1000
 ):
     """
     Generate a circular profile for point sources.
@@ -97,24 +112,25 @@ def generate_circular_profile_point_sources(
     B: np.ndarray
         Circular Gaussian profile.
     """
-    
+
     radius_profile = np.linspace(0, radius_max, n_points_profile)  # in arcminutes
 
-    
-    beam_point_source_profile = np.exp(-(4 * np.log(2) * radius_profile**2) / (fwhm_pointsrcs**2))
-    
-    return [radius_profile * 1/60 * np.pi / 180, beam_point_source_profile]
-        
+    beam_point_source_profile = np.exp(
+        -(4 * np.log(2) * radius_profile**2) / (fwhm_pointsrcs**2)
+    )
+
+    return [radius_profile * 1 / 60 * np.pi / 180, beam_point_source_profile]
+
 
 def generate_point_source_map(
-        nside, 
-        n_point_sources, 
-        log_amplitude_pointsource_min=2.0,
-        log_amplitude_pointsource_max=5.0,
-        fwhm_pointsrcs=5.0,
-        mask=None,
-        return_CAR_map=False
-    ):
+    nside,
+    n_point_sources,
+    log_amplitude_pointsource_min=2.0,
+    log_amplitude_pointsource_max=5.0,
+    fwhm_pointsrcs=5.0,
+    mask=None,
+    return_CAR_map=False,
+):
     """
     Generate a point source map in HEALPix format.
 
@@ -134,7 +150,7 @@ def generate_point_source_map(
         HEALPix mask to define the area of the sky to generate the point sources in. If None, the full sky is used.
     return_CAR_map: bool, optional
         If True, return the map in CAR projection instead of HEALPix format. Default is False.
-    
+
     Returns
     -------
     srcmap: np.ndarray
@@ -143,52 +159,57 @@ def generate_point_source_map(
     """
     try:
         import pixell as pxl
-        from pixell import enmap, utils, pointsrcs, reproject
+        from pixell import enmap, pointsrcs, reproject, utils
     except ImportError:
-        raise ImportError("pixell is not installed. Please install it to use this function.")
-    
-    res = np.pi/(utils.nint(np.pi/(hp.nside2resol(nside, arcmin=True) * utils.arcmin)))#/utils.arcmin
-    
+        raise ImportError(
+            "pixell is not installed. Please install it to use this function."
+        )
+
+    res = np.pi / (
+        utils.nint(np.pi / (hp.nside2resol(nside, arcmin=True) * utils.arcmin))
+    )  # /utils.arcmin
+
     if mask is None:
         theta_min, theta_max, phi_min, phi_max = -90, 90, -180, 180
-        shape, wcs = enmap.fullsky_geometry(res=res, proj='car')
+        shape, wcs = enmap.fullsky_geometry(res=res, proj="car")
 
     else:
         theta_min, theta_max, phi_min, phi_max = get_coordinates_from_healpix_mask(mask)
         print(theta_min, theta_max, phi_min, phi_max)
-        box = np.array([[theta_min, phi_min],[theta_max, phi_max]]) * pxl.utils.degree
+        box = np.array([[theta_min, phi_min], [theta_max, phi_max]]) * pxl.utils.degree
 
-        shape, wcs = enmap.geometry(pos=box, res=res, proj='car')
-
+        shape, wcs = enmap.geometry(pos=box, res=res, proj="car")
 
     # Generating profile for point sources
     profile_point_sources = generate_circular_profile_point_sources(
-        radius_max=20*fwhm_pointsrcs,
+        radius_max=20 * fwhm_pointsrcs,
         fwhm_pointsrcs=fwhm_pointsrcs,
-        n_points_profile=100
+        n_points_profile=100,
     )
 
-
     # we choose a logspace between 100 and 10000
-    amplitude_logspace = np.logspace(log_amplitude_pointsource_min, log_amplitude_pointsource_max, n_point_sources)
+    amplitude_logspace = np.logspace(
+        log_amplitude_pointsource_min, log_amplitude_pointsource_max, n_point_sources
+    )
     # the position are random values inside omap
-    dec_positions = np.random.uniform(theta_min, theta_max, n_point_sources) * np.pi / 180
-    ra_positions = np.random.uniform(phi_min, phi_max, n_point_sources)  *np.pi / 180
+    dec_positions = (
+        np.random.uniform(theta_min, theta_max, n_point_sources) * np.pi / 180
+    )
+    ra_positions = np.random.uniform(phi_min, phi_max, n_point_sources) * np.pi / 180
 
     # we generate the sourcemap here
     srcmap = pointsrcs.sim_objects(
-        shape, wcs, 
-        poss=[dec_positions, ra_positions], 
-        amps=amplitude_logspace, 
+        shape,
+        wcs,
+        poss=[dec_positions, ra_positions],
+        amps=amplitude_logspace,
         profile=profile_point_sources,
-        vmin=np.min(amplitude_logspace)*1e-4
+        vmin=np.min(amplitude_logspace) * 1e-4,
     )
 
     if return_CAR_map:
         return enmap.enmap(srcmap, wcs=wcs)
 
     return reproject.map2healpix(
-        enmap.enmap(srcmap, wcs=wcs), 
-        nside=nside, 
-        method='spline'
+        enmap.enmap(srcmap, wcs=wcs), nside=nside, method="spline"
     )

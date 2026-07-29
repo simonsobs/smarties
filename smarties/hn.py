@@ -4,34 +4,83 @@
 
 
 from collections.abc import Iterable
-import numpy as np
+
 import healpy as hp
+import numpy as np
 from opt_einsum import contract
 from pixell import enmap
 
-class Spin_nm(tuple):
+__all__ = ["Spin_nm", "Spin_maps", "ud_grade_hn"]
 
+
+class Spin_nm(tuple):
     def __neg__(self):
         return Spin_nm([-item for item in self.__iter__()])
-    
+
     def __add__(self, other):
-        return Spin_nm([item1 + item2 for item1,item2 in zip(self.__iter__(), other)])
+        return Spin_nm([item1 + item2 for item1, item2 in zip(self.__iter__(), other)])
 
     def __sub__(self, other):
-        return Spin_nm([item1 - item2 for item1,item2 in zip(self.__iter__(), other)])
+        return Spin_nm([item1 - item2 for item1, item2 in zip(self.__iter__(), other)])
+
 
 class Spin_maps(dict):
     """
-    Class to handle fundamental operations related to the spin maps
+    Class to handle fundamental operations related to the spin maps.
+
+    WARNNING: The wcs and shape attributes as 'shape_fullsky' and 'wcs_car' are
+    not set and neither updated dynamically when creating the Spin_maps object,
+    but they can be set and accessed through the corresponding properties.
     """
-    
+
+    _projection_pixel = None
+    _shape_fullsky = None
+    _wcs_car = None
+
+    def set_projection_pixel(self, projection_pixel=None):
+        assert projection_pixel in ["car", "healpix"], (
+            f"Projection pixel must be either 'car' or 'healpix', got {projection_pixel}"
+        )
+        self._projection_pixel = projection_pixel
+
+    def get_projection_pixel(self):
+        return self._projection_pixel
+
+    projection_pixel = property(get_projection_pixel, set_projection_pixel)
+
+    def set_shape_fullsky(self, shape=None):
+        self._shape_fullsky = shape
+
+    def get_shape_fullsky(self):
+        return self._shape_fullsky
+
+    shape_fullsky = property(get_shape_fullsky, set_shape_fullsky)
+
+    def set_wcs_car(self, wcs=None):
+        self._wcs_car = wcs
+
+    def get_wcs_car(self):
+        return self._wcs_car
+
+    wcs_car = property(get_wcs_car, set_wcs_car)
+
+    def set_total_hits_map(self, total_hits_map=None):
+        self._total_hits_map = total_hits_map
+
+    def get_total_hits_map(self):
+        return self._total_hits_map
+
+    total_hits_map = property(get_total_hits_map, set_total_hits_map)
+
     @property
     def spins(self):
         """
         Returns the list of spins in the Spin_maps object
         """
-        all_keys = self.keys() if len(self.keys()) > 1 else [self.keys()]
-        define_spins_func = lambda key: Spin_nm(key) if (isinstance(key, Iterable) and len(key) != 1) else key
+        all_keys = self.keys() if len(self.keys()) > 1 else list(self.keys())
+        define_spins_func = lambda key: (
+            Spin_nm(key) if (isinstance(key, Iterable) and len(key) != 1) else key
+        )
         return [define_spins_func(key) for key in all_keys]
 
     @classmethod
@@ -45,7 +94,7 @@ class Spin_maps(dict):
             result[key] = value
 
         return result
-    
+
     @classmethod
     def from_list_maps(cls, maps, list_spin):
         """
@@ -53,17 +102,19 @@ class Spin_maps(dict):
         """
         assert isinstance(list_spin, Iterable)
         result = cls()
-        transform_into_car = lambda x: x if type(maps) is not enmap.ndmap else enmap.ndmap(x, wcs=maps.wcs)
+        transform_into_car = lambda x: (
+            x if type(maps) is not enmap.ndmap else enmap.ndmap(x, wcs=maps.wcs)
+        )
         for spin, map_ in zip(list_spin, maps):
             result[spin] = transform_into_car(map_)
         return result
-    
+
     def __add__(self, other):
         """
         Add two spin maps objects
 
         Notes
-        ----- 
+        -----
         A new object is created.
         """
 
@@ -88,12 +139,8 @@ class Spin_maps(dict):
                 self[key] = self[key] + value
             else:
                 self[key] = value
-    
-    def multiply_inplace_detectors_spin_maps(
-            self, 
-            other, 
-            subscripts='d...,d...->d...'
-    ):
+
+    def multiply_inplace_detectors_spin_maps(self, other, subscripts="d...,d...->d..."):
         """
         Multiply the spin maps by another Spin_maps object in place
 
@@ -105,17 +152,19 @@ class Spin_maps(dict):
             Einstein summation subscripts for the multiplication operation.
             Default is 'd...,d...->d...' which multiplies each `spin` map by the corresponding `spin` map of the other Spin_maps object for each detector.
         """
-        assert isinstance(other, Spin_maps) or np.all([key in other for key in self.keys() if key!=0]), "The other object must be an instance of Spin_maps or at least contain all keys of self"
-        assert subscripts is not None, "Subscripts must be provided for the multiplication operation"
+        assert isinstance(other, Spin_maps) or np.all(
+            [key in other for key in self.keys() if key != 0]
+        ), (
+            "The other object must be an instance of Spin_maps or at least contain all keys of self"
+        )
+        assert subscripts is not None, (
+            "Subscripts must be provided for the multiplication operation"
+        )
         for key in self.keys():
             if key != 0:
                 self[key] = contract(subscripts, self[key], other[key])
 
-    def divide_inplace_detectors_spin_maps(
-            self, 
-            other, 
-            subscripts='d...,d...->d...'
-        ):
+    def divide_inplace_detectors_spin_maps(self, other, subscripts="d...,d...->d..."):
         """
         Multiply the spin maps in place, with each `spin` map multiplied
         by the corresponding `-spin` map of the other Spin_maps object.
@@ -125,8 +174,14 @@ class Spin_maps(dict):
         other: Spin_maps
             Another Spin_maps object to extract `-spin` maps from for multiplication.
         """
-        assert isinstance(other, Spin_maps) or np.all([key in other for key in self.keys() if key!=0]), "The other object must be an instance of Spin_maps or at least contain all keys of self"
-        assert subscripts is not None, "Subscripts must be provided for the multiplication operation"
+        assert isinstance(other, Spin_maps) or np.all(
+            [key in other for key in self.keys() if key != 0]
+        ), (
+            "The other object must be an instance of Spin_maps or at least contain all keys of self"
+        )
+        assert subscripts is not None, (
+            "Subscripts must be provided for the multiplication operation"
+        )
 
         for key in self.keys():
             if key != 0:
@@ -137,50 +192,10 @@ class Spin_maps(dict):
         Extend the first dimension of the spin maps to a new shape
 
         Notes
-        ----- 
-        A broadcast is performed to extend the first dimension of each element of the dictionary. 
+        -----
+        A broadcast is performed to extend the first dimension of each element of the dictionary.
         """
         for key in self.keys():
-            self[key] = np.broadcast_to(self[key], (new_shape_first_dimension,) + np.asarray(self[key]).shape)
-
-def ud_grade_hn(h_n_maps, nside_out):
-    """
-    Change the resolution of the $h_n$ maps to a lower or higher resolution, 
-    by averaging or repeating the pixels in the provided output resolution 
-    using the `ud_grade` function from HEALPix. 
-
-    Parameters
-    ----------
-    h_n_maps: Spin_maps
-        Spin maps containing the $h_n$ maps, with keys being the spins and values being
-        the maps of shape (n_det, n_pix) or (n_det,) for spin=0.
-    nside_out: int
-        The desired output resolution, given as nside.
-
-    Returns
-    -------
-    new_h_n: Spin_maps
-        A new Spin_maps object containing the $h_n$ maps at the desired resolution,
-        with the same spins as the input maps. The maps are of shape (n_det, n_pix) or 
-        (n_det,) for spin=0, where n_det is the number of detectors (1 for spin=0) and 
-        n_pix is the number of pixels at the output resolution.
-
-    Notes
-    -----
-    Currently the corresponding operations only work with HEALPix maps, so the input maps must be provided in the HEALPix format. 
-    """
-
-    #TODO: Adapt in case h_n maps are not healpix or ful sky
-    
-    #TODO: Take gradient conjugate for the -spin?
-    
-    new_h_n = Spin_maps()
-    for spin in h_n_maps.spins:
-        if h_n_maps[spin].ndim != 1 and h_n_maps[spin].shape[-1] != 1:
-            number_of_detectors = 1 if h_n_maps[spin].ndim == 1 else h_n_maps[spin].shape[0]
-            new_h_n[spin] = np.zeros((number_of_detectors, hp.nside2npix(nside_out)), dtype=h_n_maps[spin].dtype)
-            for detector in range(number_of_detectors):
-                new_h_n[spin][detector] = hp.ud_grade(h_n_maps[spin][detector], nside_out, power=None)
-        else:
-            new_h_n[spin] = h_n_maps[spin]
-    return new_h_n
+            self[key] = np.broadcast_to(
+                self[key], (new_shape_first_dimension,) + np.asarray(self[key]).shape
+            )
