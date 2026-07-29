@@ -13,16 +13,16 @@ from pixell import enmap
 from smarties.hn import Spin_maps, Spin_nm
 
 __all__ = [
-    'get_coupled_spin',
-    'get_row_mapmaking_matrix',
-    'get_rotation_matrix',
-    'transform_array_maps_into_spin_maps',
-    'transform_spin_maps_into_array_maps',
-    'convert_ellipticities_conventions',
-    'flatten_CAR_maps',
-    'unflatten_CAR_maps',
-    'reweight_hmaps_by_hits',
-    'list_conventions'
+    "get_coupled_spin",
+    "get_row_mapmaking_matrix",
+    "get_rotation_matrix",
+    "transform_array_maps_into_spin_maps",
+    "transform_spin_maps_into_array_maps",
+    "convert_ellipticities_conventions",
+    "flatten_CAR_maps",
+    "unflatten_CAR_maps",
+    "reweight_hmaps_by_hits",
+    "list_conventions",
 ]
 
 list_conventions = [
@@ -73,14 +73,8 @@ def get_row_mapmaking_matrix(
     polar_angle_coeff=None,
     polar_efficiency_coeff=None,
     dtype=complex,
+    slice_to_apply=None,
 ):
-        reference_spin,
-        h_n_spin_dict,
-        list_spin_input,
-        polar_angle_coeff=None,
-        dtype=complex,
-        slice_to_apply=None
-    ):
     """
     The mapmaking matrix will always be multiplied to the vector ordered with spins [0, 2, -2] for the $\tilde{S}^{\rm pixel}_{k}$ term.
 
@@ -108,29 +102,24 @@ def get_row_mapmaking_matrix(
         polar_angle_coeff = {
             spin: np.ones(h_n_spin_dict[0].shape[0]) for spin in h_n_spin_dict.spins
         }
+    if slice_to_apply is None:
+        slice_to_apply = ...
 
     factor_func = lambda x: 1 if x == 0 else 0.5
+
     def polar_efficiency_func(spin):
         if spin in [-2, 2]:
             return polar_efficiency_coeff
         else:
             return np.ones_like(polar_efficiency_coeff, dtype=int)
+
     print(polar_efficiency_func(1).dtype)
     if polar_efficiency_coeff is None:
         polar_efficiency_coeff = np.ones(h_n_spin_dict[0].shape[0])
 
     mapmaking_matrix_row = np.zeros(
-        tuple(h_n_spin_dict[2].shape[1:]) + (len(list_spin_input),), dtype=dtype)
-    if slice_to_apply is None:
-        slice_to_apply = ...
-
-    factor_func = lambda x: 1 if x == 0 else .5
-
-    mapmaking_matrix_row = np.zeros(
-        tuple(h_n_spin_dict[2][slice_to_apply].shape[1:]) + (
-         len(list_spin_input),
-        ),
-        dtype=dtype
+        tuple(h_n_spin_dict[2][slice_to_apply].shape[1:]) + (len(list_spin_input),),
+        dtype=dtype,
     )
     for i, spin_name in enumerate(list_spin_input):
         mapmaking_matrix_row[:, i] = (
@@ -139,12 +128,11 @@ def get_row_mapmaking_matrix(
             * contract(
                 "d...,d...,d...->...",
                 polar_angle_coeff[spin_name - reference_spin],
-                h_n_spin_dict[spin_name-reference_spin][slice_to_apply],
+                h_n_spin_dict[spin_name - reference_spin][slice_to_apply],
                 polar_efficiency_func(spin_name)
                 * polar_efficiency_func(reference_spin),
-                )
             )
-
+        )
 
     return mapmaking_matrix_row
 
@@ -497,23 +485,27 @@ def flatten_CAR_maps(maps_CAR):
 def unflatten_CAR_maps(maps_CAR_flatten, original_shape_pixels):
     return maps_CAR_flatten.reshape(maps_CAR_flatten.shape[:-1] + original_shape_pixels)
 
-def reweight_hmaps_by_hits(
-        h_dictionary: dict| Spin_maps,
-        list_weights: np.ndarray,
-        list_spin: list[int],
-        error_precision: float = None,
-):
-    if 0 not in h_dictionary.spins and Spin_nm((0,0)) not in h_dictionary.spins:
-        error_precision = 1e-8 if error_precision is None else error_precision
-        spin_0 = Spin_nm((0,0)) if np.size((h_dictionary.spins)[0]) == 2 else 0
 
-        h_dictionary[spin_0] = list_weights[..., np.newaxis] if list_weights.ndim == 1 else list_weights
+def reweight_hmaps_by_hits(
+    h_dictionary: dict | Spin_maps,
+    list_weights: np.ndarray,
+    list_spin: list[int],
+    error_precision: float = None,
+):
+    if 0 not in h_dictionary.spins and Spin_nm((0, 0)) not in h_dictionary.spins:
+        error_precision = 1e-8 if error_precision is None else error_precision
+        spin_0 = Spin_nm((0, 0)) if np.size((h_dictionary.spins)[0]) == 2 else 0
+
+        h_dictionary[spin_0] = (
+            list_weights[..., np.newaxis] if list_weights.ndim == 1 else list_weights
+        )
 
         print("--Applying new weighting to h_n dictionary...", flush=True)
 
-        array_hits_detector_pixel = np.int64(np.logical_or(
-            np.abs(h_dictionary[list_spin[0]]) > 10*error_precision,
-            np.abs(h_dictionary[-list_spin[0]]) > 10*error_precision
+        array_hits_detector_pixel = np.int64(
+            np.logical_or(
+                np.abs(h_dictionary[list_spin[0]]) > 10 * error_precision,
+                np.abs(h_dictionary[-list_spin[0]]) > 10 * error_precision,
             )
         )
         pixel_map_weighting_array = (array_hits_detector_pixel).sum(axis=0)
@@ -521,21 +513,42 @@ def reweight_hmaps_by_hits(
             h_dictionary.total_hits_map = pixel_map_weighting_array
 
         if 0 in pixel_map_weighting_array:
-            print("--Warning: some pixels are not observed by any detector, they will have their h maps values set to zero", flush=True)
-            print("--Number of unobserved pixels: {}".format(np.sum(pixel_map_weighting_array==0)), flush=True)
-            print("--Total number of pixels: {}".format(pixel_map_weighting_array.size), flush=True)
-            print("--Fraction of unobserved pixels: {:.2e}".format(np.sum(pixel_map_weighting_array==0)/pixel_map_weighting_array.size), flush=True)
+            print(
+                "--Warning: some pixels are not observed by any detector, they will have their h maps values set to zero",
+                flush=True,
+            )
+            print(
+                "--Number of unobserved pixels: {}".format(
+                    np.sum(pixel_map_weighting_array == 0)
+                ),
+                flush=True,
+            )
+            print(
+                "--Total number of pixels: {}".format(pixel_map_weighting_array.size),
+                flush=True,
+            )
+            print(
+                "--Fraction of unobserved pixels: {:.2e}".format(
+                    np.sum(pixel_map_weighting_array == 0)
+                    / pixel_map_weighting_array.size
+                ),
+                flush=True,
+            )
 
         for spin in h_dictionary.spins:
             if spin != spin_0:
-                h_dictionary[spin][...,pixel_map_weighting_array!=0] = contract(
-                    'd...,d...,...->d...',
+                h_dictionary[spin][..., pixel_map_weighting_array != 0] = contract(
+                    "d...,d...,...->d...",
                     h_dictionary[spin],
                     list_weights,
-                    1 / pixel_map_weighting_array[pixel_map_weighting_array!=0]
+                    1 / pixel_map_weighting_array[pixel_map_weighting_array != 0],
                 )
 
-        h_dictionary[spin_0] = np.where(array_hits_detector_pixel==0, 0, array_hits_detector_pixel / pixel_map_weighting_array )
+        h_dictionary[spin_0] = np.where(
+            array_hits_detector_pixel == 0,
+            0,
+            array_hits_detector_pixel / pixel_map_weighting_array,
+        )
     else:
         spin_0 = 0 if 0 in h_dictionary.spins else Spin_nm((0, 0))
         print("--Spin 0 in h maps dictionary, re-weighting applied.", flush=True)
@@ -554,7 +567,11 @@ def reweight_hmaps_by_hits(
 
         for spin in h_dictionary.spins:
             if spin != spin_0:
-                h_dictionary[spin][cond_non_zero] *= (inverse_weights * h_dictionary[spin_0] / sum_hits)[cond_non_zero]
+                h_dictionary[spin][cond_non_zero] *= (
+                    inverse_weights * h_dictionary[spin_0] / sum_hits
+                )[cond_non_zero]
 
-        h_dictionary[spin_0] = np.where(cond_non_zero, h_dictionary[spin_0] / sum_hits, 0)
+        h_dictionary[spin_0] = np.where(
+            cond_non_zero, h_dictionary[spin_0] / sum_hits, 0
+        )
     return h_dictionary

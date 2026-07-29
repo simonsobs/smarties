@@ -91,12 +91,9 @@ class FrameworkSystematics(object):
     def get_inverse_mapmaking_matrix(
             self,
             h_n_spin_dict: dict | Spin_maps,
-            mask: np.ndarray = None,
-            mask_input: bool = False,
-            polar_angle_coeff: np.ndarray = None,
-            polar_efficiency_coeff: np.ndarray = None,
             npix: int = None,
             polar_angle_coeff: np.ndarray = None,
+            polar_efficiency_coeff: np.ndarray = None,
             slice_to_apply: slice = None
         ):
         """
@@ -122,20 +119,6 @@ class FrameworkSystematics(object):
 
         list_spin = np.array(list(h_n_spin_dict.keys()))
         dtype = h_n_spin_dict[list_spin[list_spin != 0][0]].dtype
-        if mask is not None:
-            observed_pixels_array = mask != 0
-            if mask_input:
-                h_n_spin_dict = Spin_maps.from_dictionary(
-                    {spin: h_n_spin_dict[spin][...,observed_pixels_array]
-                     if np.size(h_n_spin_dict[spin][0,...]) == mask.size
-                     else h_n_spin_dict[spin]
-                     for spin in h_n_spin_dict.keys()}
-                    )
-
-            npix = mask[observed_pixels_array].size
-        else:
-            npix = h_n_spin_dict[list_spin[list_spin != 0][0]].shape[-1]
-
 
         if slice_to_apply is None:
             slice_to_apply = ...
@@ -157,7 +140,7 @@ class FrameworkSystematics(object):
                 list_spin_input=self.list_spin_input,
                 dtype=dtype,
                 polar_angle_coeff=polar_angle_coeff,
-                polar_efficiency_coeff=polar_efficiency_coeff
+                polar_efficiency_coeff=polar_efficiency_coeff,
                 slice_to_apply=slice_to_apply
             )
         # Then, compute the inverse of the mapmaking matrix
@@ -216,6 +199,7 @@ class FrameworkSystematics(object):
         """
 
         # Few assert
+        print([spin_sky_maps[spin].ndim for spin in spin_sky_maps.keys()])
         assert np.allclose([spin_sky_maps[spin].ndim for spin in spin_sky_maps.keys()], 1), 'The CMB maps must be 1D arrays of shape (n_pix)'
         assert np.allclose([h_n_spin_dict[spin].ndim for spin in h_n_spin_dict.keys() if spin != 0 ], 2), 'The h_n maps must be 2D arrays of shape (n_det, n_pix)'
         if spin_systematics_maps is not None:
@@ -293,13 +277,9 @@ class FrameworkSystematics(object):
         if inverse_mapmaking_matrix is None:
             inverse_mapmaking_matrix = self.get_inverse_mapmaking_matrix(
                 h_n_spin_dict,
-                mask=mask,
-                mask_input=mask_input,
                 polar_angle_coeff=polar_angle_coeff,
                 polar_efficiency_coeff=polar_efficiency_coeff,
-                h_n_spin_dict,
                 npix=npix,
-                polar_angle_coeff=polar_angle_coeff
             )
         else:
             assert inverse_mapmaking_matrix.shape == (npix, self.nstokes, self.nstokes), 'The inverse mapmaking matrix must be of shape (npix, nstokes, nstokes), with npix being the number of pixels in the observed area of the provided mask'

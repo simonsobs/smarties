@@ -5,7 +5,7 @@
 import healpy as hp
 import numpy as np
 
-from smarties.harmonics import _alm2map_ducc0
+from smarties.utils.harmonics import _alm2map_ducc0
 
 
 def convert_alm_plusminus_to_spin(
