@@ -435,6 +435,7 @@ def reweight_hmaps_by_hits(
         list_weights: np.ndarray,
         list_spin: list[int],
         error_precision: float = None,
+        in_place: bool = False
 ):
     if 0 not in h_dictionary.spins and Spin_nm((0,0)) not in h_dictionary.spins:
         error_precision = 1e-8 if error_precision is None else error_precision
@@ -486,4 +487,5 @@ def reweight_hmaps_by_hits(
                 h_dictionary[spin][cond_non_zero] *= (inverse_weights * h_dictionary[spin_0] / sum_hits)[cond_non_zero]
 
         h_dictionary[spin_0] = np.where(cond_non_zero, h_dictionary[spin_0] / sum_hits, 0)
-    return h_dictionary
+    if not in_place:  
+        return h_dictionary

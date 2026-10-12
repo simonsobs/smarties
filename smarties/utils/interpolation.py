@@ -2,6 +2,10 @@ import numpy as np
 from scipy.interpolate import griddata
 from smarties.hn import Spin_maps
 
+__all__ = [
+    'perform_interpolation_scipy'
+]
+
 def perform_interpolation_scipy(
         dictionary_detector_to_interpolate,
         dictionary_known_values, 

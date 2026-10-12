@@ -19,13 +19,11 @@ from smarties.utils.tools import convert_ellipticities_conventions, get_rotation
 
 __all__ = [
     'get_differential_ellipticity_BICEP',
-    'get_differential_ellipticity_no_calibration'
+    'get_differential_ellipticity_no_calibration',
+    'create_dict_template_differential_ellipticity_BICEP'
 ]
-
-def get_differential_ellipticity_BICEP(
-        intensity_CMB,
-        ellipticity_parameters_dict,
-        sigma_fwhm,
+def _build_central_term_differential_ellipticity_BICEP(
+        intensity_sky_map,
         lmax=None,
         mask=None,
         spherical_derivatives=None,
@@ -33,16 +31,16 @@ def get_differential_ellipticity_BICEP(
         shape_fullsky_car=None
     ):
     """
-    Get the differential ellipticity maps for a given intensity CMB map and 
+    Get the differential ellipticity maps for a given intensity sky map and 
     ellipticity parameters using BICEP templates as described in the formalism 
     described in BICEP2 III: INSTRUMENTAL SYSTEMATICS, arXiv:1502.00608, with 
     the derivatives being computed directly from the spherical derivatives of 
-    the provided intensity CMB map. 
+    the provided intensity sky map. 
     
     Parameters
     ----------
-    intensity_CMB: np.ndarray | enmap.ndmap
-        Full sky intensity CMB map assumed to be already convolved with Gaussian 
+    intensity_sky_map: np.ndarray | enmap.ndmap
+        Full sky intensity sky map assumed to be already convolved with Gaussian 
         circularly-symmetric beam of the parameter sigma_FWHP, the output maps 
         will have the same dimension
     ellipticity: dict
@@ -52,22 +50,22 @@ def get_differential_ellipticity_BICEP(
     sigma_fwhm: np.ndarray | float
         Full width at half maximum of the beam in arcmin, provided for each detector
         or as a float, assumed to have been used to compute the circularly-symmetric 
-        beam smoothing the intensity_CMB map, and around which the Taylor expansion 
+        beam smoothing the intensity_sky_map map, and around which the Taylor expansion 
         of the beam ellipticity is performed in the BICEP formalism
     lmax: int (optional)
-        Maximum multipole for the computation of the spin derivatives of the intensity CMB map
+        Maximum multipole for the computation of the spin derivatives of the intensity sky map
     mask: np.ndarray (optional)
         Mask to define the area of the sky to compute the differential systematics maps. 
         If None, the full sky is used.
     spherical_derivatives: dict (optional)
-        Dictionary of the spherical derivatives of the intensity CMB map, 
+        Dictionary of the spherical derivatives of the intensity sky map, 
         with keys 'phi_phi', 'theta_phi', 'theta_theta' for the second derivatives, 
         and 'phi' for the first derivative with respect to phi, including the 
         factor 1/sin^2(theta) for the derivatives with respect to phi. If not 
         provided, the spherical derivatives will be computed from the intensity 
-        CMB map using the spin-derivative formalism. If provided, they will be 
+        sky map using the spin-derivative formalism. If provided, they will be 
         used directly to compute the differential ellipticity maps, which can 
-        save time if multiple systematics maps are computed from the same intensity CMB map.
+        save time if multiple systematics maps are computed from the same intensity sky map.
     Returns
     -------
     differential_ellipticity_spin_maps: dictionary 
@@ -76,27 +74,10 @@ def get_differential_ellipticity_BICEP(
 
     Notes
     -----
-    Currently, the input intensity_CMB map is assumed to be a full sky map, 
+    Currently, the input intensity_sky_map map is assumed to be a full sky map, 
     i.e. it must have a dimension of 12 * nside^2 or the full sky car dimension, 
     and smoothed with the circularly-symmetric beam defined by the sigma_fwhm parameter. 
     """
-
-    assert 'ellipticity_parameter_convention' in ellipticity_parameters_dict or ('dp' in ellipticity_parameters_dict and 'dc' in ellipticity_parameters_dict), "The provided ellipticity_parameters_dict must contain the 'ellipticity_parameter_convention' key to specify the ellipticity parameter convention used to compute the dp and dc parameters"
-    if 'ellipticity_parameter_convention' not in ellipticity_parameters_dict:
-        ellipticity_parameters_dict['ellipticity_parameter_convention'] = 'Plus-Cross ellipticity'
-
-    p_c_parameters_dict = convert_ellipticities_conventions(
-        ellipticity_parameters_dict,
-        sigma_fwhm=sigma_fwhm,
-        input_ellipticity_convention=ellipticity_parameters_dict['ellipticity_parameter_convention'],
-        output_ellipticity_convention='Plus-Cross ellipticity',
-    )
-
-    parameter_p = p_c_parameters_dict['dp']
-    parameter_c = p_c_parameters_dict['dc']
-    assert parameter_p.ndim == 1, 'The parameter p provided must have shape (n_det)'
-    assert parameter_c.ndim == 1, 'The parameter c provided must have shape (n_det)'
-    assert parameter_p.shape == parameter_c.shape, 'The parameter p and c provided must have the same shape'
 
     if mask is None:
         mask_bool = ...
@@ -106,21 +87,20 @@ def get_differential_ellipticity_BICEP(
     take_box_function = lambda x: x#[mask_bool]
 
     
-    sigma_cs = np.asarray(sigma_fwhm) / ((8 * np.log(2)) ** 0.5) * np.pi/(180*60)  # convert from FWHM to sigma_cs, in radians
     if spherical_derivatives is None:
         print("Computing spherical derivatives from the temperature map", flush=True)
 
-        if type(intensity_CMB) == np.ndarray:
+        if type(intensity_sky_map) == np.ndarray:
             # HEALPIX pixelization expected
-            assert intensity_CMB.ndim == 1, 'The intensity_CMB map must be a 1D array compatible with a full sky healpy map'
-            assert np.log(np.sqrt(intensity_CMB.size/12)) / np.log(2) % 1 == 0, 'The intensity_CMB map dimension must be compatible with a full sky healpy map'
+            assert intensity_sky_map.ndim == 1, 'The intensity_sky_map map must be a 1D array compatible with a full sky healpy map'
+            assert np.log(np.sqrt(intensity_sky_map.size/12)) / np.log(2) % 1 == 0, 'The intensity_sky_map map dimension must be compatible with a full sky healpy map'
             shape_car = None
-        elif type(intensity_CMB) == enmap.ndmap:
+        elif type(intensity_sky_map) == enmap.ndmap:
             # CAR pixelization expected
             assert shape_car is not None, 'The shape_car must be provided if the intensity map is provided as enmap.ndmap'
             
             if shape_fullsky_car is None:
-                shape_fullsky_car = intensity_CMB.shape if intensity_CMB.ndim == 2 else None
+                shape_fullsky_car = intensity_sky_map.shape if intensity_sky_map.ndim == 2 else None
             assert shape_fullsky_car is not None
 
             assert type(mask) == enmap.ndmap, 'The provided mask must be of type ndmap if the intensity map is as well provided with this type'
@@ -129,10 +109,10 @@ def get_differential_ellipticity_BICEP(
             take_box_function = lambda x: x.reshape(shape_fullsky_car).submap(box_coordinates).ravel()#[mask_bool]
 
         else:
-            raise ValueError("The intensity_CMB map must be either a 1D array compatible with a full sky healpy map or a 2D array compatible with a CAR array")
+            raise ValueError("The intensity_sky_map map must be either a 1D array compatible with a full sky healpy map or a 2D array compatible with a CAR array")
 
         alms_I = map2alm_anypix(
-            intensity_CMB,
+            intensity_sky_map,
             spin=0,
             lmax=lmax, 
             niter=10,
@@ -142,12 +122,12 @@ def get_differential_ellipticity_BICEP(
         input_spin = 0
         intensity_spin_1_derivatives = get_first_spin_derivative(
             -np.vstack([alms_I, np.zeros_like(alms_I)]),
-            shape_pixels_output=(intensity_CMB.size,),
+            shape_pixels_output=(intensity_sky_map.size,),
             input_spin=input_spin,
         )
         intensity_spin_2_derivatives = get_second_spin_derivative(
             -np.vstack([alms_I, np.zeros_like(alms_I)]),
-            shape_pixels_output=(intensity_CMB.size,),
+            shape_pixels_output=(intensity_sky_map.size,),
             input_spin=input_spin,
         )
         
@@ -186,6 +166,95 @@ def get_differential_ellipticity_BICEP(
             - 2 * spherical_derivatives['theta_phi'][mask_bool] 
         )
 
+    return central_term
+
+def get_differential_ellipticity_BICEP(
+        intensity_sky_map,
+        ellipticity_parameters_dict,
+        sigma_fwhm,
+        lmax=None,
+        mask=None,
+        spherical_derivatives=None,
+        shape_car=None,
+        shape_fullsky_car=None
+    ):
+    """
+    Get the differential ellipticity maps for a given intensity sky map and 
+    ellipticity parameters using BICEP templates as described in the formalism 
+    described in BICEP2 III: INSTRUMENTAL SYSTEMATICS, arXiv:1502.00608, with 
+    the derivatives being computed directly from the spherical derivatives of 
+    the provided intensity sky map. 
+    
+    Parameters
+    ----------
+    intensity_sky_map: np.ndarray | enmap.ndmap
+        Full sky intensity sky map assumed to be already convolved with Gaussian 
+        circularly-symmetric beam of the parameter sigma_FWHP, the output maps 
+        will have the same dimension
+    ellipticity: dict
+        Dictionary of the ellipticity parameters provided for each detector, see
+        must contain keys 'ellipticity_parameter_convention', see the function
+        `convert_ellipticities_conventions` in `tools.py` for more details
+    sigma_fwhm: np.ndarray | float
+        Full width at half maximum of the beam in arcmin, provided for each detector
+        or as a float, assumed to have been used to compute the circularly-symmetric 
+        beam smoothing the intensity_sky_map map, and around which the Taylor expansion 
+        of the beam ellipticity is performed in the BICEP formalism
+    lmax: int (optional)
+        Maximum multipole for the computation of the spin derivatives of the intensity sky map
+    mask: np.ndarray (optional)
+        Mask to define the area of the sky to compute the differential systematics maps. 
+        If None, the full sky is used.
+    spherical_derivatives: dict (optional)
+        Dictionary of the spherical derivatives of the intensity sky map, 
+        with keys 'phi_phi', 'theta_phi', 'theta_theta' for the second derivatives, 
+        and 'phi' for the first derivative with respect to phi, including the 
+        factor 1/sin^2(theta) for the derivatives with respect to phi. If not 
+        provided, the spherical derivatives will be computed from the intensity 
+        sky map using the spin-derivative formalism. If provided, they will be 
+        used directly to compute the differential ellipticity maps, which can 
+        save time if multiple systematics maps are computed from the same intensity sky map.
+    Returns
+    -------
+    differential_ellipticity_spin_maps: dictionary 
+        Dictionary of differential ellipticity maps, each of shape (n_det,npix), 
+        with keys being spin=0, 2, -2 
+
+    Notes
+    -----
+    Currently, the input intensity_sky_map map is assumed to be a full sky map, 
+    i.e. it must have a dimension of 12 * nside^2 or the full sky car dimension, 
+    and smoothed with the circularly-symmetric beam defined by the sigma_fwhm parameter. 
+    """
+
+    assert 'ellipticity_parameter_convention' in ellipticity_parameters_dict or ('dp' in ellipticity_parameters_dict and 'dc' in ellipticity_parameters_dict), "The provided ellipticity_parameters_dict must contain the 'ellipticity_parameter_convention' key to specify the ellipticity parameter convention used to compute the dp and dc parameters"
+    if 'ellipticity_parameter_convention' not in ellipticity_parameters_dict:
+        ellipticity_parameters_dict['ellipticity_parameter_convention'] = 'Plus-Cross ellipticity'
+
+    p_c_parameters_dict = convert_ellipticities_conventions(
+        ellipticity_parameters_dict,
+        sigma_fwhm=sigma_fwhm,
+        input_ellipticity_convention=ellipticity_parameters_dict['ellipticity_parameter_convention'],
+        output_ellipticity_convention='Plus-Cross ellipticity',
+    )
+
+    parameter_p = p_c_parameters_dict['dp']
+    parameter_c = p_c_parameters_dict['dc']
+    assert parameter_p.ndim == 1, 'The parameter p provided must have shape (n_det)'
+    assert parameter_c.ndim == 1, 'The parameter c provided must have shape (n_det)'
+    assert parameter_p.shape == parameter_c.shape, 'The parameter p and c provided must have the same shape'
+
+    sigma_cs = np.asarray(sigma_fwhm) / ((8 * np.log(2)) ** 0.5) * np.pi/(180*60)  # convert from FWHM to sigma_cs, in radians
+
+    central_term = _build_central_term_differential_ellipticity_BICEP(
+        intensity_sky_map,
+        lmax=lmax,
+        mask=mask,
+        spherical_derivatives=spherical_derivatives,
+        shape_car=shape_car,
+        shape_fullsky_car=shape_fullsky_car
+    )
+
     differential_ellipticity_spin_maps = Spin_maps()
 
     # Spin -2
@@ -208,11 +277,11 @@ def get_differential_ellipticity_BICEP(
         differential_ellipticity_spin_maps[-2]
     )
 
-    if type(intensity_CMB) == enmap.ndmap:
+    if type(intensity_sky_map) == enmap.ndmap:
         for spin in differential_ellipticity_spin_maps.spins:
             differential_ellipticity_spin_maps[spin] = enmap.ndmap(
                 differential_ellipticity_spin_maps[spin],
-                wcs=intensity_CMB.wcs
+                wcs=intensity_sky_map.wcs
             )
     else:
         for spin in differential_ellipticity_spin_maps.spins:
@@ -220,8 +289,8 @@ def get_differential_ellipticity_BICEP(
 
     return differential_ellipticity_spin_maps
 
-def old_get_differential_ellipticity_BICEP(
-        intensity_CMB,
+def create_dict_template_differential_ellipticity_BICEP(
+        intensity_sky_map,
         ellipticity_parameters_dict,
         sigma_fwhm,
         lmax=None,
@@ -231,23 +300,16 @@ def old_get_differential_ellipticity_BICEP(
         shape_fullsky_car=None
     ):
     """
-    Get the differential ellipticity maps for a given intensity CMB map and 
+    Get the differential ellipticity maps for a given intensity sky map and 
     ellipticity parameters using BICEP templates as described in the formalism 
     described in BICEP2 III: INSTRUMENTAL SYSTEMATICS, arXiv:1502.00608, with 
     the derivatives being computed directly from the spherical derivatives of 
-    the provided intensity CMB map. 
-
-    **WARNNING** 
-    Old version of the function with wrong templates, should not be used, 
-    kept here for reference and comparison with the new version of the function 
-    `get_differential_ellipticity_BICEP` in which the correct templates are implemented.
-    Will be removed in future versions of the code. 
-
+    the provided intensity sky map. 
     
     Parameters
     ----------
-    intensity_CMB: np.ndarray | enmap.ndmap
-        Full sky intensity CMB map assumed to be already convolved with Gaussian 
+    intensity_sky_map: np.ndarray | enmap.ndmap
+        Full sky intensity sky map assumed to be already convolved with Gaussian 
         circularly-symmetric beam of the parameter sigma_FWHP, the output maps 
         will have the same dimension
     ellipticity: dict
@@ -257,38 +319,36 @@ def old_get_differential_ellipticity_BICEP(
     sigma_fwhm: np.ndarray | float
         Full width at half maximum of the beam in arcmin, provided for each detector
         or as a float, assumed to have been used to compute the circularly-symmetric 
-        beam smoothing the intensity_CMB map, and around which the Taylor expansion 
+        beam smoothing the intensity_sky_map map, and around which the Taylor expansion 
         of the beam ellipticity is performed in the BICEP formalism
     lmax: int (optional)
-        Maximum multipole for the computation of the spin derivatives of the intensity CMB map
+        Maximum multipole for the computation of the spin derivatives of the intensity sky map
     mask: np.ndarray (optional)
         Mask to define the area of the sky to compute the differential systematics maps. 
         If None, the full sky is used.
     spherical_derivatives: dict (optional)
-        Dictionary of the spherical derivatives of the intensity CMB map, 
+        Dictionary of the spherical derivatives of the intensity sky map, 
         with keys 'phi_phi', 'theta_phi', 'theta_theta' for the second derivatives, 
         and 'phi' for the first derivative with respect to phi, including the 
         factor 1/sin^2(theta) for the derivatives with respect to phi. If not 
         provided, the spherical derivatives will be computed from the intensity 
-        CMB map using the spin-derivative formalism. If provided, they will be 
+        sky map using the spin-derivative formalism. If provided, they will be 
         used directly to compute the differential ellipticity maps, which can 
-        save time if multiple systematics maps are computed from the same intensity CMB map.
+        save time if multiple systematics maps are computed from the same intensity sky map.
     Returns
     -------
     differential_ellipticity_spin_maps: dictionary 
         Dictionary of differential ellipticity maps, each of shape (n_det,npix), 
-        with keys being spin=2, -2 
+        with keys being spin=0, 2, -2 
 
     Notes
     -----
-    Currently, the input intensity_CMB map is assumed to be a full sky map, 
+    Currently, the input intensity_sky_map map is assumed to be a full sky map, 
     i.e. it must have a dimension of 12 * nside^2 or the full sky car dimension, 
     and smoothed with the circularly-symmetric beam defined by the sigma_fwhm parameter. 
     """
 
-    assert 'ellipticity_parameter_convention' in ellipticity_parameters_dict or (
-        'dp' in ellipticity_parameters_dict and 'dc' in ellipticity_parameters_dict
-    ), "The provided ellipticity_parameters_dict must contain the 'ellipticity_parameter_convention' key to specify the ellipticity parameter convention used to compute the dp and dc parameters"
+    assert 'ellipticity_parameter_convention' in ellipticity_parameters_dict or ('dp' in ellipticity_parameters_dict and 'dc' in ellipticity_parameters_dict), "The provided ellipticity_parameters_dict must contain the 'ellipticity_parameter_convention' key to specify the ellipticity parameter convention used to compute the dp and dc parameters"
     if 'ellipticity_parameter_convention' not in ellipticity_parameters_dict:
         ellipticity_parameters_dict['ellipticity_parameter_convention'] = 'Plus-Cross ellipticity'
 
@@ -305,133 +365,40 @@ def old_get_differential_ellipticity_BICEP(
     assert parameter_c.ndim == 1, 'The parameter c provided must have shape (n_det)'
     assert parameter_p.shape == parameter_c.shape, 'The parameter p and c provided must have the same shape'
 
-    if mask is None:
-        mask_bool = ...
-    else:
-        mask_bool = ..., mask != 0
-    
-    take_box_function = lambda x: x#[mask_bool]
-
-    
     sigma_cs = np.asarray(sigma_fwhm) / ((8 * np.log(2)) ** 0.5) * np.pi/(180*60)  # convert from FWHM to sigma_cs, in radians
-    if spherical_derivatives is None:
-        print("Computing spherical derivatives from the temperature map", flush=True)
 
-        if type(intensity_CMB) == np.ndarray:
-            # HEALPIX pixelization expected
-            assert intensity_CMB.ndim == 1, 'The intensity_CMB map must be a 1D array compatible with a full sky healpy map'
-            assert np.log(np.sqrt(intensity_CMB.size/12)) / np.log(2) % 1 == 0, 'The intensity_CMB map dimension must be compatible with a full sky healpy map'
-            shape_car = None
-        elif type(intensity_CMB) == enmap.ndmap:
-            # CAR pixelization expected
-            assert shape_car is not None, 'The shape_car must be provided if the intensity map is provided as enmap.ndmap'
-            
-            if shape_fullsky_car is None:
-                shape_fullsky_car = intensity_CMB.shape if intensity_CMB.ndim == 2 else None
-            assert shape_fullsky_car is not None
-
-            assert type(mask) == enmap.ndmap, 'The provided mask must be of type ndmap if the intensity map is as well provided with this type'
-            box_coordinates = mask.reshape(shape_car).corners()
-
-            take_box_function = lambda x: x.reshape(shape_fullsky_car).submap(box_coordinates).ravel()#[mask_bool]
-
-        else:
-            raise ValueError("The intensity_CMB map must be either a 1D array compatible with a full sky healpy map or a 2D array compatible with a CAR array")
-
-        alms_I = map2alm_anypix(
-            intensity_CMB,
-            spin=0,
-            lmax=lmax, 
-            niter=10,
-            shape_car=shape_fullsky_car
-        )
-
-        input_spin = 0
-        intensity_spin_2_derivatives = get_second_spin_derivative(
-            -np.vstack([alms_I, np.zeros_like(alms_I)]),
-            shape_pixels_output=(intensity_CMB.size,),
-            input_spin=input_spin,
-        )
-        spherical_derivatives = get_second_spherical_derivatives_from_spin_derivatives(
-            input_map=intensity_CMB,
-            spin_derivatives_dict=intensity_spin_2_derivatives,
-            shape_pixels_output=(intensity_CMB.size,),
-            lmax=lmax,
-            input_spin=input_spin
-        )
-        
-        central_term = take_box_function(
-            (intensity_spin_2_derivatives[input_spin+2]  
-            - intensity_spin_2_derivatives[input_spin-2])/(4*1j)
-            + spherical_derivatives['theta_phi']
-        )[mask_bool]
-
-    else:
-        print("Using provided spherical derivatives", flush=True)
-        assert 'phi_phi' in spherical_derivatives, "The provided spherical_derivatives dictionnary must contain the 'phi_phi' key for the second derivative with respect to phi (including factor 1/sin^2(theta))"
-        assert 'theta_phi' in spherical_derivatives, "The provided spherical_derivatives dictionnary must contain the 'theta_phi' key for the second derivative with respect to theta and phi"
-        assert 'theta_theta' in spherical_derivatives, "The provided spherical_derivatives dictionnary must contain the 'theta_theta' key for the second derivative with respect to theta"
-        assert 'phi' in spherical_derivatives, "The provided spherical_derivatives dictionnary must contain the 'phi' key for the first derivative with respect to phi"
-        
-        print("Computing central term ...", flush=True)
-        for spin in spherical_derivatives:
-            if spherical_derivatives[spin].shape != np.prod(shape_car):
-                spherical_derivatives[spin] = take_box_function(spherical_derivatives[spin])
-            
-
-        central_term = 2 * spherical_derivatives['theta_phi'][mask_bool] - multiply_tan_theta_power(
-                spherical_derivatives['phi'],
-                power=-1,
-                shape_car=shape_car
-            )[mask_bool]
+    central_term = _build_central_term_differential_ellipticity_BICEP(
+        intensity_sky_map,
+        lmax=lmax,
+        mask=mask,
+        spherical_derivatives=spherical_derivatives,
+        shape_car=shape_car,
+        shape_fullsky_car=shape_fullsky_car
+    )
 
     differential_ellipticity_spin_maps = Spin_maps()
 
-    # Spin 2
-    print("Computing spin -2 differential ellipticity map ...", flush=True)
+    differential_ellipticity_spin_maps[-2] = central_term
+    differential_ellipticity_spin_maps[2] = np.conj(central_term)
 
-    differential_ellipticity_spin_maps[-2] = contract(
-        'd,...->d...', 
-        sigma_cs**2 /2 * (1j*parameter_p + parameter_c),
-        central_term - 1j * spherical_derivatives['phi_phi'][mask_bool], 
-        memory_limit='max_input'
-    ) + contract(
-        'd,...->d...', 
-        sigma_cs**2 /2 * ( parameter_p + 1j * parameter_c ),
-        spherical_derivatives['theta_theta'][mask_bool], 
-        memory_limit='max_input'
-    )
 
-    # Spin -2
-    print("Computing spin 2 differential ellipticity map ...", flush=True)
-    differential_ellipticity_spin_maps[2] = contract(
-        'd,...->d...', 
-        sigma_cs**2 /2 * (-1j*parameter_p + parameter_c),
-        central_term + 1j * spherical_derivatives['phi_phi'][mask_bool], 
-        memory_limit='max_input'
-    ) + contract(
-        'd,...->d...', 
-        sigma_cs**2 /2 * ( parameter_p - 1j * parameter_c ),
-        spherical_derivatives['theta_theta'][mask_bool], 
-        memory_limit='max_input'
-    )
+    parameter_systematics = {-2: sigma_cs**2 *(parameter_p - 1j * parameter_c) / 2.}
+    parameter_systematics[2] = np.conj(parameter_systematics[-2])
 
-    differential_ellipticity_spin_maps[0] = np.zeros_like(differential_ellipticity_spin_maps[2])
-
-    if type(intensity_CMB) == enmap.ndmap:
+    if type(intensity_sky_map) == enmap.ndmap:
         for spin in differential_ellipticity_spin_maps.spins:
             differential_ellipticity_spin_maps[spin] = enmap.ndmap(
                 differential_ellipticity_spin_maps[spin],
-                wcs=intensity_CMB.wcs
+                wcs=intensity_sky_map.wcs
             )
-    else:
-        for spin in differential_ellipticity_spin_maps.spins:
-            differential_ellipticity_spin_maps[spin] = differential_ellipticity_spin_maps[spin].squeeze()
+    # else:
+    for spin in differential_ellipticity_spin_maps.spins:
+        differential_ellipticity_spin_maps[spin] = differential_ellipticity_spin_maps[spin].squeeze()
 
-    return differential_ellipticity_spin_maps
+    return parameter_systematics, differential_ellipticity_spin_maps
 
 def get_differential_ellipticity_no_calibration(
-        intensity_CMB,
+        intensity_sky_map,
         ellipticity_parameters_dict,
         sigma_fwhm,
         lmax=None,
@@ -442,12 +409,12 @@ def get_differential_ellipticity_no_calibration(
         bool_secondary_term=False
     ):
     """
-    Get the differential ellipticity maps for a given intensity CMB map and ellipticity parameters as described in the formalism describe in arXiv:2011.13910, with output spins 0, 2, -2. 
+    Get the differential ellipticity maps for a given intensity sky map and ellipticity parameters as described in the formalism describe in arXiv:2011.13910, with output spins 0, 2, -2. 
     
     Parameters
     ----------
-    intensity_CMB: np.ndarray | enmap.ndmap
-        Full sky intensity CMB map already convolved with Gaussian circularly-symmetric beam (as assumed in the formalism), the output maps will have the same dimension
+    intensity_sky_map: np.ndarray | enmap.ndmap
+        Full sky intensity sky map already convolved with Gaussian circularly-symmetric beam (as assumed in the formalism), the output maps will have the same dimension
     ellipticity: np.ndarray
         Ellipticity parameter provided for each detector, defined as the ratio of the difference between the squares of the major and minor axes of the ellipse to their sum, i.e. $\epsilon = (\sigma_{\rm maj}^2 - \sigma_{\rm min}^2) / (\sigma_{\rm maj}^2 + \sigma_{\rm min}^2)$, which is also two times the third eccentricity parameter
     ellipse_angle: np.ndarray
@@ -455,7 +422,7 @@ def get_differential_ellipticity_no_calibration(
     sigma_fwhm: np.ndarray
         Full width at half maximum of the beam in arcmin, for each detector, used to compute the circularly-symmetric (cs) beam width $\sigma_{\rm cs}$ as $\sigma_{\rm cs} = \frac{\rm FWHM}{\sqrt{8 \ln(2)}}$
     lmax: int
-        Maximum multipole for the computation of the spin derivatives of the intensity CMB map
+        Maximum multipole for the computation of the spin derivatives of the intensity sky map
     mask: np.ndarray, optional
         HEALPix mask to define the area of the sky to compute the differential systematics maps. If None, the full sky is used.
     bool_secondary_term: bool, optional
@@ -469,7 +436,7 @@ def get_differential_ellipticity_no_calibration(
 
     Notes
     -----
-    Currently, the input intensity_CMB map is assumed to be a full sky map, i.e. it must have a dimension of 12 * nside^2, where nside is the HEALPix nside parameter, and smooth with the circularly-symmetric beam defined by the sigma_fwhm parameter. 
+    Currently, the input intensity_sky_map map is assumed to be a full sky map, i.e. it must have a dimension of 12 * nside^2, where nside is the HEALPix nside parameter, and smooth with the circularly-symmetric beam defined by the sigma_fwhm parameter. 
     """
 
     assert 'ellipticity_parameter_convention' in ellipticity_parameters_dict or ('dp' in ellipticity_parameters_dict and 'dc' in ellipticity_parameters_dict), "The provided ellipticity_parameters_dict must contain the 'ellipticity_parameter_convention' key to specify the ellipticity parameter convention used to compute the dp and dc parameters"
@@ -531,19 +498,19 @@ def get_differential_ellipticity_no_calibration(
     if spherical_derivatives is None:
         print("Computing spherical derivatives from the temperature map", flush=True)
 
-        if type(intensity_CMB) == np.ndarray:
+        if type(intensity_sky_map) == np.ndarray:
             # HEALPIX pixelization expected
-            assert intensity_CMB.ndim == 1, 'The intensity_CMB map must be a 1D array compatible with a full sky healpy map'
-            assert np.log(np.sqrt(intensity_CMB.size/12)) / np.log(2) % 1 == 0, 'The intensity_CMB map dimension must be compatible with a full sky healpy map'
-            nside = hp.npix2nside(intensity_CMB.size)
+            assert intensity_sky_map.ndim == 1, 'The intensity_sky_map map must be a 1D array compatible with a full sky healpy map'
+            assert np.log(np.sqrt(intensity_sky_map.size/12)) / np.log(2) % 1 == 0, 'The intensity_sky_map map dimension must be compatible with a full sky healpy map'
+            nside = hp.npix2nside(intensity_sky_map.size)
             shape_car = None
-        elif type(intensity_CMB) == enmap.ndmap:
+        elif type(intensity_sky_map) == enmap.ndmap:
             # CAR pixelization expected
             assert shape_car is not None, 'The shape_car must be provided if the intensity map is provided as enmap.ndmap'
             
             nside = None
             if shape_fullsky_car is None:
-                shape_fullsky_car = intensity_CMB.shape if intensity_CMB.ndim == 2 else None
+                shape_fullsky_car = intensity_sky_map.shape if intensity_sky_map.ndim == 2 else None
             assert shape_fullsky_car is not None
 
             assert type(mask) == enmap.ndmap, 'The provided mask must be of type ndmap if the intensity map is as well provided with this type'
@@ -552,10 +519,10 @@ def get_differential_ellipticity_no_calibration(
             take_box_function = lambda x: x.reshape(shape_fullsky_car).submap(box_coordinates).ravel()#[mask_bool]
 
         else:
-            raise ValueError("The intensity_CMB map must be either a 1D array compatible with a full sky healpy map or a 2D array compatible with a CAR array")
+            raise ValueError("The intensity_sky_map map must be either a 1D array compatible with a full sky healpy map or a 2D array compatible with a CAR array")
 
         alms_I = map2alm_anypix(
-            intensity_CMB,
+            intensity_sky_map,
             spin=0,
             lmax=lmax, 
             niter=10,
@@ -565,13 +532,13 @@ def get_differential_ellipticity_no_calibration(
         input_spin = 0
         intensity_spin_2_derivatives = get_second_spin_derivative(
             -np.vstack([alms_I, np.zeros_like(alms_I)]),
-            shape_pixels_output=(intensity_CMB.size,),
+            shape_pixels_output=(intensity_sky_map.size,),
             input_spin=input_spin,
         )
         spherical_derivatives = get_second_spherical_derivatives_from_spin_derivatives(
-            input_map=intensity_CMB,
+            input_map=intensity_sky_map,
             spin_derivatives_dict=intensity_spin_2_derivatives,
-            shape_pixels_output=(intensity_CMB.size,),
+            shape_pixels_output=(intensity_sky_map.size,),
             lmax=lmax,
             input_spin=input_spin
         )
@@ -622,11 +589,11 @@ def get_differential_ellipticity_no_calibration(
     if 0 not in differential_ellipticity_spin_maps:
         differential_ellipticity_spin_maps[0] = np.zeros_like(differential_ellipticity_spin_maps[2])
 
-    if type(intensity_CMB) == enmap.ndmap:
+    if type(intensity_sky_map) == enmap.ndmap:
         for spin in differential_ellipticity_spin_maps.spins:
             differential_ellipticity_spin_maps[spin] = enmap.ndmap(
                 differential_ellipticity_spin_maps[spin],
-                wcs=intensity_CMB.wcs
+                wcs=intensity_sky_map.wcs
             )
     else:
         for spin in differential_ellipticity_spin_maps.spins:

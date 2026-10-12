@@ -11,8 +11,7 @@ from pixell import enmap
 
 __all__ = [
     'Spin_nm',
-    'Spin_maps',
-    'ud_grade_hn'
+    'Spin_maps'
 ]
 
 class Spin_nm(tuple):

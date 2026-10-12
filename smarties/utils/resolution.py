@@ -9,6 +9,14 @@ from smarties.utils.tools import get_coupled_spin, get_row_mapmaking_matrix, rew
 from smarties.sky.cmb import create_CMB_spin_maps
 from smarties.hn import Spin_maps, Spin_nm
 
+__all__ = [
+    'get_chunks_from_shape',
+    'get_projector_map_resolution',
+    'get_chunks_final_map_from_downgraded_chunks',
+    'get_slice_1d_from_2d',
+    'ud_grade_hn'
+]
+
 def get_chunks_from_shape(
         shape_map, 
         number_chunks=10,

@@ -61,7 +61,7 @@ class FrameworkSystematics(object):
         else:
             raise NotImplemented('The number of Stokes parameters must be 2 (polarization only) or 3 (intensity and polarization), other cases are not implemented yet')
 
-    def get_spin_sky_maps(self, nside, fwhm=0., seed=42):
+    def get_CMB_spin_sky_maps(self, nside, fwhm=0., seed=42):
         """
         Get the spin CMB maps which are the following for intensity and polarization:
             * Spin 0: I
@@ -156,7 +156,7 @@ class FrameworkSystematics(object):
             mask_input: bool = False,
             polar_angle: np.ndarray = None,
             projector_h_n: np.ndarray = None,
-            wcs_car=None
+            geometry_dictionary=dict()
         ):
         """
         Compute the total maps from the $h_n$ maps, the spin CMB maps and the spin systematics maps
@@ -310,6 +310,7 @@ class FrameworkSystematics(object):
                     ) # Polarization angle to remove for consistent modeling of the data
                 )
 
+        wcs_car = geometry_dictionary.get('wcs_car', None)
         get_final_map = lambda x: x if wcs_car is None else enmap.ndmap(
             x, 
             wcs=wcs_car
@@ -433,7 +434,7 @@ class FrameworkSystematics(object):
 
         if inverse_mapmaking_matrix is not None:
             assert inverse_mapmaking_matrix.ndim == 3, 'The inverse mapmaking matrix must be a 3D array of shape (n_pix, n_stokes, n_stokes)'
-            assert (perform_det_interpolation and perform_resolution_change == False) and inverse_mapmaking_matrix.shape == (npix, self.nstokes, self.nstokes), 'Interpolation and resolution change of the mapmaking matrix are implemetend and the inverse mapmaking matrix will be recomputed, so it should not be provided as an input'
+            # assert (perform_det_interpolation and perform_resolution_change == False) and inverse_mapmaking_matrix.shape == (npix, self.nstokes, self.nstokes), 'Interpolation and resolution change of the mapmaking matrix are implemetend and the inverse mapmaking matrix will be recomputed, so it should not be provided as an input'
             #TODO: Change as a warning
 
         if polar_angle is None:
@@ -454,17 +455,6 @@ class FrameworkSystematics(object):
         assert np.all(sum(spin_sky_maps.values()).imag < 1e-14), 'The sum of the input sky maps must be real, the imaginary part is not expected to be non-zero'
         assert np.all(sum(spin_systematics_maps.values()).imag < 1e-14), 'The sum of the input systematics maps must be real, the imaginary part is not expected to be non-zero'
 
-        if build_systematics_maps_from_templates and dict_utils_template_systematics_maps is not None:
-            print("Template systematics maps provided, checking their consistency...", flush=True)
-            assert 'template_spin_systematics_maps' in dict_utils_template_systematics_maps, 'The template systematics maps must be provided in the parameters template systematics maps with key "template_spin_systematics_maps"'
-            assert 'parameters_template_systematics' in dict_utils_template_systematics_maps, 'The parameters of the template systematics maps must be provided in the parameters template systematics maps with key "parameters_template_systematics"'
-
-            assert isinstance(dict_utils_template_systematics_maps['template_spin_systematics_maps'], Spin_maps), 'The template systematics maps must be a Spin_maps instance'
-            assert np.all(sum(dict_utils_template_systematics_maps['template_spin_systematics_maps'].values()).imag < 1e-14), 'The sum of the template systematics maps must be real, the imaginary part is not expected to be non-zero'
-            if dict_utils_template_systematics_maps['parameters_template_systematics'].ndim > 1:
-                assert np.array([dict_utils_template_systematics_maps['template_spin_systematics_maps'][spin].shape[0] == dict_utils_template_systematics_maps['parameters_template_systematics'].shape[0] for spin in dict_utils_template_systematics_maps['template_spin_systematics_maps'].spins]).all() , 'The number of templates in the template systematics maps must be the same as the number of parameters in the template systematics maps'
-
-
         for spin in set(spin_sky_maps.spins):
             if spin not in spin_systematics_maps:
                 spin_systematics_maps[spin] = np.zeros(1) # If a spin is not provided in the systematics maps, we assume that the systematics maps for this spin are zero
@@ -472,7 +462,24 @@ class FrameworkSystematics(object):
         for spin in set(spin_systematics_maps.spins):
             if spin not in spin_sky_maps:
                 spin_sky_maps[spin] = np.zeros(1) # If a spin is not provided in the sky maps, we assume that the sky maps for this spin are zero
-        
+
+        if build_systematics_maps_from_templates and dict_utils_template_systematics_maps is not None:
+            print("Template systematics maps provided, checking their consistency...", flush=True)
+            assert 'template_spin_systematics_maps' in dict_utils_template_systematics_maps, 'The template systematics maps must be provided in the parameters template systematics maps with key "template_spin_systematics_maps"'
+            assert 'parameters_template_systematics' in dict_utils_template_systematics_maps, 'The parameters of the template systematics maps must be provided in the parameters template systematics maps with key "parameters_template_systematics"'
+
+            assert isinstance(dict_utils_template_systematics_maps['template_spin_systematics_maps'], Spin_maps), 'The template systematics maps must be a Spin_maps instance'
+            assert np.all(sum(dict_utils_template_systematics_maps['template_spin_systematics_maps'].values()).imag < 1e-14), 'The sum of the template systematics maps must be real, the imaginary part is not expected to be non-zero'
+            assert isinstance(dict_utils_template_systematics_maps['parameters_template_systematics'], dict), 'The parameters of the template systematics maps must be provided as a dictionary with the keys being the spins and the values the parameters of the template systematics maps'
+            assert np.array([spin in dict_utils_template_systematics_maps['parameters_template_systematics'] for spin in dict_utils_template_systematics_maps['template_spin_systematics_maps'].spins]).all() , 'The parameters of the template systematics maps must be provided for all the spins present in the template systematics maps'
+
+            for spin in set(spin_sky_maps.spins):
+                if spin not in dict_utils_template_systematics_maps['template_spin_systematics_maps'].spins:
+                    # If a spin is not provided in the template systematics maps, 
+                    # we assume that the systematics maps for this spin and parameters are zero
+                    dict_utils_template_systematics_maps['template_spin_systematics_maps'][spin] = np.zeros(1) 
+                    dict_utils_template_systematics_maps['parameters_template_systematics'][spin] = np.zeros(1) 
+
         if projection_pixel == 'car':
             assert np.isin(
                 ['shape_car', 'wcs_car'],
@@ -585,6 +592,7 @@ class FrameworkSystematics(object):
 
             
             if perform_resolution_change:
+                print(f"Performing resolution change for chunk {chunk_elem}...", flush=True)
                 slice_1d_hmap = get_slice_1d_from_2d(
                     **dict_info_map_downgraded,
                     boolean_mask=mask_downgraded != 0
@@ -650,11 +658,12 @@ class FrameworkSystematics(object):
                 list_spin_positive = [spin for spin in h_n_spin_dict.spins if spin >= 0]
 
                 # Different slices are taken depending on wether a resolution change is applied or not
-                slice_output_interpolation = slice_hmaps_from_downgraded_slice if perform_resolution_change else None
+                slice_output_interpolation = None# slice_hmaps_from_downgraded_slice if perform_resolution_change else None
 
                 # If perform_det_interpolation and perform_resolution_change are both True,
                 # then the output of the interpolation will be directly projected to the final map resolution
-                slice_hmaps_from_fullsky = ...
+                
+                slice_hmaps_from_fullsky = (..., slice_hmaps_from_downgraded_slice) if perform_resolution_change else ...
 
                 spin_non_0 = [spin for spin in h_n_spin_dict.spins if spin != spin_0][0]
                 slice_weight = ...,slice_1d_hmap if inverse_weight_func(spin_non_0).shape[1] != 1 else ...
@@ -695,16 +704,17 @@ class FrameworkSystematics(object):
                 final_inverse_mapmaking_matrix_sliced = final_inverse_mapmaking_matrix[slice_1d_final_map]
                 
             def build_on_the_fly_spin_systematics_maps(spin):
-                slice_spin_systematics_maps = (...,slice_1d_final_map) if spin_systematics_maps[list(spin_systematics_maps.spins)[0]].size != 1 else ...
+                slice_spin_systematics_maps = (...,slice_1d_final_map) if spin_systematics_maps[spin].size != 1 else ...
                 if build_systematics_maps_from_templates:
+                    slice_for_template = (...,slice_1d_final_map) if dict_utils_template_systematics_maps['template_spin_systematics_maps'][spin].size != 1 else ...
                     return contract(
                         '...d,...p->dp',
-                        dict_utils_template_systematics_maps['parameters_template_systematics'],
-                        dict_utils_template_systematics_maps['template_spin_systematics_maps'][spin][slice_spin_sky_maps]
+                        dict_utils_template_systematics_maps['parameters_template_systematics'][spin],
+                        dict_utils_template_systematics_maps['template_spin_systematics_maps'][spin][slice_for_template]
                     ) + spin_systematics_maps[spin][slice_spin_systematics_maps]
                 else:
                     return spin_systematics_maps[spin][slice_spin_systematics_maps]
-            
+
 
             print("Computing the spin coupled maps...", flush=True)
             spin_coupled_maps = np.zeros((slice_1d_final_map.size, len(self.list_spin_output),), dtype=complex)
@@ -725,15 +735,17 @@ class FrameworkSystematics(object):
 
                 # \sum_{k' = -\infty}^{\infty} h_{k-k'} S_{k'} on all (k-k', k') pairs
                 for tuple_spins in coupled_spins:
+                    sliced_spin_sky_map = spin_sky_maps[tuple_spins[1]][slice_spin_sky_maps] if spin_sky_maps[tuple_spins[1]].size != 1 else spin_sky_maps[tuple_spins[1]]
+                    sliced_spin_systematics_map = build_on_the_fly_spin_systematics_maps(tuple_spins[1])
                     spin_coupled_maps[...,i] += factor_func(spin) * contract(
                         'd,d...,d...->...', 
                         polar_angle_coeff[spin], 
                         h_n_spin_to_use[tuple_spins[0]][slice_hmaps_from_fullsky],
-                        build_on_the_fly_spin_systematics_maps(tuple_spins[1])
+                        sliced_spin_systematics_map
                         + contract(
                         'd,...->d...', 
                         polar_angle_coeff[-tuple_spins[1]], 
-                        spin_sky_maps[tuple_spins[1]][slice_spin_sky_maps],
+                        sliced_spin_sky_map,
                     )
                 ) # Polarization angle to remove for consistent modeling of the data
 

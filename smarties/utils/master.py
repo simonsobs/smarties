@@ -17,7 +17,8 @@ __all__ = [
     'uncouple_spectra_TT',
     'uncouple_spectra_pol',
     'uncouple_cross_spectra',
-    'uncouple_spectra_all'
+    'uncouple_spectra_all',
+    'uncouple_spectra_pspy'
 ]
 
 def filter_map_ell_cut(
@@ -468,8 +469,6 @@ def uncouple_spectra_all(
         lmax=lmax,
         lmax_mask=lmax,
         masked_on_input=False,
-        purify_e=purify_e,
-        purify_b=purify_b
     )
 
     field_spin2 = nmt.NmtField(
