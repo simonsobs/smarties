@@ -12,6 +12,10 @@ from smarties.utils.harmonics import (
     convert_alm_spin_to_plusminus,
 )
 
+__all__ = [
+    "gaussian_circular_beam_blms",
+    "get_beam_convolution_spins_maps"
+]
 
 def gaussian_circular_beam_alms(
     fwhm_rad: float,
