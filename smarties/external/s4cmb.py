@@ -730,8 +730,7 @@ def get_second_spherical_derivatives_from_spin_derivatives(
                 input_spin - 1
             ]
 
-        spherical_derivatives_dict_ = (
-            get_first_spherical_derivatives_from_spin_derivatives(
+        spherical_derivatives_dict_ = get_first_spherical_derivatives_from_spin_derivatives(
                 input_map=input_map,
                 spin_derivatives_dict=spin_derivatives_dict,
                 shape_pixels_output=shape_pixels_output,
