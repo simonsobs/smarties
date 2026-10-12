@@ -125,6 +125,8 @@ def get_beam_convolution_spins_maps(
         Polarization angles in radians, only used if ``substract_gaussian_beam`` is True
     spins: np.ndarray or None (optional)
         Spins to compute. If ``None``, use ``-mmax..mmax``.
+    wcs: WCS object
+        Geometry of the output map. If not specified, set to None and the output map will be computed with healpix pixelization
     substract_gaussian_beam: bool
         Wether to substract a gaussian beam or not, default to False.
     Returns
