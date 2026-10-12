@@ -737,7 +737,6 @@ def get_second_spherical_derivatives_from_spin_derivatives(
                 input_spin=input_spin,
                 zbounds=zbounds,
             )
-        )
         spherical_derivatives_dict["theta"] = spherical_derivatives_dict_["theta"]
         spherical_derivatives_dict["phi"] = spherical_derivatives_dict_["phi"]
 
