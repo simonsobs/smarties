@@ -9,7 +9,8 @@ requires = [
 [project]
 name = 'smarties'
 authors = [
-    {name = 'Magdy Morshed', email = 'magdy.morshed@fe.infn.it'}
+    {name = 'Magdy Morshed', email = 'magdy.morshed@fe.infn.it'},
+    {name = 'Camille Demay', email = 'camille.demay@unife.it'}
 ]
 maintainers = [
     {name = 'Magdy Morshed', email = 'magdy.morshed@fe.infn.it'}
@@ -26,7 +27,7 @@ classifiers = [
     'Operating System :: OS Independent',
     'Topic :: Scientific/Engineering',
 ]
-requires-python = '>=3.7'
+requires-python = '>=3.13'
 license = {file = 'LICENSE'}
 dependencies = [
     'healpy>=0.16.6',
@@ -34,7 +35,9 @@ dependencies = [
     'scipy',
     'opt_einsum',
     'ducc0',
-    'h5py'
+    'h5py',
+    'pixell',
+    'tqdm'
 ]
 
 dynamic = ['version']
@@ -44,8 +47,6 @@ optional = [
     'camb',
     'toml',
     'matplotlib',
-    'pixell',
-    'tqdm'
 ]
 
 
