@@ -181,7 +181,7 @@ def get_beam_convolution_spins_maps(
             print(
                 f"Substracting gaussian beam for detector {det_name} with fwhm {fwhm[idet]} arcmin"
             )
-            gaussian_blms = gaussian_circular_beam_alms(
+            gaussian_blms = gaussian_circular_beam_blms(
                 fwhm_rad=np.radians(fwhm[idet] / 60),
                 lmax=lmax,
                 mmax=mmax_beam,
