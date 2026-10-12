@@ -80,7 +80,7 @@ def gaussian_circular_beam_blms(
             * np.exp(2 * sigmasq)  # accounting for polarization angle of the detector
             * (-1 * np.sqrt(2))  # norm factor when going from +- 2 alms to almE almB
         )
-        blms[2] = 1j * alms[1]
+        blms[2] = 1j * blms[1]
 
     return blms
 
