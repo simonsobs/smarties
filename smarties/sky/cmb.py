@@ -3,16 +3,13 @@
 # lease refer to the LICENSE file in the root of this repository.
 
 
-import numpy as np
 import healpy as hp
+import numpy as np
 
 from smarties.hn import Spin_maps
 
-__all__ = [
-    'generate_power_spectra_CAMB',
-    'generate_CMB_map',
-    'create_CMB_spin_maps'
-]
+__all__ = ["generate_power_spectra_CAMB", "generate_CMB_map", "create_CMB_spin_maps"]
+
 
 def generate_power_spectra_CAMB(
     lmax,
@@ -29,7 +26,7 @@ def generate_power_spectra_CAMB(
     lens_potential_accuracy=1,
     nt=0,
     ntrun=0,
-    type_power='total',
+    type_power="total",
     typeless_bool=False,
 ):
     """
@@ -79,33 +76,43 @@ def generate_power_spectra_CAMB(
     try:
         import camb
     except ImportError:
-        raise ImportError('camb is not installed. Please install it with "pip install camb"')
+        raise ImportError(
+            'camb is not installed. Please install it with "pip install camb"'
+        )
 
     if lmax < 256:
         lmax_computation = 512
     else:
         lmax_computation = lmax
-    
+
     # pars = camb.CAMBparams(max_l_tensor=lmax, parameterization='tensor_param_indeptilt')
     pars = camb.CAMBparams(max_l_tensor=lmax_computation)
     pars.WantTensors = True
 
     pars.Accuracy.AccurateBB = True
     pars.Accuracy.AccuratePolarization = True
-    pars.set_cosmology(H0=H0, ombh2=ombh2, omch2=omch2, mnu=mnu, omk=omk, tau=tau, Alens=Alens)
-    pars.InitPower.set_params(As=As, ns=ns, r=r, parameterization='tensor_param_indeptilt', nt=nt, ntrun=ntrun)
-    pars.max_eta_k_tensor = lmax_computation + 100 
+    pars.set_cosmology(
+        H0=H0, ombh2=ombh2, omch2=omch2, mnu=mnu, omk=omk, tau=tau, Alens=Alens
+    )
+    pars.InitPower.set_params(
+        As=As, ns=ns, r=r, parameterization="tensor_param_indeptilt", nt=nt, ntrun=ntrun
+    )
+    pars.max_eta_k_tensor = lmax_computation + 100
 
     # pars.set_cosmology(H0=H0)
     pars.set_for_lmax(lmax_computation, lens_potential_accuracy=lens_potential_accuracy)
 
-    print('Calculating spectra from CAMB !')
+    print("Calculating spectra from CAMB !")
     results = camb.get_results(pars)
 
-    powers = results.get_cmb_power_spectra(pars, CMB_unit='muK', raw_cl=True, lmax=lmax_computation)
+    powers = results.get_cmb_power_spectra(
+        pars, CMB_unit="muK", raw_cl=True, lmax=lmax_computation
+    )
     if typeless_bool:
-        return {powers_type: powers[powers_type][:lmax+1, :] for powers_type in powers}
-    return powers[type_power][:lmax+1, :]
+        return {
+            powers_type: powers[powers_type][: lmax + 1, :] for powers_type in powers
+        }
+    return powers[type_power][: lmax + 1, :]
 
 
 def generate_CMB_map(nside, lmax, seed=42):
@@ -119,16 +126,16 @@ def generate_CMB_map(nside, lmax, seed=42):
     # Generating the CMB map
     np.random.seed(seed)
     return hp.synfast(all_spectra, nside, lmax=lmax, new=True)
-    
 
-def create_CMB_spin_maps(nside, nstokes, lmax, fwhm=0., seed=42):
+
+def create_CMB_spin_maps(nside, nstokes, lmax, fwhm=0.0, seed=42):
     """
     Create spin maps for the CMB contribution, the $\Tilde{S}_k$ maps, defined
-    as 
+    as
         $\Tilde{S}_0 = I$
         $\Tilde{S}_2 = \frac{1}{2} (Q + iU)$
         $\Tilde{S}_{-2} = \frac{1}{2} (Q - iU)$
-    by generating them from CAMB 
+    by generating them from CAMB
 
     Parameters
     ----------
@@ -146,13 +153,14 @@ def create_CMB_spin_maps(nside, nstokes, lmax, fwhm=0., seed=42):
     Returns
     -------
     spin_maps: dictionary of spin maps
-        dictionary of spin maps, each of shape (n_spin, npix), with n_spin being 1 if nstokes=1 (spin=0), 2 if nstokes=2 (spin=2, -2) and 3 if nstokes=3 (spin=0, 2, -2) 
+        dictionary of spin maps, each of shape (n_spin, npix), with n_spin being 1 if nstokes=1 (spin=0), 2 if nstokes=2 (spin=2, -2) and 3 if nstokes=3 (spin=0, 2, -2)
 
     """
-    npix = 12*nside**2
+    npix = 12 * nside**2
 
-    assert nstokes in [1, 2, 3], 'The number of Stokes parameters must be 1 (only temperature), 2 (only polarization) or 3 (both temperature and polarization)'
-    
+    assert nstokes in [1, 2, 3], (
+        "The number of Stokes parameters must be 1 (only temperature), 2 (only polarization) or 3 (both temperature and polarization)"
+    )
 
     spin_dict_maps = Spin_maps()
 
@@ -163,27 +171,30 @@ def create_CMB_spin_maps(nside, nstokes, lmax, fwhm=0., seed=42):
         idx_polar = np.array([0, 1])
     elif nstokes == 1:
         # I
-        relevant_indices = [...] #np.array([0])
+        relevant_indices = [...]  # np.array([0])
     else:
         # I, Q, U
         relevant_indices = np.arange(3)
         idx_polar = np.array([1, 2])
-        
+
     maps_CMB = generate_CMB_map(nside, lmax, seed=seed)
-    
+
     if fwhm != 0:
-        maps_CMB = hp.smoothing(maps_CMB, fwhm=np.deg2rad(fwhm/60), lmax=lmax)
-    
+        maps_CMB = hp.smoothing(maps_CMB, fwhm=np.deg2rad(fwhm / 60), lmax=lmax)
+
     maps_CMB = maps_CMB[relevant_indices]
-        
 
     if nstokes == 1:
-        spin_dict_maps[0] = maps_CMB # [spin=0]
-    
+        spin_dict_maps[0] = maps_CMB  # [spin=0]
+
     if nstokes > 1:
-        if nstokes == 3: 
-            spin_dict_maps[0] = maps_CMB[0] # [spin=0]
-        spin_dict_maps[-2] = .5*(maps_CMB[idx_polar[0]] - 1j * maps_CMB[idx_polar[1]]) # [spin=-2]
-        spin_dict_maps[2] = .5*(maps_CMB[idx_polar[0]] + 1j * maps_CMB[idx_polar[1]]) # [spin=2]
-        
+        if nstokes == 3:
+            spin_dict_maps[0] = maps_CMB[0]  # [spin=0]
+        spin_dict_maps[-2] = 0.5 * (
+            maps_CMB[idx_polar[0]] - 1j * maps_CMB[idx_polar[1]]
+        )  # [spin=-2]
+        spin_dict_maps[2] = 0.5 * (
+            maps_CMB[idx_polar[0]] + 1j * maps_CMB[idx_polar[1]]
+        )  # [spin=2]
+
     return spin_dict_maps

@@ -59,7 +59,6 @@ module = [
 ]
 ignore_missing_imports = true
 
-[tool.setuptools]
-packages = ["smarties"]
-
+[tool.setuptools.packages.find]
+include = ["smarties*"]
 [tool.setuptools_scm]

@@ -4,37 +4,40 @@
 
 
 import os
-import yaml
-import numpy as np
-import healpy as hp
-from opt_einsum import contract
+
 import h5py
+import healpy as hp
+import numpy as np
+import yaml
+from opt_einsum import contract
 from pixell import enmap
+
 from smarties.hn import Spin_maps, Spin_nm
 from smarties.utils.tools import flatten_CAR_maps, reweight_hmaps_by_hits
 
 __all__ = [
-    'build_mask_from_toast_h_maps',
-    'read_file',
-    'read_toast_h_maps',
-    'read_lbs_h_maps',
-    'read_spherical_derivatives_from_file',
-    'read_values_from_yaml_file',
-    'save_partial_spin_maps'
+    "build_mask_from_toast_h_maps",
+    "read_file",
+    "read_toast_h_maps",
+    "read_lbs_h_maps",
+    "read_spherical_derivatives_from_file",
+    "read_values_from_yaml_file",
+    "save_partial_spin_maps",
 ]
 
+
 def read_file(
-        name_file:str, 
-        format_file:str='fits', 
-        boolean_mask:np.ndarray=None,
-        reorder: bool=False,
-        dtype=np.float64,
-        projection_pixel: str='healpix',
-        flatten_output: bool=True,
-    ):
+    name_file: str,
+    format_file: str = "fits",
+    boolean_mask: np.ndarray = None,
+    reorder: bool = False,
+    dtype=np.float64,
+    projection_pixel: str = "healpix",
+    flatten_output: bool = True,
+):
     """
     Read the $h_n$ maps as provided either in FITS, NPY or NPZ
-    format, and eventually mask them. 
+    format, and eventually mask them.
 
     Parameters
     ----------
@@ -42,46 +45,46 @@ def read_file(
         Path to the $h_n$ file to be read. If the path provided does
         not contain the fomat suffix, in '.fits', '.npy' or '.npz',
         the suffix corresponding to the format indicated in format_file
-        will be concatenated. 
+        will be concatenated.
     format_file: str
-        String indicated the format of the file to be read, must be 
-        either 'fits', 'npy' or 'npz' otherwise a ValueError is raised 
+        String indicated the format of the file to be read, must be
+        either 'fits', 'npy' or 'npz' otherwise a ValueError is raised
     boolean_mask: array[bool] | Ellipsis
-        Optional, boolean array corresponding to the selected pixels in 
-        the array to retain after loading the file. By default, return 
+        Optional, boolean array corresponding to the selected pixels in
+        the array to retain after loading the file. By default, return
         all pixels. Note that this option is not active for 'npz' format
         files. If None, the full maps are read.
 
     Returns
     -------
         Array containing the $h_n$ map read, from which only the relevant
-        pixels are possibly retained. 
+        pixels are possibly retained.
     """
     if boolean_mask is None:
         boolean_mask = ...
-    
+
     _flatten_CAR_maps = flatten_CAR_maps if flatten_output else lambda x: x
-    
-    if format_file == 'fits':
-        if not name_file.endswith('.fits'):
-            name_file = name_file + '.fits'
-        if projection_pixel == 'healpix':
+
+    if format_file == "fits":
+        if not name_file.endswith(".fits"):
+            name_file = name_file + ".fits"
+        if projection_pixel == "healpix":
             return hp.read_map(name_file)[boolean_mask]
         else:
             return _flatten_CAR_maps(enmap.read_map(name_file))[boolean_mask]
-    elif format_file == 'npy':
-        if not name_file.endswith('.npy'):
-            name_file = name_file + '.npy'
+    elif format_file == "npy":
+        if not name_file.endswith(".npy"):
+            name_file = name_file + ".npy"
         # return np.load(name_file)[boolean_mask]
-        return np.memmap(name_file, mode='r', dtype=dtype)[boolean_mask]
-    elif format_file == 'npz':
-        if not name_file.endswith('.npz'):
-            name_file = name_file + '.npz'
-        return np.load(name_file) #, allow_pickle=True)
-    elif format_file in ['h5', 'hdf5', 'H5', 'hdf']:
+        return np.memmap(name_file, mode="r", dtype=dtype)[boolean_mask]
+    elif format_file == "npz":
+        if not name_file.endswith(".npz"):
+            name_file = name_file + ".npz"
+        return np.load(name_file)  # , allow_pickle=True)
+    elif format_file in ["h5", "hdf5", "H5", "hdf"]:
         if not name_file.endswith(format_file):
-            name_file = name_file + '.' + format_file
-        if projection_pixel == 'healpix':
+            name_file = name_file + "." + format_file
+        if projection_pixel == "healpix":
             return h5py.File(name_file, "r")
         else:
             return _flatten_CAR_maps(enmap.read_map(name_file))[boolean_mask]
@@ -90,20 +93,19 @@ def read_file(
 
 
 def read_toast_h_maps(
-        list_name_files: list[str], 
-        list_spin: list[int]=[2,4], 
-        list_prefix: list[str]=['A_', 'B_'], 
-        list_weights=None, 
-        mask: np.ndarray=None, 
-        format_file: str='npz',
-        reweight_by_hits: bool=True,
-        single_precision: bool=False,
-        duplicate_maps_with_prefix=False,
-        projection_pixel: str='healpix',
-        
-    ):
+    list_name_files: list[str],
+    list_spin: list[int] = [2, 4],
+    list_prefix: list[str] = ["A_", "B_"],
+    list_weights=None,
+    mask: np.ndarray = None,
+    format_file: str = "npz",
+    reweight_by_hits: bool = True,
+    single_precision: bool = False,
+    duplicate_maps_with_prefix=False,
+    projection_pixel: str = "healpix",
+):
     """
-    Read the $h_n$ map as generated by TOAST, 
+    Read the $h_n$ map as generated by TOAST,
     which filename is preferrentially given as
         filever_w14_p082_f150_A_sin_1.fits
     with:
@@ -112,15 +114,15 @@ def read_toast_h_maps(
     * p082: the pixel number (here 082)
     * f150: the frequency band (here 150 GHz)
     * A: the polarization detector number (here A)
-    * sin_1: the spin dependence and component written, here the $h_n$ component with spin 1 
-    
-    Only the latest part of the file actually matters, considering the $sin$ or $cos$ component of the $h_n$ map as well as its spin dependence. 
+    * sin_1: the spin dependence and component written, here the $h_n$ component with spin 1
+
+    Only the latest part of the file actually matters, considering the $sin$ or $cos$ component of the $h_n$ map as well as its spin dependence.
 
     Parameters
     ----------
     name_file: str
         The version of the file, given so that `hp.read_map(name_file + '_sin_1.fits')` can be used to read the file (with `sin_1` being the sin or cos component of the $h_n$ maps and the spin dependence)
-    list_spin (list[int]): 
+    list_spin (list[int]):
         List of the spin to read
     list_prefix: list[str]
         List of the prefixes to read, typically ['A_', 'B_'] for two polarization detectors in a pair
@@ -131,8 +133,8 @@ def read_toast_h_maps(
     format_file: str
         Format of the file to read, must be 'fits', 'npy' or 'npz', otherwise a ValueError is raised
     reweight_by_hits: bool, optional
-        If True, the weights are computed from the number of hits per pixel and per detectors if available, are read from spin 0 maps, otherwise by the number of detectors observing each pixel. 
-    
+        If True, the weights are computed from the number of hits per pixel and per detectors if available, are read from spin 0 maps, otherwise by the number of detectors observing each pixel.
+
     Returns
     -------
     h_n: Spin_maps
@@ -143,12 +145,20 @@ def read_toast_h_maps(
     try:
         from tqdm import tqdm
     except ImportError:
-        raise ImportError('tqdm is not installed. Please install it with "pip install tqdm"')
+        raise ImportError(
+            'tqdm is not installed. Please install it with "pip install tqdm"'
+        )
 
-    assert np.unique(list_spin).size == np.array(list_spin).size, 'The list of spins must be unique'
-    assert (np.array(list_spin) >= 0).all(), 'The spins provided must be positive, their negative counterpart will be computed from the components read'
+    assert np.unique(list_spin).size == np.array(list_spin).size, (
+        "The list of spins must be unique"
+    )
+    assert (np.array(list_spin) >= 0).all(), (
+        "The spins provided must be positive, their negative counterpart will be computed from the components read"
+    )
 
-    assert format_file in ['npy', 'npz', 'h5', 'hdf5', 'H5', 'hdf', 'fits'], "Format file must be 'fits', 'npy', 'h5', 'hdf5', 'H5', 'hdf' or 'npz' for TOAST h maps"
+    assert format_file in ["npy", "npz", "h5", "hdf5", "H5", "hdf", "fits"], (
+        "Format file must be 'fits', 'npy', 'h5', 'hdf5', 'H5', 'hdf' or 'npz' for TOAST h maps"
+    )
 
     if single_precision:
         dtype = np.complex64
@@ -156,7 +166,6 @@ def read_toast_h_maps(
     else:
         dtype = np.complex128
         error_precision = 1e-15
-
 
     if duplicate_maps_with_prefix:
         print("Duplicate maps with prefix is enabled", flush=True)
@@ -168,16 +177,19 @@ def read_toast_h_maps(
         list_weights = np.ones(n_det, dtype=float) / n_det
     else:
         list_weights = np.asarray(list_weights, dtype=float)
-        assert list_weights.shape[0] == n_det and list_weights.ndim <= 2, "list_weights must be a 1D array of size n_det or a 2D array of shape (n_det, n_pix)"
-    
+        assert list_weights.shape[0] == n_det and list_weights.ndim <= 2, (
+            "list_weights must be a 1D array of size n_det or a 2D array of shape (n_det, n_pix)"
+        )
+
     if mask is None:
         boolean_mask = ...
         fake_h_map = read_file(
-                    list_name_files[0]+'_{}_sin_{}'.format(list_prefix[0].replace('_',''),list_spin[0]), 
-                    format_file=format_file,
-                    boolean_mask=boolean_mask,
-                    projection_pixel=projection_pixel,
-                )
+            list_name_files[0]
+            + "_{}_sin_{}".format(list_prefix[0].replace("_", ""), list_spin[0]),
+            format_file=format_file,
+            boolean_mask=boolean_mask,
+            projection_pixel=projection_pixel,
+        )
         n_pix = np.prod(fake_h_map[boolean_mask].shape)
     elif mask is not None:
         boolean_mask = np.bool_(mask)
@@ -185,13 +197,14 @@ def read_toast_h_maps(
 
     # Setting geometry
     fake_h_map = read_file(
-            list_name_files[0]+'_{}_sin_{}'.format(list_prefix[0].replace('_',''),list_spin[0]), 
-            format_file=format_file,
-            boolean_mask=None,
-            projection_pixel=projection_pixel,
-            flatten_output=False,
-        )
-    wcs = None if projection_pixel == 'healpix' else fake_h_map.wcs
+        list_name_files[0]
+        + "_{}_sin_{}".format(list_prefix[0].replace("_", ""), list_spin[0]),
+        format_file=format_file,
+        boolean_mask=None,
+        projection_pixel=projection_pixel,
+        flatten_output=False,
+    )
+    wcs = None if projection_pixel == "healpix" else fake_h_map.wcs
     shape_fullsky = fake_h_map.shape
     if shape_fullsky[0] == 1:
         shape_fullsky = shape_fullsky[1:]
@@ -199,11 +212,11 @@ def read_toast_h_maps(
 
     total_list_spin = list_spin + [-spin for spin in list_spin]
     if 0 in total_list_spin and total_list_spin.count(0) > 1:
-        total_list_spin.remove(0)  
+        total_list_spin.remove(0)
 
     h_n_spinmaps = Spin_maps.from_dictionary(
-            {spin: np.zeros((n_det, n_pix), dtype=dtype) for spin in total_list_spin}
-        ) # Initialize dictionary for spins
+        {spin: np.zeros((n_det, n_pix), dtype=dtype) for spin in total_list_spin}
+    )  # Initialize dictionary for spins
     h_n_spinmaps.projection_pixel = projection_pixel
     h_n_spinmaps.wcs_car = wcs
     h_n_spinmaps.shape_fullsky = shape_fullsky
@@ -213,39 +226,46 @@ def read_toast_h_maps(
         if not duplicate_maps_with_prefix:
             for prefix in list_prefix:
                 for spin in list_spin:
-                    for component in ['sin', 'cos']:
-                        spin_h_n[prefix+f'{component}_{spin}'] = read_file(
-                            name_file+f'_{prefix.replace('_','')}_{component}_{spin}', 
+                    for component in ["sin", "cos"]:
+                        spin_h_n[prefix + f"{component}_{spin}"] = read_file(
+                            name_file
+                            + f"_{prefix.replace('_', '')}_{component}_{spin}",
                             format_file=format_file,
                             boolean_mask=boolean_mask,
                             projection_pixel=projection_pixel,
                         )
         else:
             for spin in list_spin:
-                for component in ['sin', 'cos']:
-                    spin_h_n[list_prefix[0]+f'{component}_{spin}'] = read_file(
-                        name_file+f'_{list_prefix[0].replace('_','')}_{component}_{spin}', 
+                for component in ["sin", "cos"]:
+                    spin_h_n[list_prefix[0] + f"{component}_{spin}"] = read_file(
+                        name_file
+                        + f"_{list_prefix[0].replace('_', '')}_{component}_{spin}",
                         format_file=format_file,
                         boolean_mask=boolean_mask,
                         projection_pixel=projection_pixel,
                     )
             for prefix in list_prefix[1:]:
                 for spin in list_spin:
-                    for component in ['sin', 'cos']:
-                        spin_h_n[prefix+f'{component}_{spin}'] = spin_h_n[list_prefix[0]+f'{component}_{spin}']
+                    for component in ["sin", "cos"]:
+                        spin_h_n[prefix + f"{component}_{spin}"] = spin_h_n[
+                            list_prefix[0] + f"{component}_{spin}"
+                        ]
 
         for spin in list_spin:
             for count_prefix, prefix in enumerate(list_prefix):
-                sin_spin_h_n = spin_h_n[prefix+'sin_{}'.format(spin)]
-                cos_spin_h_n = spin_h_n[prefix+'cos_{}'.format(spin)]
+                sin_spin_h_n = spin_h_n[prefix + "sin_{}".format(spin)]
+                cos_spin_h_n = spin_h_n[prefix + "cos_{}".format(spin)]
 
-                h_n_spinmaps[spin][j*number_detectors_prefix + count_prefix,...].real = cos_spin_h_n * list_weights[j]
-                h_n_spinmaps[spin][j*number_detectors_prefix + count_prefix,...].imag = sin_spin_h_n * list_weights[j]
+                h_n_spinmaps[spin][
+                    j * number_detectors_prefix + count_prefix, ...
+                ].real = cos_spin_h_n * list_weights[j]
+                h_n_spinmaps[spin][
+                    j * number_detectors_prefix + count_prefix, ...
+                ].imag = sin_spin_h_n * list_weights[j]
         spin_h_n = None
-    
+
     for spin in list_spin:
         h_n_spinmaps[-spin] = np.conj(h_n_spinmaps[spin])
-
 
     print("Finalizing h_n dictionary...", flush=True)
 
@@ -257,22 +277,22 @@ def read_toast_h_maps(
             list_spin=list_spin,
         )
 
-
     return h_n_spinmaps
 
+
 def read_lbs_h_maps(
-        list_detector_names: list[str], 
-        prefix: str='h_maps_det_',
-        list_spin: list[int]=[np.array([2,0]),np.array([4,0])], 
-        list_weights=None, 
-        mask: np.ndarray=None, 
-        format_file: str='h5',
-        reweight_by_hits: bool=True,
-        single_precision: bool=False,
-        # projection_pixel: str='healpix',
-    ):
+    list_detector_names: list[str],
+    prefix: str = "h_maps_det_",
+    list_spin: list[int] = [np.array([2, 0]), np.array([4, 0])],
+    list_weights=None,
+    mask: np.ndarray = None,
+    format_file: str = "h5",
+    reweight_by_hits: bool = True,
+    single_precision: bool = False,
+    # projection_pixel: str='healpix',
+):
     """
-    Read the $h_{n,m}$ map as generated by litebird_sim, 
+    Read the $h_{n,m}$ map as generated by litebird_sim,
     which filename is preferrentially given as
         h_maps_det_*.h5
     with:
@@ -282,7 +302,7 @@ def read_lbs_h_maps(
     ----------
     name_file: str
         The version of the file, given so that `hp.read_map(name_file + '_sin_1.fits')` can be used to read the file (with `sin_1` being the sin or cos component of the $h_{n,m}$ maps and the spin dependence)
-    list_spin: list[int]=[(2,0),(4,0)], 
+    list_spin: list[int]=[(2,0),(4,0)],
         List of spins to read
     list_prefix: list[str]
         List of the prefixes to read, typically ['A_', 'B_'] for two polarization detectors in a pair
@@ -293,7 +313,7 @@ def read_lbs_h_maps(
     format_file: str
         Format of the file to read, must be 'h5', 'hdf5', 'H5' or 'hdf', otherwise a ValueError is raised, as other formats are not supported for litebird_sim h maps
     reweight_by_hits: bool, optional
-        If True, the weights are computed from the number of pixels with non-zero $h_n$ values, so that the total $h_n$ maps are weighted by the number of detectors observing each pixel. 
+        If True, the weights are computed from the number of pixels with non-zero $h_n$ values, so that the total $h_n$ maps are weighted by the number of detectors observing each pixel.
 
     Returns
     -------
@@ -305,18 +325,29 @@ def read_lbs_h_maps(
     try:
         from tqdm import tqdm
     except ImportError:
-        raise ImportError('tqdm is not installed. Please install it with "pip install tqdm"')
+        raise ImportError(
+            'tqdm is not installed. Please install it with "pip install tqdm"'
+        )
 
     list_spin = [Spin_nm(spin) for spin in list_spin]
 
-    assert np.unique(np.atleast_2d(list_spin).sum(axis=1)).size == np.array(list_spin).shape[0], 'The list of spins must be unique'
-    assert (np.atleast_2d(list_spin)[0] >= 0).all(), 'The pointing spins provided must be positive, their negative counterpart will be computed from the components read'
-    assert np.array(list_spin).ndim == 1 or (np.array(list_spin).ndim == 2 and np.array(list_spin).shape[1] == 2), 'The list of spins must be a 1D array of (pointing) spins or a 2D array of shape (n_spins, 2) for (n,m) spins'
-    assert format_file in ['h5', 'hdf5', 'H5', 'hdf'], "Format file must be 'h5', 'hdf5', 'H5' or 'hdf' for litebird_sim h maps"
+    assert (
+        np.unique(np.atleast_2d(list_spin).sum(axis=1)).size
+        == np.array(list_spin).shape[0]
+    ), "The list of spins must be unique"
+    assert (np.atleast_2d(list_spin)[0] >= 0).all(), (
+        "The pointing spins provided must be positive, their negative counterpart will be computed from the components read"
+    )
+    assert np.array(list_spin).ndim == 1 or (
+        np.array(list_spin).ndim == 2 and np.array(list_spin).shape[1] == 2
+    ), (
+        "The list of spins must be a 1D array of (pointing) spins or a 2D array of shape (n_spins, 2) for (n,m) spins"
+    )
+    assert format_file in ["h5", "hdf5", "H5", "hdf"], (
+        "Format file must be 'h5', 'hdf5', 'H5' or 'hdf' for litebird_sim h maps"
+    )
 
-    
-
-    projection_pixel='healpix' # Currently only healpix is supported for lbs h maps
+    projection_pixel = "healpix"  # Currently only healpix is supported for lbs h maps
 
     if single_precision:
         dtype = np.complex64
@@ -331,15 +362,17 @@ def read_lbs_h_maps(
         list_weights = np.ones(n_det, dtype=float) / n_det
     else:
         list_weights = np.asarray(list_weights, dtype=float)
-        assert list_weights.shape[0] == n_det and list_weights.ndim <= 2, "list_weights must be a 1D array of size n_det or a 2D array of shape (n_det, n_pix)"
-    
+        assert list_weights.shape[0] == n_det and list_weights.ndim <= 2, (
+            "list_weights must be a 1D array of size n_det or a 2D array of shape (n_det, n_pix)"
+        )
+
     if mask is None:
         boolean_mask = ...
         fake_h_map = read_file(
-                    prefix+list_detector_names[0], 
-                    format_file=format_file,
-                    projection_pixel=projection_pixel,
-                )['{},{}'.format(0,0)]['Re'].ravel()
+            prefix + list_detector_names[0],
+            format_file=format_file,
+            projection_pixel=projection_pixel,
+        )["{},{}".format(0, 0)]["Re"].ravel()
         n_pix = np.prod(fake_h_map.shape)
     elif mask is not None:
         boolean_mask = np.bool_(mask)
@@ -347,43 +380,39 @@ def read_lbs_h_maps(
 
     total_list_spin = list_spin + [-spin for spin in list_spin if np.sum(spin) != 0]
     # if 0 in total_list_spin and total_list_spin.count(0) > 1:
-    #     total_list_spin.remove(0)  
+    #     total_list_spin.remove(0)
 
     h_n_spinmaps = Spin_maps.from_dictionary(
-            {spin: np.zeros((n_det, n_pix), dtype=dtype) for spin in total_list_spin}
-        ) # Initialize dictionary for spins
-    shape_fullsky = boolean_mask.size # Sufficient as only healpix maps are currently supported for lbs h maps
+        {spin: np.zeros((n_det, n_pix), dtype=dtype) for spin in total_list_spin}
+    )  # Initialize dictionary for spins
+    shape_fullsky = (
+        boolean_mask.size
+    )  # Sufficient as only healpix maps are currently supported for lbs h maps
 
     h_n_spinmaps.projection_pixel = projection_pixel
     h_n_spinmaps.wcs_car = None
     h_n_spinmaps.shape_fullsky = (shape_fullsky,)
 
     for j, name_file in enumerate(tqdm(list_detector_names)):
-
         h_map_file = read_file(
-            name_file=name_file, 
+            name_file=name_file,
             format_file=format_file,
             boolean_mask=boolean_mask,
             projection_pixel=projection_pixel,
         )
         for spin in list_spin:
-            real_part = h_map_file['{},{}'.format(*spin)]["Re"][boolean_mask]
-            imag_part = h_map_file['{},{}'.format(*spin)]["Im"][boolean_mask]
-            h_n_spinmaps[spin][j,...].real = np.where(
-                real_part != hp.UNSEEN, 
-                real_part, 
-                0.0
-            ) * list_weights[j]
-            h_n_spinmaps[spin][j,...].imag = np.where(
-                imag_part != hp.UNSEEN,
-                imag_part, 
-                0.0
-            ) * list_weights[j]
+            real_part = h_map_file["{},{}".format(*spin)]["Re"][boolean_mask]
+            imag_part = h_map_file["{},{}".format(*spin)]["Im"][boolean_mask]
+            h_n_spinmaps[spin][j, ...].real = (
+                np.where(real_part != hp.UNSEEN, real_part, 0.0) * list_weights[j]
+            )
+            h_n_spinmaps[spin][j, ...].imag = (
+                np.where(imag_part != hp.UNSEEN, imag_part, 0.0) * list_weights[j]
+            )
         h_map_file.close()
-    
+
     for spin in list_spin:
         h_n_spinmaps[-spin] = np.conj(h_n_spinmaps[spin])
-
 
     print("Finalizing h_n dictionary...", flush=True)
 
@@ -396,23 +425,27 @@ def read_lbs_h_maps(
         )
 
     all_spins = np.array(h_n_spinmaps.spins)
-    if (all_spins[:,1] == 0).all():
-        print("No HWP angle spins, removing m=0 spins from the h_nm dictionary...", flush=True)
+    if (all_spins[:, 1] == 0).all():
+        print(
+            "No HWP angle spins, removing m=0 spins from the h_nm dictionary...",
+            flush=True,
+        )
         h_n_spinmaps = Spin_maps.from_dictionary(
             {spin[0]: h_n_spinmaps[spin] for spin in h_n_spinmaps.spins}
         )
     return h_n_spinmaps
 
+
 def build_mask_from_toast_h_maps(
-        list_name_files: list[str], 
-        list_prefix: list[str]=['A_', 'B_'], 
-        format_file: str='npz',
-        spin_to_read: int=1,
-        return_detectors_hits: bool=False,
-        projection_pixel: str='healpix',
-    ):
+    list_name_files: list[str],
+    list_prefix: list[str] = ["A_", "B_"],
+    format_file: str = "npz",
+    spin_to_read: int = 1,
+    return_detectors_hits: bool = False,
+    projection_pixel: str = "healpix",
+):
     """
-    Read the $h_n$ map as generated by TOAST, 
+    Read the $h_n$ map as generated by TOAST,
     which filename is preferrentially given as
         filever_w14_p082_f150_A_sin_1.fits
     with:
@@ -421,15 +454,15 @@ def build_mask_from_toast_h_maps(
     * p082: the pixel number (here 082)
     * f150: the frequency band (here 150 GHz)
     * A: the polarization detector number (here A)
-    * sin_1: the spin dependence and component written, here the $h_n$ component with spin 1 
-    
-    Only the latest part of the file actually matters, considering the $sin$ or $cos$ component of the $h_n$ map as well as its spin dependence. 
+    * sin_1: the spin dependence and component written, here the $h_n$ component with spin 1
+
+    Only the latest part of the file actually matters, considering the $sin$ or $cos$ component of the $h_n$ map as well as its spin dependence.
 
     Parameters
     ----------
     name_file: str
         The version of the file, given so that `hp.read_map(name_file + '_sin_1.fits')` can be used to read the file (with `sin_1` being the sin or cos component of the $h_n$ maps and the spin dependence)
-    list_spin (list[int]): 
+    list_spin (list[int]):
         List of the spin to read
     list_prefix: list[str]
         List of the prefixes to read, typically ['A_', 'B_'] for two polarization detectors in a pair
@@ -447,33 +480,51 @@ def build_mask_from_toast_h_maps(
     try:
         from tqdm import tqdm
     except ImportError:
-        raise ImportError('tqdm is not installed. Please install it with "pip install tqdm"')
+        raise ImportError(
+            'tqdm is not installed. Please install it with "pip install tqdm"'
+        )
 
-    assert format_file in ['npy', 'npz'] or format_file in ['h5', 'hdf5', 'H5', 'hdf'] or format_file == 'fits'
+    assert (
+        format_file in ["npy", "npz"]
+        or format_file in ["h5", "hdf5", "H5", "hdf"]
+        or format_file == "fits"
+    )
 
     mask = np.zeros_like(
         read_file(
-            list_name_files[0]+'_{}_sin_{}'.format(list_prefix[0].replace('_',''),spin_to_read), format_file=format_file,
-            projection_pixel=projection_pixel,), 
-        dtype=np.float64).ravel()
+            list_name_files[0]
+            + "_{}_sin_{}".format(list_prefix[0].replace("_", ""), spin_to_read),
+            format_file=format_file,
+            projection_pixel=projection_pixel,
+        ),
+        dtype=np.float64,
+    ).ravel()
     mask_detectors = np.int64(np.bool_(mask))
 
-    
     for name_file in tqdm(list_name_files):
         for prefix in list_prefix:
-            map_cos_sin = np.abs(read_file(
-                name_file+'_{}_sin_{}'.format(prefix.replace('_',''),spin_to_read), 
-                format_file=format_file,
-                projection_pixel=projection_pixel,
-            )[:]).ravel() + np.abs(read_file(
-                name_file+'_{}_cos_{}'.format(prefix.replace('_',''),spin_to_read), 
-                format_file=format_file,
-                projection_pixel=projection_pixel,
-            )[:]).ravel()
+            map_cos_sin = (
+                np.abs(
+                    read_file(
+                        name_file
+                        + "_{}_sin_{}".format(prefix.replace("_", ""), spin_to_read),
+                        format_file=format_file,
+                        projection_pixel=projection_pixel,
+                    )[:]
+                ).ravel()
+                + np.abs(
+                    read_file(
+                        name_file
+                        + "_{}_cos_{}".format(prefix.replace("_", ""), spin_to_read),
+                        format_file=format_file,
+                        projection_pixel=projection_pixel,
+                    )[:]
+                ).ravel()
+            )
             mask += map_cos_sin
             mask_detectors += np.int64(np.bool_(map_cos_sin))
 
-    if format_file in ['h5', 'hdf5', 'H5', 'hdf'] and projection_pixel == 'healpix':
+    if format_file in ["h5", "hdf5", "H5", "hdf"] and projection_pixel == "healpix":
         reorder_output = lambda x: hp.reorder(x, n2r=True)
     else:
         reorder_output = lambda x: x
@@ -482,15 +533,16 @@ def build_mask_from_toast_h_maps(
         return reorder_output(np.int8(np.bool_(mask))), reorder_output(mask_detectors)
     return reorder_output(np.int8(np.bool_(mask)))
 
+
 def build_mask_from_lbs_h_maps(
-        list_name_files: list[str], 
-        format_file: str='h5',
-        spin_to_read: int|tuple=(0,0),
-        return_detectors_hits: bool=False,
-        projection_pixel: str='healpix',
-    ):
+    list_name_files: list[str],
+    format_file: str = "h5",
+    spin_to_read: int | tuple = (0, 0),
+    return_detectors_hits: bool = False,
+    projection_pixel: str = "healpix",
+):
     """
-    Read the $h_n$ map as generated by TOAST, 
+    Read the $h_n$ map as generated by TOAST,
     which filename is preferrentially given as
         *.h5
         TODO: to replace
@@ -500,15 +552,15 @@ def build_mask_from_lbs_h_maps(
     * p082: the pixel number (here 082)
     * f150: the frequency band (here 150 GHz)
     * A: the polarization detector number (here A)
-    * sin_1: the spin dependence and component written, here the $h_n$ component with spin 1 
-    
-    Only the latest part of the file actually matters, considering the $sin$ or $cos$ component of the $h_n$ map as well as its spin dependence. 
+    * sin_1: the spin dependence and component written, here the $h_n$ component with spin 1
+
+    Only the latest part of the file actually matters, considering the $sin$ or $cos$ component of the $h_n$ map as well as its spin dependence.
 
     Parameters
     ----------
     name_file: str
         The version of the file, given so that `hp.read_map(name_file + '_sin_1.fits')` can be used to read the file (with `sin_1` being the sin or cos component of the $h_n$ maps and the spin dependence)
-    list_spin (list[int]): 
+    list_spin (list[int]):
         List of the spin to read
     list_prefix: list[str]
         List of the prefixes to read, typically ['A_', 'B_'] for two polarization detectors in a pair
@@ -526,32 +578,32 @@ def build_mask_from_lbs_h_maps(
     try:
         from tqdm import tqdm
     except ImportError:
-        raise ImportError('tqdm is not installed. Please install it with "pip install tqdm"')
+        raise ImportError(
+            'tqdm is not installed. Please install it with "pip install tqdm"'
+        )
 
-    assert format_file in ['h5', 'hdf5', 'H5', 'hdf'], "Format file must be 'h5', 'hdf5', 'H5' or 'hdf' for litebird_sim h maps"
+    assert format_file in ["h5", "hdf5", "H5", "hdf"], (
+        "Format file must be 'h5', 'hdf5', 'H5' or 'hdf' for litebird_sim h maps"
+    )
 
     mask = np.zeros_like(
         read_file(
-            list_name_files[0], 
-            format_file=format_file,
-            projection_pixel=projection_pixel
-        )['{},{}'.format(*spin_to_read)]["Re"][:].ravel(), 
-        dtype=np.float64).ravel()
-    mask_detectors = np.int64(np.bool_(mask))
-
-    
-    for name_file in tqdm(list_name_files):
-        h_map_file = read_file(
-            name_file=name_file, 
+            list_name_files[0],
             format_file=format_file,
             projection_pixel=projection_pixel,
-        )['{},{}'.format(*spin_to_read)]["Re"][:].ravel()
-        
-        mask_contribution = np.where(
-            h_map_file>0,
-            np.ones_like(h_map_file),
-            0
-        )
+        )["{},{}".format(*spin_to_read)]["Re"][:].ravel(),
+        dtype=np.float64,
+    ).ravel()
+    mask_detectors = np.int64(np.bool_(mask))
+
+    for name_file in tqdm(list_name_files):
+        h_map_file = read_file(
+            name_file=name_file,
+            format_file=format_file,
+            projection_pixel=projection_pixel,
+        )["{},{}".format(*spin_to_read)]["Re"][:].ravel()
+
+        mask_contribution = np.where(h_map_file > 0, np.ones_like(h_map_file), 0)
         mask += mask_contribution
         mask_detectors += np.int64(np.bool_(mask_contribution))
 
@@ -559,53 +611,56 @@ def build_mask_from_lbs_h_maps(
         return np.int8(np.bool_(mask)), mask_detectors
     return np.int8(np.bool_(mask))
 
+
 def read_ellipticity_values_from_yaml_file(
-        path_values_ellipticity: str,
-        transform_into_dict: bool=False,
-        detector_features_all: list[str]=None,
-    ):
+    path_values_ellipticity: str,
+    transform_into_dict: bool = False,
+    detector_features_all: list[str] = None,
+):
     if transform_into_dict:
-        assert detector_features_all is not None, "detector_features_all must be provided if transform_into_array is True"
+        assert detector_features_all is not None, (
+            "detector_features_all must be provided if transform_into_array is True"
+        )
 
     with open(path_values_ellipticity) as file:
         ellipticity_file = yaml.safe_load(file)
-    
+
     if transform_into_dict:
         ellipticity_parameters_dict = {
-            key: 
-            np.array(
+            key: np.array(
                 [ellipticity_file[det_name][key] for det_name in detector_features_all]
             )
-            for key in ellipticity_file[
-                list(ellipticity_file.keys())[-1]
-            ].keys()
+            for key in ellipticity_file[list(ellipticity_file.keys())[-1]].keys()
         }
-        ellipticity_parameters_dict['ellipticity_parameter_convention'] = ellipticity_file['ellipticity_parameter_convention']
+        ellipticity_parameters_dict["ellipticity_parameter_convention"] = (
+            ellipticity_file["ellipticity_parameter_convention"]
+        )
         return ellipticity_parameters_dict
     return ellipticity_file
 
 
 def read_values_from_yaml_file(
-        path_yaml: str,
-        transform_into_dict: bool=False,
-        detector_features_all: list[str]=None,
-        retrieve_all_parameters: bool=False,
-        list_additional_parameters_to_retrieve: list[str]=None,
-    ):
+    path_yaml: str,
+    transform_into_dict: bool = False,
+    detector_features_all: list[str] = None,
+    retrieve_all_parameters: bool = False,
+    list_additional_parameters_to_retrieve: list[str] = None,
+):
     if transform_into_dict:
-        assert detector_features_all is not None, "detector_features_all must be provided if transform_into_array is True"
+        assert detector_features_all is not None, (
+            "detector_features_all must be provided if transform_into_array is True"
+        )
 
     with open(path_yaml) as file:
         dictionary_yaml = yaml.safe_load(file)
 
     if not transform_into_dict:
         return dictionary_yaml
-    
+
     else:
         list_keys_parameter_values = dictionary_yaml[detector_features_all[0]].keys()
         output_parameters_dict = {
-            key: 
-            np.array(
+            key: np.array(
                 [dictionary_yaml[det_name][key] for det_name in detector_features_all]
             )
             for key in list_keys_parameter_values
@@ -624,109 +679,100 @@ def read_values_from_yaml_file(
         return output_parameters_dict
 
 
-
 def read_spherical_derivatives_from_file(
-        path_spherical_derivatives,
-        is_car: bool=False,
-    ):
+    path_spherical_derivatives,
+    is_car: bool = False,
+):
 
     wcs_car = None
 
     if os.path.isfile(path_spherical_derivatives):
         if not is_car:
             spherical_derivatives_array = hp.read_map(
-                path_spherical_derivatives, 
-                field=None
+                path_spherical_derivatives, field=None
             )
         else:
             spherical_derivatives_array = flatten_CAR_maps(
-                enmap.read_map(
-                    path_spherical_derivatives
-                )
+                enmap.read_map(path_spherical_derivatives)
             )
             wcs_car = spherical_derivatives_array.wcs
-        assert spherical_derivatives_array.shape[0] == (6), "The spherical derivatives file must contain 6 maps with shape (6, npix)."
-
-        list_derivatives = ['theta', 'phi', 'theta_theta', 'theta_phi', 'phi_phi']
-
-        get_final_map = lambda x: x if wcs_car is None else enmap.ndmap(
-            x, 
-            wcs=wcs_car
+        assert spherical_derivatives_array.shape[0] == (6), (
+            "The spherical derivatives file must contain 6 maps with shape (6, npix)."
         )
 
+        list_derivatives = ["theta", "phi", "theta_theta", "theta_phi", "phi_phi"]
+
+        get_final_map = lambda x: x if wcs_car is None else enmap.ndmap(x, wcs=wcs_car)
+
         return {
-            derivative: get_final_map(spherical_derivatives_array[i+1]) 
+            derivative: get_final_map(spherical_derivatives_array[i + 1])
             for i, derivative in enumerate(list_derivatives)
         }
 
 
 def save_partial_spin_maps(
-        partial_spin_maps, 
-        nstokes,
-        shape_pixels,
-        mask_on_full_map, 
-        path_output,
-        format_output='.npy'
-    ):
+    partial_spin_maps,
+    nstokes,
+    shape_pixels,
+    mask_on_full_map,
+    path_output,
+    format_output=".npy",
+):
 
-    extended_final_maps = np.zeros((nstokes,)+(np.prod(shape_pixels),), dtype=complex)
+    extended_final_maps = np.zeros((nstokes,) + (np.prod(shape_pixels),), dtype=complex)
     if nstokes == 3 or nstokes == 1:
         extended_final_maps[0, mask_on_full_map != 0] = partial_spin_maps[0]
     if nstokes == 3 or nstokes == 2:
-        final_Q_map = (partial_spin_maps[-2] + partial_spin_maps[2])/2.
-        final_U_map = 1j*(partial_spin_maps[-2] - partial_spin_maps[2])/2.
+        final_Q_map = (partial_spin_maps[-2] + partial_spin_maps[2]) / 2.0
+        final_U_map = 1j * (partial_spin_maps[-2] - partial_spin_maps[2]) / 2.0
 
         extended_final_maps[-2, mask_on_full_map != 0] = final_Q_map.real
         extended_final_maps[-1, mask_on_full_map != 0] = final_U_map.real
 
-    if extended_final_maps.shape[-len(shape_pixels):] != shape_pixels:
+    if extended_final_maps.shape[-len(shape_pixels) :] != shape_pixels:
         extended_final_maps = extended_final_maps.reshape(
             extended_final_maps.shape[:-1] + shape_pixels
         )
-    
+
     is_car = False
     first_spin = 0 if (nstokes == 1 or nstokes == 3) else -2
     if type(partial_spin_maps[first_spin]) == enmap.ndmap:
         extended_final_maps = enmap.ndmap(
-            extended_final_maps, 
-            wcs=partial_spin_maps[first_spin].wcs
+            extended_final_maps, wcs=partial_spin_maps[first_spin].wcs
         )
         is_car = True
 
     if is_car:
-        if format_output == '.fits' and not path_output.endswith('.fits'):
-            path_output = path_output + '.fits'
-        elif format_output == '.hdf' and not path_output.endswith('.hdf'):
-            path_output = path_output + '.hdf'
-        enmap.write_map(
-                path_output, 
-                extended_final_maps,
-                extra={'BUNIT' : 'uK'}
-            )
-    elif format_output == '.npy' or path_output.endswith('.npy'):
-        if not path_output.endswith('.npy'):
-            path_output = path_output + '.npy'
+        if format_output == ".fits" and not path_output.endswith(".fits"):
+            path_output = path_output + ".fits"
+        elif format_output == ".hdf" and not path_output.endswith(".hdf"):
+            path_output = path_output + ".hdf"
+        enmap.write_map(path_output, extended_final_maps, extra={"BUNIT": "uK"})
+    elif format_output == ".npy" or path_output.endswith(".npy"):
+        if not path_output.endswith(".npy"):
+            path_output = path_output + ".npy"
         print("Saving map into", path_output)
-        np.save(path_output, extended_final_maps[:,mask_on_full_map!=0])
-    elif format_output == '.fits' or path_output.endswith('.fits'):
-        if not path_output.endswith('.fits'):
-            path_output = path_output + '.fits'
+        np.save(path_output, extended_final_maps[:, mask_on_full_map != 0])
+    elif format_output == ".fits" or path_output.endswith(".fits"):
+        if not path_output.endswith(".fits"):
+            path_output = path_output + ".fits"
         print("Saving map into", path_output)
-        
-        hp.write_map(
-            path_output, 
-            extended_final_maps, 
-            overwrite=True
-        )
-            
-    elif format_output in ['.hdf', '.hdf5'] or path_output.endswith('.hdf') or path_output.endswith('.hdf5'):
-        if not (path_output.endswith('.hdf') or path_output.endswith('.hdf5')):
-            path_output = path_output + '.hdf'
+
+        hp.write_map(path_output, extended_final_maps, overwrite=True)
+
+    elif (
+        format_output in [".hdf", ".hdf5"]
+        or path_output.endswith(".hdf")
+        or path_output.endswith(".hdf5")
+    ):
+        if not (path_output.endswith(".hdf") or path_output.endswith(".hdf5")):
+            path_output = path_output + ".hdf"
         print("Saving map into", path_output)
-    
-        with h5py.File(path_output, 'w') as hf:
-            hf.create_dataset('maps', data=extended_final_maps)
+
+        with h5py.File(path_output, "w") as hf:
+            hf.create_dataset("maps", data=extended_final_maps)
         hf.close()
     else:
-        raise ValueError("Unsupported format_output. Supported formats are '.npy' and '.fits'.")
-
+        raise ValueError(
+            "Unsupported format_output. Supported formats are '.npy' and '.fits'."
+        )
