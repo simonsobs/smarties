@@ -781,8 +781,7 @@ def get_second_spherical_derivatives_from_spin_derivatives(
             + spin_derivatives_dict[input_spin - 2]
         )
     )
-    spherical_derivatives_dict["theta_phi"], spherical_derivatives_dict["phi_phi"] = (
-        compute_phi_2nd_derivatives(
+    spherical_derivatives_dict["theta_phi"], spherical_derivatives_dict["phi_phi"] = compute_phi_2nd_derivatives(
             input_map=input_map,
             spin_derivatives_dict=spin_derivatives_dict,
             spherical_derivatives_dict=spherical_derivatives_dict,
@@ -790,6 +789,5 @@ def get_second_spherical_derivatives_from_spin_derivatives(
             shape_car=shape_pixels_output,
             zbounds=zbounds,
         )
-    )
 
     return spherical_derivatives_dict
