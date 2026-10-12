@@ -17,7 +17,7 @@ __all__ = [
     "get_beam_convolution_spins_maps"
 ]
 
-def gaussian_circular_beam_alms(
+def gaussian_circular_beam_blms(
     fwhm_rad: float,
     lmax: int,
     mmax: int,
@@ -25,7 +25,7 @@ def gaussian_circular_beam_alms(
 ):
     """Compute harmonic coefficients of a circular Gaussian beam.
     Uses the analytic Gaussian beam coefficients from Challinor et al. (2000,
-    astro-ph/0008228), includes the polarization-angle phase factor in the alms.
+    astro-ph/0008228), includes the polarization-angle phase factor in the blms.
 
 
     Parameters
@@ -60,12 +60,12 @@ def gaussian_circular_beam_alms(
     if is_polarized and mmax < 2:
         raise ValueError("mmax must be 2 or more for polarized output")
     ncomp = 3 if is_polarized else 1
-    alms = np.zeros((ncomp, nval), dtype=np.complex128)
+    blms = np.zeros((ncomp, nval), dtype=np.complex128)
     sigmasq = fwhm_rad * fwhm_rad / (8 * np.log(2.0))
 
     ell_intensity = np.arange(lmax + 1)  # Only m=0 for intensity
 
-    alms[0, hp.Alm.getidx(lmax, ell_intensity, 0)] = np.sqrt(
+    blms[0, hp.Alm.getidx(lmax, ell_intensity, 0)] = np.sqrt(
         (2 * ell_intensity + 1) / (4.0 * np.pi)
     ) * np.exp(-0.5 * sigmasq * ell_intensity * (ell_intensity + 1))
 
@@ -73,16 +73,16 @@ def gaussian_circular_beam_alms(
         pol_angle_factor = np.exp(-2j * pol_angle_rad)
         ell_polarisation = np.arange(2, lmax + 1)  # Only m=2 for polarization
 
-        alms[1, hp.Alm.getidx(lmax, ell_polarisation, 2)] = (
+        blms[1, hp.Alm.getidx(lmax, ell_polarisation, 2)] = (
             np.sqrt((2 * ell_polarisation + 1) / (32 * np.pi))
             * np.exp(-0.5 * sigmasq * ell_polarisation * (ell_polarisation + 1))
             * pol_angle_factor
             * np.exp(2 * sigmasq)  # accounting for polarization angle of the detector
             * (-1 * np.sqrt(2))  # norm factor when going from +- 2 alms to almE almB
         )
-        alms[2] = 1j * alms[1]
+        blms[2] = 1j * alms[1]
 
-    return alms
+    return blms
 
 
 def get_beam_convolution_spins_maps(
