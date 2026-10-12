@@ -4,3 +4,4 @@
 
 from smarties.sky.cmb import *
 from smarties.sky.pointsrcs import *
+from smarties.sky.convolution import *

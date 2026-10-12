@@ -2,7 +2,7 @@
 # Copyright (c) 2024-2026 bers of the Simons Simons Observatory Collaboration.
 # lease refer to the LICENSE file in the root of this repository.
 
-from os import cpu_count
+from os import process_cpu_count
 import numpy as np
 import healpy as hp
 from pixell import enmap, curvedsky
@@ -16,26 +16,26 @@ __all__ = [
 
 
 def _ducc_dictionary(
-        spin, 
-        nside, 
-        lmax, 
+        spin,
+        nside,
+        lmax,
         mmax=None):
-    
+
     ducc_healpix_obj = ducc0.healpix.Healpix_Base(nside, 'RING')
     if mmax is None:
         mmax = lmax
     # m_array = np.arange(mmax + 1)
     return {'spin': spin,
-              'lmax': lmax, 
+              'lmax': lmax,
               'mmax': mmax,
-            #   'mstart': (m_array*(2*lmax+1-m_array)//2).astype(np.uint64, copy=False), 
+            #   'mstart': (m_array*(2*lmax+1-m_array)//2).astype(np.uint64, copy=False),
               **ducc_healpix_obj.sht_info()
     }
 
 def _alm2map_ducc0(alms, spin, nside, lmax=None, mmax=None, nthreads=-1):
 
     if nthreads < 0:
-        nthreads = cpu_count()
+        nthreads = process_cpu_count()
 
     if alms.ndim > 1:
         alm_size = alms.shape[-1]
@@ -52,10 +52,10 @@ def _alm2map_ducc0(alms, spin, nside, lmax=None, mmax=None, nthreads=-1):
         alm=np.atleast_2d(alms),
         nthreads=nthreads,
         **_ducc_dictionary(
-            spin, 
-            nside, 
-            lmax, 
-            mmax, 
+            spin,
+            nside,
+            lmax,
+            mmax,
         )
     )
     return maps
@@ -64,7 +64,7 @@ def _alm2map_ducc0(alms, spin, nside, lmax=None, mmax=None, nthreads=-1):
 def _map2alm_ducc0(maps, spin, lmax=None, mmax=None, nthreads=-1):
 
     nside = hp.npix2nside(maps.shape[-1])
-    
+
     if lmax is None:
         lmax = 3 * nside - 1
 
@@ -72,17 +72,17 @@ def _map2alm_ducc0(maps, spin, lmax=None, mmax=None, nthreads=-1):
         mmax = lmax
 
     if nthreads < 0:
-        nthreads = cpu_count()
+        nthreads = process_cpu_count()
 
     weight = 4*np.pi/(12 * nside**2)
     alm = ducc0.sht.adjoint_synthesis(
-        map=np.atleast_2d(maps) * weight, 
+        map=np.atleast_2d(maps) * weight,
         nthreads=nthreads,
         **_ducc_dictionary(
-            spin, 
-            nside, 
-            lmax, 
-            mmax, 
+            spin,
+            nside,
+            lmax,
+            mmax,
         )
     )
     return alm
@@ -98,10 +98,10 @@ def map2alm_ducc0_iter(maps, spin, lmax=None, mmax=None, niter=3):
     return alms_output
 
 def map2alm_anypix(
-        maps, 
-        spin, 
+        maps,
+        spin,
         niter=0,
-        lmax=None, 
+        lmax=None,
         mmax=None,
         shape_car=None
     ):
@@ -113,29 +113,29 @@ def map2alm_anypix(
         else:
             assert maps.ndim >= 2
             maps_to_pass = maps
-        
+
         return curvedsky.map2alm(
             maps_to_pass,
-            spin=spin, 
+            spin=spin,
             lmax=lmax,
             niter=niter
         )
     else:
         # HEALPIX pixelization expected
         return map2alm_ducc0_iter(
-            maps=maps, 
-            spin=spin, 
-            lmax=lmax, 
-            mmax=mmax, 
+            maps=maps,
+            spin=spin,
+            lmax=lmax,
+            mmax=mmax,
             niter=niter
         )
 
 def alm2map_anypix(
         alms,
-        spin, 
+        spin,
         shape_pixels_output,
         map_output=None,
-        lmax=None, 
+        lmax=None,
         mmax=None,
 ):
     """
@@ -144,14 +144,14 @@ def alm2map_anypix(
 
     Parameters
     __________
-    alms: np.ndarray 
-        Spherical harmonics coefficients from which the pixel map will be 
+    alms: np.ndarray
+        Spherical harmonics coefficients from which the pixel map will be
         computed
     spin: int
         Input spin in terms of spin-weighted spherical harmonics
     shape_pixels_output: tuple or int
-        Pixel shape of the output pixel map (only the last dimensions of the output), 
-        the parameter can be either an int or 1d tuple representing an HEALPIX map, 
+        Pixel shape of the output pixel map (only the last dimensions of the output),
+        the parameter can be either an int or 1d tuple representing an HEALPIX map,
         or a 2d tuple representing a CAR map.
     """
 
@@ -162,7 +162,7 @@ def alm2map_anypix(
         return curvedsky.alm2map(
             alms,
             map=map_output,
-            spin=spin, 
+            spin=spin,
             copy=True
         ).reshape(map_output.shape[:-2] + (np.prod(shape_pixels_output),))
     else:
@@ -170,19 +170,70 @@ def alm2map_anypix(
         if spin == 0:
             return np.array([
                 _alm2map_ducc0(
-                alms=_alm, 
+                alms=_alm,
                 spin=spin,
                 nside=hp.npix2nside(np.prod(shape_pixels_output)),
-                lmax=lmax, 
-                mmax=mmax, 
+                lmax=lmax,
+                mmax=mmax,
                 )
             for _alm in (alms if alms.ndim > 1 else [alms])
         ])
 
         return _alm2map_ducc0(
-            alms=alms, 
+            alms=alms,
             spin=spin,
             nside=hp.npix2nside(np.prod(shape_pixels_output)),
-            lmax=lmax, 
-            mmax=mmax, 
+            lmax=lmax,
+            mmax=mmax,
         )
+
+def convert_alm_plusminus_to_spin(
+    alm_plus: np.ndarray, alm_minus: np.ndarray, spin: int = 2
+):
+    """Convert +/- basis alms coefficients to spin-weighted alms.
+
+    Parameters
+    ----------
+    alm_plus: np.ndarray
+        + basis coefficients.
+    alm_minus: np.ndarray
+        - basis coefficients (same shape as ``alm_plus``).
+    spin: int (optional)
+        Target spin (default 2).
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray]
+        ``(alm_pos_spin, alm_neg_spin)`` following Healpix convention
+    """
+    alms_pos_spin = -1 * (alm_plus + 1j * alm_minus)  # |spin| component
+    alms_neg_spin = (alm_plus - 1j * alm_minus) * (-1.0) ** (
+        -1 - spin
+    )  # -|spin| component
+
+    return alms_pos_spin, alms_neg_spin
+
+
+def convert_alm_spin_to_plusminus(
+    alm_pos_spin: np.ndarray, alm_neg_spin: np.ndarray, spin: int = 2
+):
+    """Convert spin-weighted alms coefficients to the +/- basis.
+
+    Parameters
+    ----------
+    alm_pos_spin: np.ndarray
+        +spin coefficients.
+    alm_neg_spin: np.ndarray
+        -spin coefficients (same shape as ``alm_pos_spin``).
+    spin: int (optional)
+        Spin of the input coefficients (default 2).
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray]
+        ``(alm_plus, alm_minus)`` following Healpix convention
+    """
+
+    alm_plus = -1 * (alm_pos_spin + (-1) ** (spin) * alm_neg_spin) / (2)
+    alm_minus = -1 * (alm_pos_spin - (-1) ** (spin) * alm_neg_spin) / (2j)
+    return alm_plus, alm_minus
