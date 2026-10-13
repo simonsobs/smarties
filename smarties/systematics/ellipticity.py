@@ -426,7 +426,8 @@ def get_differential_ellipticity_no_calibration(
         spherical_derivatives=None,
         shape_car=None,
         shape_fullsky_car=None,
-        bool_secondary_term=False
+        bool_secondary_term=False,
+        single_precision=False,
     ):
     """
     Get the differential ellipticity maps for a given intensity sky map and ellipticity parameters as described in the formalism describe in arXiv:2011.13910, with output spins 0, 2, -2. 
@@ -458,6 +459,8 @@ def get_differential_ellipticity_no_calibration(
     -----
     Currently, the input intensity_sky_map map is assumed to be a full sky map, i.e. it must have a dimension of 12 * nside^2, where nside is the HEALPix nside parameter, and smooth with the circularly-symmetric beam defined by the sigma_fwhm parameter. 
     """
+
+    dtype = np.complex64 if single_precision else np.complex128
 
     assert "ellipticity_parameter_convention" in ellipticity_parameters_dict or (
         "dp" in ellipticity_parameters_dict and "dc" in ellipticity_parameters_dict
@@ -645,7 +648,7 @@ def get_differential_ellipticity_no_calibration(
 
     for spin in [-2, 0, 2]:
         differential_ellipticity_spin_maps[spin] = np.zeros(
-            (delta_sigma.size, npix), dtype=np.complex128
+            (delta_sigma.size, npix), dtype=dtype
         )
         for idx_0, key_0 in enumerate(["x", "y"]):
             for idx_1, key_1 in enumerate(["x", "y"]):

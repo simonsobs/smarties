@@ -22,6 +22,7 @@ def gaussian_circular_beam_blms(
     lmax: int,
     mmax: int,
     pol_angle_rad: float | None = None,
+    single_precision: bool = False
 ):
     """Compute harmonic coefficients of a circular Gaussian beam.
     Uses the analytic Gaussian beam coefficients from Challinor et al. (2000,
@@ -38,6 +39,8 @@ def gaussian_circular_beam_blms(
         Maximum azimuthal index.
     pol_angle_rad: float or None (optional)
         Polarization angle in radians. If set, include polarized coefficients.
+    single_precision: bool
+        If True, return single-precision coefficients. Default is False (double precision).
 
     Returns
     -------
@@ -60,7 +63,8 @@ def gaussian_circular_beam_blms(
     if is_polarized and mmax < 2:
         raise ValueError("mmax must be 2 or more for polarized output")
     ncomp = 3 if is_polarized else 1
-    blms = np.zeros((ncomp, nval), dtype=np.complex128)
+    dtype = np.complex64 if single_precision else np.complex128
+    blms = np.zeros((ncomp, nval), dtype=dtype)
     sigmasq = fwhm_rad * fwhm_rad / (8 * np.log(2.0))
 
     ell_intensity = np.arange(lmax + 1)  # Only m=0 for intensity
@@ -97,6 +101,7 @@ def get_beam_convolution_spins_maps(
     spins: np.ndarray | None = None,
     wcs=None,
     substract_gaussian_beam=False,
+    single_precision: bool = False
 ):
     """Compute systematic spin maps from sky and beam harmonic coefficents.
 
@@ -129,6 +134,8 @@ def get_beam_convolution_spins_maps(
         Geometry of the output map. If not specified, set to None and the output map will be computed with healpix pixelization
     substract_gaussian_beam: bool
         Wether to substract a gaussian beam or not, default to False.
+    single_precision: bool
+        If True, return single-precision coefficients. Default is False (double precision).
     Returns
     -------
     dict[int, np.ndarray]
@@ -146,12 +153,13 @@ def get_beam_convolution_spins_maps(
     assert np.all(spins_needed_pos) >= 0, (
         "Please provide only positive spins"
     )
+    dtype = np.complex64 if single_precision else np.complex128
     dict_spin_maps = {
-        spin: np.zeros((n_det,) + shape_pixels_output, dtype=np.complex128)
+        spin: np.zeros((n_det,) + shape_pixels_output, dtype=dtype)
         for spin in spins_needed
     }
     dict_harm_coeff = {
-        spin: np.zeros((n_det, hp.Alm.getsize(lmax)), dtype=np.complex128)
+        spin: np.zeros((n_det, hp.Alm.getsize(lmax)), dtype=dtype)
         for spin in spins_needed
     }
 
@@ -197,9 +205,9 @@ def get_beam_convolution_spins_maps(
                 blmB[idx] -= gaussian_blms[2, idx]
         else:
             blm0, blmE, blmB = blms_det[0], blms_det[1], blms_det[2]
-        curr_blm0 = np.zeros(lmax + 1, dtype=np.complex128)
-        curr_blmE = np.zeros(lmax + 1, dtype=np.complex128)
-        curr_blmB = np.zeros(lmax + 1, dtype=np.complex128)
+        curr_blm0 = np.zeros(lmax + 1, dtype=dtype)
+        curr_blmE = np.zeros(lmax + 1, dtype=dtype)
+        curr_blmB = np.zeros(lmax + 1, dtype=dtype)
 
         for spin in spins_needed:
             curr_blm0.fill(0)
