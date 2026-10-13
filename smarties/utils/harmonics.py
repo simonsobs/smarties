@@ -5,6 +5,7 @@
 from os import process_cpu_count
 import numpy as np
 import healpy as hp
+from numba import njit,prange
 from pixell import enmap, curvedsky
 import ducc0
 
@@ -237,3 +238,44 @@ def convert_alm_spin_to_plusminus(
     alm_plus = -1 * (alm_pos_spin + (-1) ** (spin) * alm_neg_spin) / (2)
     alm_minus = -1 * (alm_pos_spin - (-1) ** (spin) * alm_neg_spin) / (2j)
     return alm_plus, alm_minus
+def almxfl(alm:np.ndarray,fl:np.ndarray,mmax:int|None=None):
+    """
+    Multiply alm by a function of ell, f(ell)
+    Parameters
+    ----------
+    alm : array_like
+        Input alm array.
+    fl : array_like
+        Function of ell to multiply the alm by.
+    mmax : int
+        Maximum m of the alm array, if None assumes mmax=lmax.
+    Returns
+    -------
+    array_like
+        Output alm array after multiplication.
+    """
+    lmax= hp.Alm.getlmax(alm.size,mmax)
+    assert lmax != -1, "Invalid alm size for given mmax"
+    if mmax is None:
+        mmax= lmax
+    flsize= fl.size
+    alm_out=np.empty_like(alm)
+    _compute_almxfl_prange(alm=alm,alm_out=alm_out, fl=fl,flsize=flsize,lmax=lmax, mmax=mmax)
+    # _compute_almxfl(alm=alm,alm_out=alm_out, fl=fl,flsize=flsize,lmax=lmax, mmax=mmax)
+    # Multiply by fl using healpy's almxfl
+    return alm_out
+
+
+
+@njit(parallel=True)
+def _compute_almxfl_prange(alm,alm_out, fl,flsize,lmax, mmax):
+    for m in prange(mmax+ 1): # type: ignore[not-iterable]
+
+        idx_m=m * (2 * lmax + 1 - m) // 2
+        for l in range(m, lmax + 1):
+            idx_lm= idx_m + l
+            if l < flsize:
+                alm_out[idx_lm] =alm[idx_lm]* fl[l]
+            else:
+                alm_out[idx_lm] = 0.
+    return alm_out
