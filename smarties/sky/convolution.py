@@ -10,6 +10,7 @@ from smarties.utils.harmonics import (
     alm2map_anypix,
     convert_alm_plusminus_to_spin,
     convert_alm_spin_to_plusminus,
+    almxfl
 )
 
 __all__ = [
@@ -236,11 +237,11 @@ def get_beam_convolution_spins_maps(
                 curr_blmE, curr_blmB, 2
             )
 
-            spin_0_term = hp.almxfl(alm0, np.conj(curr_blm0) * prefactor)
-            spin_plus_2_term = hp.almxfl(alm_p2, np.conj(curr_blm_p2) * prefactor)
-            spin_minus_2_term = hp.almxfl(alm_m2, np.conj(curr_blm_m2) * prefactor)
+            spin_0_term =almxfl(alm0, np.conj(curr_blm0)*prefactor)
+            spin_plus_2_term = almxfl(alm_p2, np.conj(curr_blm_p2)*prefactor)
+            spin_minus_2_term = almxfl(alm_m2, np.conj(curr_blm_m2)*prefactor)
 
-            output_alms = spin_0_term + 0.5 * (spin_plus_2_term + spin_minus_2_term)
+            output_alms =  (spin_0_term + 0.5 * (spin_plus_2_term + spin_minus_2_term))
 
             dict_harm_coeff[spin][idet] = output_alms
 
