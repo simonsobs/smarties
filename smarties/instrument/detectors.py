@@ -263,7 +263,7 @@ def get_list_detectors_from_yaml_and_h_n(path_yaml_detectors, directory_h_n):
             path_h_n
             + detector_features[i]
             + "_"
-            + dictionary_detectors["h_n"]["list_prefix"][0]
+            + dictionary_detectors["h_n"]["list_prefix"][0].replace('_', '')
             + "_cos_1."
             + dictionary_detectors["h_n"]["format_h_n"]
         ):
