@@ -544,17 +544,23 @@ class FrameworkSystematics(object):
             print("No systematics maps provided, assuming no systematics", flush=True)
             spin_systematics_maps = Spin_maps.from_dictionary({spin: np.zeros(1) for spin in spin_sky_maps.spins})
 
-        assert np.all(sum(spin_sky_maps.values()).imag < precision), 'The sum of the input sky maps must be real, the imaginary part is not expected to be non-zero'
-        assert np.all(sum(spin_systematics_maps.values()).imag < precision), 'The sum of the input systematics maps must be real, the imaginary part is not expected to be non-zero'
-
-
         for spin in set(spin_sky_maps.spins):
-            if spin not in spin_systematics_maps:
-                spin_systematics_maps[spin] = np.zeros(1) # If a spin is not provided in the systematics maps, we assume that the systematics maps for this spin are zero
+            if (spin not in spin_sky_maps) and (-spin not in spin_sky_maps):
+                spin_sky_maps[spin] = np.zeros(1) 
+                spin_sky_maps[-spin] = np.zeros(1)
+                # If a spin is not provided in the sky maps, we assume that the sky maps for this spin are zero
+            if (spin in spin_sky_maps) and (-spin in spin_sky_maps):
+                assert np.all((spin_sky_maps[spin]+spin_sky_maps[-spin]).values().imag < precision), 'The sum of the input sky maps must be real, the total imaginary part is not expected to be non-zero'
 
         for spin in set(spin_systematics_maps.spins):
-            if spin not in spin_sky_maps:
-                spin_sky_maps[spin] = np.zeros(1) # If a spin is not provided in the sky maps, we assume that the sky maps for this spin are zero
+            if (spin not in spin_systematics_maps) and (-spin not in spin_systematics_maps):
+                spin_systematics_maps[spin] = np.zeros(1) 
+                spin_systematics_maps[-spin] = np.zeros(1)
+                # If a spin is not provided in the systematics maps, we assume that the systematics maps for this spin are zero
+
+            
+            if (spin in spin_systematics_maps) and (-spin in spin_systematics_maps):
+                assert np.all((spin_systematics_maps[spin]+spin_systematics_maps[-spin]).values().imag < precision), 'The sum of the input systematics maps must be real, the imaginary part is not expected to be non-zero'
 
         if inverse_mapmaking_matrix is None:
             t_start_mapmaking_matrix = time.time()
@@ -573,7 +579,8 @@ class FrameworkSystematics(object):
 
         print("Computing the spin coupled maps...", flush=True)
         
-        list_spin_maps = list(np.unique(spin_sky_maps.spins + spin_systematics_maps.spins))
+        base_spins = list(np.unique(spin_sky_maps.spins + spin_systematics_maps.spins))
+        list_spin_maps = sorted(set(base_spins) | {-s for s in base_spins if s > 0})
 
 
         spin_coupled_maps = self.compute_spin_convolution(
@@ -610,7 +617,6 @@ class FrameworkSystematics(object):
                 dict_final_CMB_fields[-spin] = get_final_map(np.conj(dict_final_CMB_fields[spin]))
 
         print("Final CMB fields computed, transforming them into Spin_maps...", flush=True)
-        # dict_final_CMB_fields = Spin_maps.from_list_maps(final_CMB_fields, self.list_spin_output)
 
         if return_Q_U:
             final_Q = (dict_final_CMB_fields[-2] + dict_final_CMB_fields[2])/2.

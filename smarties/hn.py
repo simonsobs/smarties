@@ -39,6 +39,11 @@ class Spin_maps(dict):
     _shape_fullsky = None
     _wcs_car = None
 
+    def __missing__(self, key):
+        if (isinstance(key, int) or isinstance(key, Spin_nm)) and -key in self: 
+            return np.conj(super().__getitem__(-key))
+        raise  KeyError(key)
+
     def set_projection_pixel(self, projection_pixel=None):
         assert projection_pixel in ["car", "healpix"], (
             f"Projection pixel must be either 'car' or 'healpix', got {projection_pixel}"
