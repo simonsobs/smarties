@@ -2,11 +2,11 @@
 # Copyright (c) 2024-2026 bers of the Simons Simons Observatory Collaboration.
 # lease refer to the LICENSE file in the root of this repository.
 
+import logging
 from copy import deepcopy
 import numpy as np
 from opt_einsum import contract
 from pixell import enmap
-import time
 from smarties.utils.tools import get_coupled_spin, get_row_mapmaking_matrix
 from smarties.sky.cmb import create_CMB_spin_maps
 from smarties.hn import Spin_maps, Spin_nm
@@ -45,8 +45,6 @@ class FrameworkSystematics(object):
             List of spins involved in the signal maps only (for CMB only, the spins are -2, 2 with polarization only)
         """
         assert np.unique(list_spin_output).size == np.array(list_spin_output).size, 'The list of spins must be unique'
-        if not np.isin(list_spin_output, np.array([0,-2,2])).all():
-            print('The output spins maps appeared to contain spin different than 0, -2 or 2, the package has not been tested in this case!', flush=True)
         self.list_spin_output = list_spin_output # list spins involved in the signal maps only (for CMB only, the spins are 0, -2, 2 if intensity is involved)
         self.nstokes = nstokes
         self.lmax = lmax
@@ -175,7 +173,7 @@ class FrameworkSystematics(object):
                 available_signal_spins=list_spin_maps
             )
 
-            print(f'Coupled spins for spin {spin}: {coupled_spins}', flush=True)
+            logging.info(f'Coupled spins for spin {spin}: {coupled_spins}')
 
             factor_correction = lambda spin: 1
             if spin == 0:
@@ -324,7 +322,7 @@ class FrameworkSystematics(object):
         npix = mask[observed_pixels_array].size
 
         if spin_systematics_maps is None:
-            print("No systematics maps provided, assuming no systematics", flush=True)
+            logging.warning("No systematics maps provided, assuming no systematics")
             spin_systematics_maps = Spin_maps.from_dictionary({spin: np.zeros(1) for spin in spin_sky_maps.spins})
 
         assert np.all(sum(spin_sky_maps.values()).imag < 1e-14), 'The sum of the input sky maps must be real, the imaginary part is not expected to be non-zero'
@@ -340,21 +338,21 @@ class FrameworkSystematics(object):
                 spin_sky_maps[spin] = np.zeros(1) # If a spin is not provided in the sky maps, we assume that the sky maps for this spin are zero
 
         if inverse_mapmaking_matrix is None:
-            t_start_mapmaking_matrix = time.time()
+            logging.info("Starting the computation of the inverse mapmaking matrix...")
             inverse_mapmaking_matrix = self.get_inverse_mapmaking_matrix(
                 h_n_spin_dict,
                 polar_angle_coeff=polar_angle_coeff,
                 polar_efficiency_coeff=polar_efficiency_coeff,
                 npix=npix,
             )
-            print(f"Inverse mapmaking matrix computed in {time.time() - t_start_mapmaking_matrix:.2f} seconds", flush=True)
+            logging.info(f"Inverse mapmaking matrix computed")
         else:
             assert inverse_mapmaking_matrix.shape == (npix, self.nstokes, self.nstokes), 'The inverse mapmaking matrix must be of shape (npix, nstokes, nstokes), with npix being the number of pixels in the observed area of the provided mask'
 
-        print("Finishing the mapmaking process, computing the total maps...", flush=True)
+        logging.info("Finishing the mapmaking process, computing the total maps...")
         # Second, form the data vector composed of (<d_j>, <d_j cos 2\phi_j>, <d_j sin 2\phi_j>)
 
-        print("Computing the spin coupled maps...", flush=True)
+        logging.info("Computing the spin coupled maps...")
         spin_coupled_maps = np.zeros((npix, len(self.list_spin_output),), dtype=dtype)
         list_spin_maps = list(np.unique(spin_sky_maps.spins + spin_systematics_maps.spins))
 
@@ -374,7 +372,7 @@ class FrameworkSystematics(object):
                 available_signal_spins=list_spin_maps
             )
 
-            print(f'Coupled spins for spin {spin}: {coupled_spins}', flush=True)
+            logging.info(f'Coupled spins for spin {spin}: {coupled_spins}')
 
             # \sum_{k' = -\infty}^{\infty} h_{k-k'} S_{k'} on all (k-k', k') pairs
             for tuple_spins in coupled_spins:
@@ -390,14 +388,13 @@ class FrameworkSystematics(object):
                         spin_sky_maps[tuple_spins[1]]
                     ) # Polarization angle to remove for consistent modeling of the data
                 )
+        logging.info("Spin coupled maps computed, computing the final CMB fields...")
 
         wcs_car = geometry_dictionary.get('wcs_car', None)
         get_final_map = lambda x: x if wcs_car is None else enmap.ndmap(
             x,
             wcs=wcs_car
         )
-
-        print("Computing the final CMB fields...", flush=True)
         # Finally, compute the final CMB fields
         final_CMB_fields = get_final_map(
             contract(
@@ -407,7 +404,7 @@ class FrameworkSystematics(object):
             )
         )
 
-        print("Final CMB fields computed, transforming them into Spin_maps...", flush=True)
+        logging.info("Final CMB fields computed, transforming them into Spin_maps...")
         dict_final_CMB_fields = Spin_maps.from_list_maps(final_CMB_fields, self.list_spin_output)
 
         if return_Q_U:
@@ -541,43 +538,41 @@ class FrameworkSystematics(object):
         npix = mask[observed_pixels_array].size
 
         if spin_systematics_maps is None:
-            print("No systematics maps provided, assuming no systematics", flush=True)
+            logging.warning("No systematics maps provided, assuming no systematics")
             spin_systematics_maps = Spin_maps.from_dictionary({spin: np.zeros(1) for spin in spin_sky_maps.spins})
 
-        for spin in set(spin_sky_maps.spins):
+        for spin in set(spin_systematics_maps.spins):
             if (spin not in spin_sky_maps) and (-spin not in spin_sky_maps):
                 spin_sky_maps[spin] = np.zeros(1) 
                 spin_sky_maps[-spin] = np.zeros(1)
                 # If a spin is not provided in the sky maps, we assume that the sky maps for this spin are zero
-            if (spin in spin_sky_maps) and (-spin in spin_sky_maps):
-                assert np.all((spin_sky_maps[spin]+spin_sky_maps[-spin]).values().imag < precision), 'The sum of the input sky maps must be real, the total imaginary part is not expected to be non-zero'
+            if (spin in spin_systematics_maps) and (-spin in spin_systematics_maps):
+                assert np.all((spin_systematics_maps[spin]+spin_systematics_maps[-spin]).imag < precision), 'The sum of the input systematics maps must be real, the total imaginary part is not expected to be non-zero'
 
-        for spin in set(spin_systematics_maps.spins):
+        for spin in set(spin_sky_maps.spins):
             if (spin not in spin_systematics_maps) and (-spin not in spin_systematics_maps):
                 spin_systematics_maps[spin] = np.zeros(1) 
                 spin_systematics_maps[-spin] = np.zeros(1)
                 # If a spin is not provided in the systematics maps, we assume that the systematics maps for this spin are zero
 
-            
-            if (spin in spin_systematics_maps) and (-spin in spin_systematics_maps):
-                assert np.all((spin_systematics_maps[spin]+spin_systematics_maps[-spin]).values().imag < precision), 'The sum of the input systematics maps must be real, the imaginary part is not expected to be non-zero'
+            if (spin in spin_sky_maps) and (-spin in spin_sky_maps):
+            assert np.all((spin_sky_maps[spin]+spin_sky_maps[-spin]).imag < precision), 'The sum of the input sky maps must be real, the imaginary part is not expected to be non-zero'
 
         if inverse_mapmaking_matrix is None:
-            t_start_mapmaking_matrix = time.time()
+            logging.info("Starting the computation of the inverse mapmaking matrix...")
             inverse_mapmaking_matrix = self.get_inverse_mapmaking_matrix(
                 h_n_spin_dict,
                 polar_angle_coeff=polar_angle_coeff,
                 polar_efficiency_coeff=polar_efficiency_coeff,
                 npix=npix,
             )
-            print(f"Inverse mapmaking matrix computed in {time.time() - t_start_mapmaking_matrix:.2f} seconds", flush=True)
+            logging.info(f"Inverse mapmaking matrix computed")
         else:
             assert inverse_mapmaking_matrix.shape == (npix, self.nstokes, self.nstokes), 'The inverse mapmaking matrix must be of shape (npix, nstokes, nstokes), with npix being the number of pixels in the observed area of the provided mask'
 
-        print("Finishing the mapmaking process, computing the total maps...", flush=True)
+        logging.info("Computing the spin coupled maps...")
         # Second, form the data vector composed of (<d_j>, <d_j cos 2\phi_j>, <d_j sin 2\phi_j>)
-
-        print("Computing the spin coupled maps...", flush=True)
+        
         
         base_spins = list(np.unique(spin_sky_maps.spins + spin_systematics_maps.spins))
         list_spin_maps = sorted(set(base_spins) | {-s for s in base_spins if s > 0})
@@ -596,16 +591,13 @@ class FrameworkSystematics(object):
             dtype = dtype,
             return_array = True
         )
-        
-
+        logging.info("Spin coupled maps computed, computing the final maps...")
         
         wcs_car = geometry_dictionary.get('wcs_car', None)
         get_final_map = lambda x: x if wcs_car is None else enmap.ndmap(
             x,
             wcs=wcs_car
         )
-
-        print("Computing the final CMB fields...", flush=True)
 
         dict_final_CMB_fields = Spin_maps.from_dictionary({spin: np.zeros((npix,), dtype=dtype) for spin in self.list_spin_output})
 
@@ -616,7 +608,7 @@ class FrameworkSystematics(object):
             if spin != 0:
                 dict_final_CMB_fields[-spin] = get_final_map(np.conj(dict_final_CMB_fields[spin]))
 
-        print("Final CMB fields computed, transforming them into Spin_maps...", flush=True)
+        logging.info("Final maps computed...")
 
         if return_Q_U:
             final_Q = (dict_final_CMB_fields[-2] + dict_final_CMB_fields[2])/2.
@@ -740,7 +732,7 @@ class FrameworkSystematics(object):
             #TODO: Generalize to m != 0 for HWP angles
 
         if spin_systematics_maps is None:
-            print("No systematics maps provided, assuming no systematics", flush=True)
+            logging.warning("No systematics maps provided, assuming no systematics")
             spin_systematics_maps = Spin_maps.from_dictionary({spin: np.zeros(1) for spin in spin_sky_maps.spins})
 
         assert np.all(sum(spin_sky_maps.values()).imag < precision), 'The sum of the input sky maps must be real, the imaginary part is not expected to be non-zero'
@@ -755,7 +747,7 @@ class FrameworkSystematics(object):
                 spin_sky_maps[spin] = np.zeros(1) # If a spin is not provided in the sky maps, we assume that the sky maps for this spin are zero
 
         if build_systematics_maps_from_templates and dict_utils_template_systematics_maps is not None:
-            print("Template systematics maps provided, checking their consistency...", flush=True)
+            logging.info("Template systematics maps provided, checking their consistency...")
             assert 'template_spin_systematics_maps' in dict_utils_template_systematics_maps, 'The template systematics maps must be provided in the parameters template systematics maps with key "template_spin_systematics_maps"'
             assert 'parameters_template_systematics' in dict_utils_template_systematics_maps, 'The parameters of the template systematics maps must be provided in the parameters template systematics maps with key "parameters_template_systematics"'
 
@@ -790,7 +782,7 @@ class FrameworkSystematics(object):
             assert ratio_resolution_change[0] >= 1 and ratio_resolution_change[1] >= 1, 'The resolution change can only be performed from a lower resolution to a higher resolution, the provided shape of the final map should be higher than the shape of the downgraded map'
             perform_resolution_change = True if ratio_resolution_change != (1,1) else False
             if perform_resolution_change:
-                print(f"Performing resolution change from {shape_hmap} to {shape_final_map} with ratio {ratio_resolution_change}...", flush=True)
+                logging.info(f"Performing resolution change from {shape_hmap} to {shape_final_map} with ratio {ratio_resolution_change}...")
                 # Handling the mask for the downgraded and final maps
                 mask_downgraded = mask.reshape(shape_final_map).downgrade(factor=ratio_resolution_change)
                 mask_downgraded[mask_downgraded != 0] = 1
@@ -832,7 +824,7 @@ class FrameworkSystematics(object):
         )
 
 
-        print("Finishing the mapmaking process, computing the total maps...", flush=True)
+        logging.info("Finishing the mapmaking process, computing the total maps...")
         # Second, form the data vector composed of (<d_j>, <d_j cos 2\phi_j>, <d_j sin 2\phi_j>)
 
 
@@ -861,7 +853,7 @@ class FrameworkSystematics(object):
 
         for j, chunk_elem in enumerate(list_chunks_downgraded_map):
 
-            print(f"Processing chunk {chunk_elem}...", flush=True)
+            logging.info(f"Processing chunk {chunk_elem}...")
 
             #TODO: Add comments everywhere here
             slice_x_downgraded = slice(chunk_elem[0], chunk_elem[1])
@@ -883,7 +875,7 @@ class FrameworkSystematics(object):
 
 
             if perform_resolution_change:
-                print(f"Performing resolution change for chunk {chunk_elem}...", flush=True)
+                logging.info(f"Performing resolution change for chunk {chunk_elem}...")
                 slice_1d_hmap = get_slice_1d_from_2d(
                     **dict_info_map_downgraded,
                     boolean_mask=mask_downgraded != 0
@@ -944,7 +936,7 @@ class FrameworkSystematics(object):
 
 
             if perform_det_interpolation:
-                print("Performing interpolation of the h_n maps for the current chunk...", flush=True)
+                logging.info("Performing interpolation of the h_n maps for the current chunk...")
 
                 list_spin_positive = [spin for spin in h_n_spin_dict.spins if spin >= 0]
 
@@ -1007,7 +999,7 @@ class FrameworkSystematics(object):
                     return spin_systematics_maps[spin][slice_spin_systematics_maps]
 
 
-            print("Computing the spin coupled maps...", flush=True)
+            logging.info("Computing the spin coupled maps...")
             spin_coupled_maps = np.zeros((slice_1d_final_map.size, len(self.list_spin_output),), dtype=dtype)
             list_spin_maps = list(np.unique(spin_sky_maps.spins + spin_systematics_maps.spins))
 
@@ -1022,7 +1014,7 @@ class FrameworkSystematics(object):
                     available_signal_spins=list_spin_maps
                 )
 
-                print(f'Coupled spins for spin {spin}: {coupled_spins}', flush=True)
+                logging.info(f'Coupled spins for spin {spin}: {coupled_spins}')
 
                 # \sum_{k' = -\infty}^{\infty} h_{k-k'} S_{k'} on all (k-k', k') pairs
                 for tuple_spins in coupled_spins:
@@ -1045,7 +1037,7 @@ class FrameworkSystematics(object):
                 wcs=wcs_car_final_map
             )
 
-            print("Computing the final CMB fields...", flush=True)
+            logging.info("Computing the final CMB fields...")
             # Finally, compute the final CMB fields
             final_CMB_fields[...,slice_1d_final_map] = contract(
                         '...ij,...j->i...',
@@ -1058,7 +1050,7 @@ class FrameworkSystematics(object):
 
         final_CMB_fields = get_final_map(final_CMB_fields)
 
-        print("Final CMB fields computed, transforming them into Spin_maps...", flush=True)
+        logging.info("Final CMB fields computed, transforming them into Spin_maps...")
         dict_final_CMB_fields = Spin_maps.from_list_maps(
             final_CMB_fields,
             self.list_spin_output
