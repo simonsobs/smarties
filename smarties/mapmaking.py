@@ -584,6 +584,7 @@ class FrameworkSystematics(object):
         base_spins = list(np.unique(spin_sky_maps.spins + spin_systematics_maps.spins))
         list_spin_maps = sorted(set(base_spins) | {-s for s in base_spins if s > 0})
 
+        time_spin_convolution = time.time()
         spin_coupled_maps = self.compute_spin_convolution(
             list_spin_maps = list_spin_maps,
             spin_sky_maps = spin_sky_maps,
@@ -597,7 +598,7 @@ class FrameworkSystematics(object):
             dtype = dtype,
             return_array = True
         )
-        logger.info("Spin coupled maps computed, computing the final maps...")
+        logger.info(f"Spin coupled maps computed in {time.time() - time_spin_convolution:.2f} seconds, computing the final maps ...")
         
         wcs_car = geometry_dictionary.get('wcs_car', None)
         get_final_map = lambda x: x if wcs_car is None else enmap.ndmap(
@@ -605,16 +606,15 @@ class FrameworkSystematics(object):
             wcs=wcs_car
         )
 
+        time_final_maps = time.time()
         dict_final_CMB_fields = Spin_maps.from_dictionary({spin: np.zeros((npix,), dtype=dtype) for spin in self.list_spin_output})
-
         for i, spin in enumerate(self.list_spin_output):
             if spin<0:
                 continue
             dict_final_CMB_fields[spin] = get_final_map((inverse_mapmaking_matrix[projector_h_n, i,:]*spin_coupled_maps).sum(axis=-1))
             if spin != 0:
                 dict_final_CMB_fields[-spin] = get_final_map(np.conj(dict_final_CMB_fields[spin]))
-
-        logger.info("Final maps computed...")
+        logger.info(f"Final maps computed in {time.time() - time_final_maps:.2f} seconds...")
 
         if return_Q_U:
             final_Q = (dict_final_CMB_fields[-2] + dict_final_CMB_fields[2])/2.
