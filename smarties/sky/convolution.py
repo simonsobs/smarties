@@ -2,6 +2,8 @@
 # Copyright (c) 2024-2026 bers of the Simons Simons Observatory Collaboration.
 # lease refer to the LICENSE file in the root of this repository.
 
+import logging
+
 import healpy as hp
 import numpy as np
 from pixell import enmap
@@ -12,6 +14,8 @@ from smarties.utils.harmonics import (
     convert_alm_spin_to_plusminus,
     almxfl
 )
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "gaussian_circular_beam_blms",
@@ -187,7 +191,7 @@ def get_beam_convolution_spins_maps(
             assert fwhm is not None and len(fwhm) == n_det, (
                 "You must provide fwhm for all detectors if you want to substract the gaussian beam"
             )
-            print(
+            logger.info(
                 f"Substracting gaussian beam for detector {det_name} with fwhm {fwhm[idet]} arcmin"
             )
             gaussian_blms = gaussian_circular_beam_blms(

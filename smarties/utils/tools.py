@@ -2,12 +2,14 @@
 # Copyright (c) 2024-2026 bers of the Simons Simons Observatory Collaboration.
 # lease refer to the LICENSE file in the root of this repository.
 
-
+import logging
 import numpy as np
 from opt_einsum import contract
 from pixell import enmap
 
 from smarties.hn import Spin_maps, Spin_nm
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "get_coupled_spin",
@@ -497,7 +499,7 @@ def reweight_hmaps_by_hits(
             list_weights[..., np.newaxis] if list_weights.ndim == 1 else list_weights
         )
 
-        print("--Applying new weighting to h_n dictionary...", flush=True)
+        logger.info("--Applying new weighting to h_n dictionary...")
 
         array_hits_detector_pixel = np.int64(
             np.logical_or(
@@ -510,26 +512,22 @@ def reweight_hmaps_by_hits(
             h_dictionary.total_hits_map = pixel_map_weighting_array
 
         if 0 in pixel_map_weighting_array:
-            print(
-                "--Warning: some pixels are not observed by any detector, they will have their h maps values set to zero",
-                flush=True,
+            logger.warning(
+                "--Some pixels are not observed by any detector, they will have their h maps values set to zero",
             )
-            print(
+            logger.info(
                 "--Number of unobserved pixels: {}".format(
                     np.sum(pixel_map_weighting_array == 0)
                 ),
-                flush=True,
             )
-            print(
+            logger.info(
                 "--Total number of pixels: {}".format(pixel_map_weighting_array.size),
-                flush=True,
             )
-            print(
+            logger.info(
                 "--Fraction of unobserved pixels: {:.2e}".format(
                     np.sum(pixel_map_weighting_array == 0)
                     / pixel_map_weighting_array.size
                 ),
-                flush=True,
             )
 
         for spin in h_dictionary.spins:
@@ -548,9 +546,8 @@ def reweight_hmaps_by_hits(
         )
     else:
         spin_0 = 0 if 0 in h_dictionary.spins else Spin_nm((0, 0))
-        print("--Spin 0 in h maps dictionary, re-weighting applied.", flush=True)
+        logger.info("--Spin 0 in h maps dictionary, re-weighting applied.")
         cond_non_zero = h_dictionary[spin_0] != 0
-        print(h_dictionary[spin_0].shape, flush=True)
         inverse_weights = (
             1 / list_weights[..., None]
             if list_weights.ndim == 1

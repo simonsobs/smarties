@@ -4,9 +4,12 @@
 
 import os
 from copy import deepcopy
+import logging
 
 import numpy as np
 import yaml
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "get_polarization_angles",
@@ -17,6 +20,7 @@ __all__ = [
     "get_detector_names_from_yaml_file",
     "get_list_detectors_from_yaml_and_h_n",
 ]
+
 
 
 def get_polarization_angles(
@@ -93,7 +97,7 @@ def save_extended_final_maps(
         extended_final_maps[-2, mask_mpi_from_total_mask != 0] = final_Q_map.real
         extended_final_maps[-1, mask_mpi_from_total_mask != 0] = final_U_map.real
 
-    print("Saving map into", path_output)
+    logger.info("Saving map into", path_output)
     np.save(path_output, extended_final_maps[:, mask_mpi_from_total_mask != 0])
 
 

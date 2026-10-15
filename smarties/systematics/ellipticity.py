@@ -2,6 +2,7 @@
 # Copyright (c) 2024-2026 bers of the Simons Simons Observatory Collaboration.
 # lease refer to the LICENSE file in the root of this repository.
 
+import logging
 import healpy as hp
 import numpy as np
 from opt_einsum import contract
@@ -16,6 +17,8 @@ from smarties.external.s4cmb import (
 from smarties.hn import Spin_maps
 from smarties.utils.harmonics import map2alm_anypix
 from smarties.utils.tools import convert_ellipticities_conventions, get_rotation_matrix
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     'get_differential_ellipticity_BICEP',
@@ -88,7 +91,7 @@ def _build_central_term_differential_ellipticity_BICEP(
 
     
     if spherical_derivatives is None:
-        print("Computing spherical derivatives from the temperature map", flush=True)
+        logger.info("Computing spherical derivatives from the temperature map")
 
         if type(intensity_sky_map) == np.ndarray:
             # HEALPIX pixelization expected
@@ -149,7 +152,7 @@ def _build_central_term_differential_ellipticity_BICEP(
         )[mask_bool]
 
     else:
-        print("Using provided spherical derivatives", flush=True)
+        logger.info("Using provided spherical derivatives")
         assert "phi_phi" in spherical_derivatives, (
             "The provided spherical_derivatives dictionnary must contain the 'phi_phi' key for the second derivative with respect to phi (including factor 1/sin^2(theta))"
         )
@@ -163,7 +166,7 @@ def _build_central_term_differential_ellipticity_BICEP(
             "The provided spherical_derivatives dictionnary must contain the 'phi' key for the first derivative with respect to phi"
         )
 
-        print("Computing central term ...", flush=True)
+        logger.info("Computing central term ...")
         for spin in spherical_derivatives:
             if spherical_derivatives[spin].shape != np.prod(shape_car):
                 spherical_derivatives[spin] = take_box_function(
@@ -273,7 +276,7 @@ def get_differential_ellipticity_BICEP(
     differential_ellipticity_spin_maps = Spin_maps()
 
     # Spin -2
-    print("Computing spin -2 differential ellipticity map ...", flush=True)
+    logger.info("Computing spin -2 differential ellipticity map ...")
 
     differential_ellipticity_spin_maps[-2] = contract(
         "d,...->d...",
@@ -283,7 +286,7 @@ def get_differential_ellipticity_BICEP(
     )
 
     # Spin 2
-    print("Computing spin 2 differential ellipticity map ...", flush=True)
+    logger.info("Computing spin 2 differential ellipticity map ...")
     differential_ellipticity_spin_maps[2] = np.conj(
         differential_ellipticity_spin_maps[-2]
     )
@@ -539,7 +542,7 @@ def get_differential_ellipticity_no_calibration(
     take_box_function = lambda x: x  # [mask_bool]
 
     if spherical_derivatives is None:
-        print("Computing spherical derivatives from the temperature map", flush=True)
+        logger.info("Computing spherical derivatives from the temperature map")
 
         if type(intensity_sky_map) == np.ndarray:
             # HEALPIX pixelization expected
@@ -592,7 +595,7 @@ def get_differential_ellipticity_no_calibration(
             input_spin=input_spin,
         )
     else:
-        print("Using provided spherical derivatives", flush=True)
+        logger.info("Using provided spherical derivatives")
         assert "phi_phi" in spherical_derivatives, (
             "The provided spherical_derivatives dictionnary must contain the 'phi_phi' key for the second derivative with respect to phi (including factor 1/sin^2(theta))"
         )
@@ -642,7 +645,6 @@ def get_differential_ellipticity_no_calibration(
 
     for key in derivatives_maps:
         derivatives_maps[key][2] = np.conj(derivatives_maps[key][-2])
-        # print("####", derivatives_maps[key][2].shape)
 
     differential_ellipticity_spin_maps = Spin_maps()
 

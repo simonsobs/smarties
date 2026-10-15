@@ -2,11 +2,13 @@
 # Copyright (c) 2024-2026 bers of the Simons Simons Observatory Collaboration.
 # lease refer to the LICENSE file in the root of this repository.
 
-
+import logging
 import healpy as hp
 import numpy as np
 
 from smarties.hn import Spin_maps
+
+logger = logging.getLogger(__name__)
 
 __all__ = ["generate_power_spectra_CAMB", "generate_CMB_map", "create_CMB_spin_maps"]
 
@@ -102,7 +104,7 @@ def generate_power_spectra_CAMB(
     # pars.set_cosmology(H0=H0)
     pars.set_for_lmax(lmax_computation, lens_potential_accuracy=lens_potential_accuracy)
 
-    print("Calculating spectra from CAMB !")
+    logger.info("Calculating spectra from CAMB !")
     results = camb.get_results(pars)
 
     powers = results.get_cmb_power_spectra(

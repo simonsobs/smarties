@@ -175,7 +175,6 @@ def generate_point_source_map(
 
     else:
         theta_min, theta_max, phi_min, phi_max = get_coordinates_from_healpix_mask(mask)
-        print(theta_min, theta_max, phi_min, phi_max)
         box = np.array([[theta_min, phi_min], [theta_max, phi_max]]) * pxl.utils.degree
 
         shape, wcs = enmap.geometry(pos=box, res=res, proj="car")

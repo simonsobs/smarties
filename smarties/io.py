@@ -4,6 +4,7 @@
 
 
 import os
+import logging
 
 import h5py
 import healpy as hp
@@ -14,6 +15,8 @@ from pixell import enmap
 
 from smarties.hn import Spin_maps, Spin_nm
 from smarties.utils.tools import flatten_CAR_maps, reweight_hmaps_by_hits
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "build_mask_from_toast_h_maps",
@@ -168,7 +171,7 @@ def read_toast_h_maps(
         error_precision = 1e-15
 
     if duplicate_maps_with_prefix:
-        print("Duplicate maps with prefix is enabled", flush=True)
+        logger.info("Duplicate maps with prefix is enabled")
 
     number_detectors_prefix = len(list_prefix)
     n_det = len(list_name_files) * number_detectors_prefix
@@ -267,7 +270,7 @@ def read_toast_h_maps(
     for spin in list_spin:
         h_n_spinmaps[-spin] = np.conj(h_n_spinmaps[spin])
 
-    print("Finalizing h_n dictionary...", flush=True)
+    logger.info("Finalizing h_n dictionary...")
 
     if reweight_by_hits:
         reweight_hmaps_by_hits(
@@ -415,7 +418,7 @@ def read_lbs_h_maps(
     for spin in list_spin:
         h_n_spinmaps[-spin] = np.conj(h_n_spinmaps[spin])
 
-    print("Finalizing h_n dictionary...", flush=True)
+    logger.info("Finalizing h_n dictionary...")
 
     if reweight_by_hits:
         reweight_hmaps_by_hits(
@@ -428,9 +431,8 @@ def read_lbs_h_maps(
 
     all_spins = np.array(h_n_spinmaps.spins)
     if (all_spins[:, 1] == 0).all():
-        print(
+        logger.info(
             "No HWP angle spins, removing m=0 spins from the h_nm dictionary...",
-            flush=True,
         )
         h_n_spinmaps = Spin_maps.from_dictionary(
             {spin[0]: h_n_spinmaps[spin] for spin in h_n_spinmaps.spins}
@@ -767,12 +769,12 @@ def save_partial_spin_maps(
     elif format_output == ".npy" or path_output.endswith(".npy"):
         if not path_output.endswith(".npy"):
             path_output = path_output + ".npy"
-        print("Saving map into", path_output)
+        logger.info("Saving map into", path_output)
         np.save(path_output, extended_final_maps[:, mask_on_full_map != 0])
     elif format_output == ".fits" or path_output.endswith(".fits"):
         if not path_output.endswith(".fits"):
             path_output = path_output + ".fits"
-        print("Saving map into", path_output)
+        logger.info("Saving map into", path_output)
 
         hp.write_map(path_output, extended_final_maps, overwrite=True)
 
@@ -783,7 +785,7 @@ def save_partial_spin_maps(
     ):
         if not (path_output.endswith(".hdf") or path_output.endswith(".hdf5")):
             path_output = path_output + ".hdf"
-        print("Saving map into", path_output)
+        logger.info("Saving map into", path_output)
 
         with h5py.File(path_output, "w") as hf:
             hf.create_dataset("maps", data=extended_final_maps)

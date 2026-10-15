@@ -2,6 +2,7 @@
 # Copyright (c) 2024-2026 bers of the Simons Simons Observatory Collaboration.
 # lease refer to the LICENSE file in the root of this repository.
 
+import logging
 import healpy as hp
 import numpy as np
 from opt_einsum import contract
@@ -15,7 +16,7 @@ from smarties.external.s4cmb import (
 from smarties.hn import Spin_maps
 from smarties.utils.harmonics import map2alm_anypix
 
-__all__ = ["create_beamwidth_spin_leakage_map_BICEP"]
+logger = logging.getLogger(__name__)
 
 __all__ = [
     'create_beamwidth_spin_leakage_map_BICEP',
@@ -74,7 +75,7 @@ def _build_central_term_beamwidth_leakage(
         mask_bool = ..., mask != 0
 
     if spherical_derivatives is None:
-        print("Computing spherical derivatives from the temperature map", flush=True)
+        logger.info("Computing spherical derivatives from the temperature map")
 
         if type(intensity_sky_map) == np.ndarray:
             # HEALPIX pixelization expected
@@ -142,7 +143,7 @@ def _build_central_term_beamwidth_leakage(
         )
 
     else:
-        print("Using provided spherical derivatives", flush=True)
+        logger.info("Using provided spherical derivatives")
         assert "theta_theta" in spherical_derivatives, (
             "The provided spherical_derivatives dictionnary must contain the 'theta_theta' key for the second derivative with respect to theta"
         )
@@ -150,7 +151,7 @@ def _build_central_term_beamwidth_leakage(
             "The provided spherical_derivatives dictionnary must contain the 'phi_phi' key for the second derivative with respect to phi"
         )
 
-        print("Computing central term ...", flush=True)
+        logger.info("Computing central term ...")
         if shape_car is not None:
             for spin in spherical_derivatives:
                 if spherical_derivatives[spin].shape != np.prod(shape_car):
