@@ -556,7 +556,7 @@ class FrameworkSystematics(object):
                 # If a spin is not provided in the systematics maps, we assume that the systematics maps for this spin are zero
 
             if (spin in spin_sky_maps) and (-spin in spin_sky_maps):
-            assert np.all((spin_sky_maps[spin]+spin_sky_maps[-spin]).imag < precision), 'The sum of the input sky maps must be real, the imaginary part is not expected to be non-zero'
+                assert np.all((spin_sky_maps[spin]+spin_sky_maps[-spin]).imag < precision), 'The sum of the input sky maps must be real, the imaginary part is not expected to be non-zero'
 
         if inverse_mapmaking_matrix is None:
             logging.info("Starting the computation of the inverse mapmaking matrix...")
