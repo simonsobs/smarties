@@ -106,7 +106,8 @@ def get_beam_convolution_spins_maps(
     spins: np.ndarray | None = None,
     wcs=None,
     substract_gaussian_beam=False,
-    single_precision: bool = False
+    single_precision: bool = False,
+    return_only_positive_spins: bool = True
 ):
     """Compute systematic spin maps from sky and beam harmonic coefficents.
 
@@ -159,10 +160,16 @@ def get_beam_convolution_spins_maps(
         "Please provide only positive spins"
     )
     dtype = np.complex64 if single_precision else np.complex128
-    dict_spin_maps = {
-        spin: np.zeros((n_det,) + shape_pixels_output, dtype=dtype)
-        for spin in spins_needed
-    }
+    if return_only_positive_spins:
+        dict_spin_maps = {
+            spin: np.zeros((n_det,) + shape_pixels_output, dtype=dtype)
+            for spin in spins_needed_pos
+        }
+    else:
+        dict_spin_maps = {
+            spin: np.zeros((n_det,) + shape_pixels_output, dtype=dtype)
+            for spin in spins_needed
+        }
     dict_harm_coeff = {
         spin: np.zeros((n_det, hp.Alm.getsize(lmax)), dtype=dtype)
         for spin in spins_needed
@@ -191,7 +198,7 @@ def get_beam_convolution_spins_maps(
             assert fwhm is not None and len(fwhm) == n_det, (
                 "You must provide fwhm for all detectors if you want to substract the gaussian beam"
             )
-            logger.info(
+            print(
                 f"Substracting gaussian beam for detector {det_name} with fwhm {fwhm[idet]} arcmin"
             )
             gaussian_blms = gaussian_circular_beam_blms(
@@ -278,8 +285,9 @@ def get_beam_convolution_spins_maps(
                     lmax=lmax,
                 )
                 dict_spin_maps[spin][idet] = maps[0] + 1j * maps[1]
-                dict_spin_maps[-spin][idet] = (
-                    maps[0] - 1j * maps[1]
-                )  # negative spin maps are the complex conjugate of the positive spin maps
+                if not return_only_positive_spins:
+                    dict_spin_maps[-spin][idet] = (
+                        maps[0] - 1j * maps[1]
+                    )  # negative spin maps are the complex conjugate of the positive spin maps
 
-    return dict_spin_maps
+    return Spin_maps.from_dictionary(dict_spin_maps)
