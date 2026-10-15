@@ -8,6 +8,7 @@ import healpy as hp
 import numpy as np
 from pixell import enmap
 
+from smarties.hn import Spin_maps
 from smarties.utils.harmonics import (
     alm2map_anypix,
     convert_alm_plusminus_to_spin,
