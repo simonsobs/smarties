@@ -160,7 +160,7 @@ class FrameworkSystematics(object):
             if spin in [-2, 2]:
                 return polar_efficiency_coeff
             else:
-                return np.ones_like(polar_efficiency_coeff, dtype=int)
+                return np.ones_like(polar_efficiency_coeff, dtype=polar_efficiency_coeff.dtype)
 
         if projector_h_n is None:
             projector_h_n = ... # Use all pixels
@@ -342,13 +342,14 @@ class FrameworkSystematics(object):
 
         if inverse_mapmaking_matrix is None:
             logger.info("Starting the computation of the inverse mapmaking matrix...")
+            time_inverse_mapmaking_matrix = time.time()
             inverse_mapmaking_matrix = self.get_inverse_mapmaking_matrix(
                 h_n_spin_dict,
                 polar_angle_coeff=polar_angle_coeff,
                 polar_efficiency_coeff=polar_efficiency_coeff,
                 npix=npix,
             )
-            logger.info(f"Inverse mapmaking matrix computed")
+            logger.info(f"Inverse mapmaking matrix computed in {time.time() - time_inverse_mapmaking_matrix:.2f} seconds")
         else:
             assert inverse_mapmaking_matrix.shape == (npix, self.nstokes, self.nstokes), 'The inverse mapmaking matrix must be of shape (npix, nstokes, nstokes), with npix being the number of pixels in the observed area of the provided mask'
 
@@ -365,7 +366,7 @@ class FrameworkSystematics(object):
             if spin in [-2, 2]:
                 return polar_efficiency_coeff
             else:
-                return np.ones_like(polar_efficiency_coeff, dtype=int)
+                return np.ones_like(polar_efficiency_coeff, dtype=polar_efficiency_coeff.dtype)
 
         for i, spin in enumerate(self.list_spin_output):
             # Get all combinations of spins (k-k', k') such that k-k' = spin
@@ -563,13 +564,14 @@ class FrameworkSystematics(object):
 
         if inverse_mapmaking_matrix is None:
             logger.info("Starting the computation of the inverse mapmaking matrix...")
+            time_inverse_mapmaking_matrix = time.time()
             inverse_mapmaking_matrix = self.get_inverse_mapmaking_matrix(
                 h_n_spin_dict,
                 polar_angle_coeff=polar_angle_coeff,
                 polar_efficiency_coeff=polar_efficiency_coeff,
                 npix=npix,
             )
-            logger.info(f"Inverse mapmaking matrix computed")
+            logger.info(f"Inverse mapmaking matrix computed in {time.time() - time_inverse_mapmaking_matrix:.2f} seconds")
         else:
             assert inverse_mapmaking_matrix.shape == (npix, self.nstokes, self.nstokes), 'The inverse mapmaking matrix must be of shape (npix, nstokes, nstokes), with npix being the number of pixels in the observed area of the provided mask'
 
@@ -579,7 +581,7 @@ class FrameworkSystematics(object):
         
         base_spins = list(np.unique(spin_sky_maps.spins + spin_systematics_maps.spins))
         list_spin_maps = sorted(set(base_spins) | {-s for s in base_spins if s > 0})
-
+        spin_h_maps = sorted(set(h_n_spin_dict.spins) | {-s for s in h_n_spin_dict.spins if s > 0})
 
         spin_coupled_maps = self.compute_spin_convolution(
             list_spin_maps = list_spin_maps,
@@ -587,7 +589,7 @@ class FrameworkSystematics(object):
             spin_systematics_maps = spin_systematics_maps,
             h_n_spin_dict = h_n_spin_dict,
             projector_h_n = projector_h_n,
-            spin_h_maps = h_n_spin_dict.spins,
+            spin_h_maps = spin_h_maps,
             npix = npix,
             polar_angle_coeff=polar_angle_coeff,
             polar_efficiency_coeff=polar_efficiency_coeff,
@@ -980,12 +982,14 @@ class FrameworkSystematics(object):
                 slice_for_inverse_mapmaking_matrix = slice_1d_hmap
 
             if inverse_mapmaking_matrix is None:
+                time_inverse_mapmaking_matrix = time.time()
                 final_inverse_mapmaking_matrix_sliced = self.get_inverse_mapmaking_matrix(
                     h_n_spin_to_use,
                     slice_1d_hmap.size,
                     polar_angle_coeff=polar_angle_coeff,
                     slice_to_apply=slice_for_inverse_mapmaking_matrix
                 )[slice_hmaps_from_downgraded_slice]
+                logger.info(f"Inverse mapmaking matrix computed in {time.time() - time_inverse_mapmaking_matrix:.2f} seconds")
             else:
                 final_inverse_mapmaking_matrix_sliced = final_inverse_mapmaking_matrix[slice_1d_final_map]
 
