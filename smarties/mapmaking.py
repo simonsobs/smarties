@@ -529,12 +529,13 @@ class FrameworkSystematics(object):
         # else:
         #     spin_sky_maps = Spin_maps.from_dictionary(spin_sky_maps)
 
+        spin_h_maps = sorted(set(h_n_spin_dict.spins) | {-s for s in h_n_spin_dict.spins if s > 0})
         if polar_angle is None:
-            polar_angle_coeff = {spin: np.ones(h_n_spin_dict[spin].shape[0], dtype=dtype) for spin in h_n_spin_dict.spins} # Default is to not apply any polar angle, i.e. the detectors are all aligned in the same direction
+            polar_angle_coeff = {spin: np.ones(h_n_spin_dict[spin].shape[0], dtype=dtype) for spin in spin_h_maps} # Default is to not apply any polar angle, i.e. the detectors are all aligned in the same direction
         else:
             assert polar_angle.size == h_n_spin_dict[spin_0].shape[0], 'The polar angle map must have the same shape as the h_n maps'
 
-            polar_angle_coeff = {spin: np.exp(spin * 1j * polar_angle) for spin in h_n_spin_dict.spins}
+            polar_angle_coeff = {spin: np.exp(spin * 1j * polar_angle) for spin in spin_h_maps}
             #TODO: Generalize to m != 0 for HWP angles
         if polar_efficiency_coeff is not None:
             assert polar_efficiency_coeff.size == h_n_spin_dict[spin_0].shape[0], 'The polar efficiency map must have the same shape as the h_n maps'
@@ -582,7 +583,6 @@ class FrameworkSystematics(object):
         
         base_spins = list(np.unique(spin_sky_maps.spins + spin_systematics_maps.spins))
         list_spin_maps = sorted(set(base_spins) | {-s for s in base_spins if s > 0})
-        spin_h_maps = sorted(set(h_n_spin_dict.spins) | {-s for s in h_n_spin_dict.spins if s > 0})
 
         spin_coupled_maps = self.compute_spin_convolution(
             list_spin_maps = list_spin_maps,
