@@ -27,6 +27,26 @@ def get_polarization_angles(
     detector_features,
     telescope="LAT",
 ):
+    """
+    Get the polarization angles for a list of detectors using sotodlib.
+
+    Parameters
+    ----------
+    detector_features : list of str
+        List of detector names for which to retrieve polarization angles.
+    telescope : str, optional
+        The telescope name. Supported values are 'SAT1', 'SAT2', 'SAT3', and 'LAT'. Default is 'LAT'.
+    
+    Returns
+    -------
+    polarization_angles : np.ndarray
+        Array of polarization angles in radians for the specified detectors.
+
+    Note
+    ----
+    This function requires the `sotodlib` package to be installed. If it is not installed, an ImportError will be raised.
+    Addditionally, the detector_features must matches the sotodlib detector names for the specified telescope. 
+    """
     if telescope in ["SAT1", "SAT2", "SAT3", "LAT"]:
         try:
             import sotodlib.sim_hardware
@@ -54,6 +74,30 @@ def get_quantities_from_sotodlib(
     list_keys_to_get,
     telescope="LAT",
 ):
+    """
+    Get the specified quantities for a list of detectors using sotodlib.
+
+    Parameters
+    ----------
+    detector_features : list of str
+        List of detector names for which to retrieve polarization angles.
+    list_keys_to_get : list of str
+        List of keys corresponding to the quantities to retrieve from sotodlib.
+        Examples of valid keys include 'pol_ang', 'fwhm', 'sigma', etc.
+    telescope : str, optional
+        The telescope name. Supported values are 'SAT1', 'SAT2', 'SAT3', and 'LAT'. Default is 'LAT'.
+    
+    Returns
+    -------
+    polarization_angles : np.ndarray
+        Array of polarization angles in radians for the specified detectors.
+
+    Note
+    ----
+    This function requires the `sotodlib` package to be installed. If it is not installed, an ImportError will be raised.
+    Addditionally, the detector_features must matches the sotodlib detector names for the specified telescope. 
+    The list_keys_to_get must be valid keys in the sotodlib detector data for the specified telescope.
+    """
     if telescope in ["SAT1", "SAT2", "SAT3", "LAT"]:
         try:
             import sotodlib.sim_hardware
@@ -97,7 +141,7 @@ def save_extended_final_maps(
         extended_final_maps[-2, mask_mpi_from_total_mask != 0] = final_Q_map.real
         extended_final_maps[-1, mask_mpi_from_total_mask != 0] = final_U_map.real
 
-    logger.info("Saving map into", path_output)
+    logger.info(f"Saving map into {path_output}")
     np.save(path_output, extended_final_maps[:, mask_mpi_from_total_mask != 0])
 
 

@@ -769,12 +769,12 @@ def save_partial_spin_maps(
     elif format_output == ".npy" or path_output.endswith(".npy"):
         if not path_output.endswith(".npy"):
             path_output = path_output + ".npy"
-        logger.info("Saving map into", path_output)
+        logger.info(f"Saving map into {path_output}")
         np.save(path_output, extended_final_maps[:, mask_on_full_map != 0])
     elif format_output == ".fits" or path_output.endswith(".fits"):
         if not path_output.endswith(".fits"):
             path_output = path_output + ".fits"
-        logger.info("Saving map into", path_output)
+        logger.info(f"Saving map into {path_output}")
 
         hp.write_map(path_output, extended_final_maps, overwrite=True)
 
@@ -785,7 +785,7 @@ def save_partial_spin_maps(
     ):
         if not (path_output.endswith(".hdf") or path_output.endswith(".hdf5")):
             path_output = path_output + ".hdf"
-        logger.info("Saving map into", path_output)
+        logger.info(f"Saving map into {path_output}")
 
         with h5py.File(path_output, "w") as hf:
             hf.create_dataset("maps", data=extended_final_maps)
