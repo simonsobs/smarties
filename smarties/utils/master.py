@@ -21,31 +21,38 @@ __all__ = [
 
 
 def filter_map_ell_cut(
-    input_map,
-    mask_apodized,
-    lmax_input_map,
-    ell_min=None,
-    ell_max=None,
-    return_alms=False,
-):
-    """Filter an enmap map with an ell cut (high-pass and/or low-pass).
+    input_map: enmap.ndmap,
+    mask_apodized: enmap.ndmap,
+    lmax_input_map: int,
+    ell_min: int = None,
+    ell_max: int = None,
+    return_alms: bool = False,
+) -> enmap.ndmap | tuple[enmap.ndmap, np.ndarray]:
+    """
+    Filter a map with an ell cut (high-pass and/or low-pass). 
+    The map needs to be provided in CAR pixelization. 
+    The filtering is done in harmonic space.
 
     Parameters
     ----------
-    input_map : enmap
-        Input enmap map to be filtered.
-    ell_min : float, optional
+    input_map : enmap.ndmap
+        Input map to be filtered.
+    mask_apodized : enmap.ndmap
+        Apodized mask to be applied to the input map.
+    lmax_input_map : int
+        Maximum ell value for the input map.
+    ell_min : int, optional
         Minimum ell value for high-pass filtering. If None, no high-pass filter is applied. Default is None.
-    ell_max : float, optional
+    ell_max : int, optional
         Maximum ell value for low-pass filtering. If None, no low-pass filter is applied. Default is None.
     return_alms : bool, optional
         If True, return the alms of the filtered map. Default is False.
 
     Returns
     -------
-    filtered_map : enmap
-        The filtered enmap map.
-    filtered_alms : array, optional
+    filtered_map : enmap.ndmap
+        The filtered output map.
+    filtered_alms : np.ndarray, optional
         The alms of the filtered map, returned if return_alms is True.
     """
 
@@ -53,11 +60,9 @@ def filter_map_ell_cut(
 
     filter_pass = np.ones(lmax_input_map + 1)
     if ell_min is not None:
-        lmin_filter = int(ell_min)
-        filter_pass[:lmin_filter] = 0
+        filter_pass[:ell_min] = 0
     if ell_max is not None:
-        lmax_filter = int(ell_max)
-        filter_pass[lmax_filter:] = 0
+        filter_pass[ell_max:] = 0
 
     alms_output_filtered_lmin = curvedsky.almxfl(alms_output, lfilter=filter_pass)
 
@@ -71,29 +76,41 @@ def filter_map_ell_cut(
 
 
 def uncouple_spectra_TT(
-    input_map,
-    mask_apodized,
-    lmax,
-    delta_ell,
-    input_map_2=None,
-):
-    """Compute the uncoupled power spectra in temperature of one enmap maps.
+    input_map: enmap.ndmap,
+    mask_apodized: enmap.ndmap,
+    lmax: int,
+    delta_ell: int,
+    input_map_2: enmap.ndmap = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Compute the uncoupled power spectra in temperature of the input maps, either auto-spectra or cross-spectra
+    if a second map is provided. The input maps need to be provided in CAR pixelization. 
+    The computation is done using the NaMaster library.
 
     Parameters
     ----------
-    input_map : enmap
-        First input enmap map.
-    mask_apodized : enmap
+    input_map : enmap.ndmap
+        First input map.
+    mask_apodized : enmap.ndmap
         Apodized mask to be applied to the maps.
+    lmax : int
+        Maximum multipole moment to consider.
     delta_ell : int
         Width of the bins for the power spectrum.
-    input_map2 : enmap
-        Second input enmap map.
+    input_map_2 : enmap.ndmap
+        Second input map (optional). If not provided, the auto-spectrum of the first map will be computed.
 
     Returns
     -------
-    binned_cls : array
-        Binned power spectra between the two maps.
+    ell_b : np.ndarray
+        Effective ell values for the binned power spectra.
+    binned_cls : np.ndarray
+        Binned decoupled power spectra.
+
+    Notes
+    -----
+    The NaMaster library needs to be installed to use this function, but is not 
+    installed by default with SMARTIES. Please refer to the NaMaster documentation for installation instructions.
     """
 
     try:
@@ -149,15 +166,47 @@ def uncouple_spectra_TT(
 
 
 def uncouple_spectra_pol(
-    input_map,
-    mask_apodized,
-    lmax,
-    delta_ell,
-    input_map_2=None,
-    purify_e=False,
-    purify_b=False,
-):
+    input_map: enmap.ndmap,
+    mask_apodized: enmap.ndmap,
+    lmax: int,
+    delta_ell: int,
+    input_map_2: enmap.ndmap = None,
+    purify_e: bool = False,
+    purify_b: bool = False,
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Compute the decoupled power spectra in polarization of the input maps, either auto-spectra or cross-spectra
+    if a second map is provided. The input maps need to be provided in CAR pixelization.
 
+    Parameters
+    ----------
+    input_map : enmap.ndmap
+        First input map.
+    mask_apodized : enmap.ndmap
+        Apodized mask to be applied to the maps.
+    lmax : int
+        Maximum multipole moment to consider.
+    delta_ell : int
+        Width of the bins for the power spectrum.
+    input_map_2 : enmap.ndmap, optional
+        Second input map. If not provided, the function will compute the auto-spectra of the first map.
+    purify_e : bool, optional
+        Whether to purify the E-mode polarization.
+    purify_b : bool, optional
+        Whether to purify the B-mode polarization.
+    
+    Returns
+    -------
+    ell_b : np.ndarray
+        Effective ell values for the binned decoupled power spectra.
+    binned_cls : np.ndarray
+        Binned decoupled power spectra.
+
+    Notes
+    -----
+    The NaMaster library needs to be installed to use this function, but is not 
+    installed by default with SMARTIES. Please refer to the NaMaster documentation for installation instructions.
+    """
     try:
         import pymaster as nmt
     except ImportError:
@@ -216,31 +265,43 @@ def uncouple_spectra_pol(
 
 
 def uncouple_cross_spectra(
-    input_map,
-    input_map_2,
-    mask_apodized,
-    lmax,
-    delta_ell,
-    purify_e=False,
-    purify_b=False,
-):
-    """Compute the uncoupled power spectra in temperature of one enmap maps.
+    input_map: enmap.ndmap,
+    input_map_2: enmap.ndmap,
+    mask_apodized: enmap.ndmap,
+    lmax: int,
+    delta_ell: int,
+    purify_e: bool = False,
+    purify_b: bool = False,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Compute the uncoupled power spectra in temperature of one maps.
 
     Parameters
     ----------
-    input_map : enmap
-        First input enmap map.
-    mask_apodized : enmap
+    input_map : enmap.ndmap
+        First input map.
+    input_map2 : enmap.ndmap
+        Second input map.
+    mask_apodized : enmap.ndmap
         Apodized mask to be applied to the maps.
+    lmax : int
+        Maximum multipole to be considered for the power spectrum estimation.
     delta_ell : int
         Width of the bins for the power spectrum.
-    input_map2 : enmap
-        Second input enmap map.
-
+    purify_e : bool, optional
+        If True, apply E-mode purification to the polarization maps. Default is False.
+    purify_b : bool, optional
+        If True, apply B-mode purification to the polarization maps. Default is False.
+    
     Returns
     -------
-    binned_cls : array
-        Binned power spectra between the two maps.
+    binned_cls : np.ndarray
+        Binned decoupled power spectra between the two maps.
+    
+    
+    Notes
+    -----
+    The NaMaster library needs to be installed to use this function, but is not 
+    installed by default with SMARTIES. Please refer to the NaMaster documentation for installation instructions.
     """
 
     try:
@@ -357,22 +418,24 @@ def uncouple_cross_spectra(
 
 
 def uncouple_spectra_all(
-    input_map,
-    mask_apodized,
-    lmax,
-    delta_ell,
-    purify_e=False,
-    purify_b=False,
-):
+    input_map: np.ndarray | enmap.ndmap,
+    mask_apodized: np.ndarray | enmap.ndmap,
+    lmax: int,
+    delta_ell: int,
+    purify_e: bool = False,
+    purify_b: bool = False,
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Compute the decoupled power spectra in temperature and polarization of input maps.
 
     Parameters
     ----------
-    input_map : enmap or np.ndarray
-        Input map to be analyzed, either in enmap format (expected to be in CAR pixelization) or in numpy array format (expected to be in HEALPIX pixelization). The first dimension of the input map should have three components (T, Q, U).
-    mask_apodized : enmap or np.ndarray
-        Apodized mask to be applied to the input map, either in enmap format (expected to be in CAR pixelization) or in numpy array format (expected to be in HEALPIX pixelization). The mask should have the same type and the same last dimensions as the input map.
+    input_map : enmap.ndmap or np.ndarray
+        Input map to be analyzed, either in CAR pixelization or in HEALPIX pixelization. 
+        The first dimension of the input map should have three components (T, Q, U).
+    mask_apodized : enmap.ndmap or np.ndarray
+        Apodized mask to be applied to the input map, either in CAR pixelization or in HEALPIX pixelization. 
+        The mask should have the same type and the same last dimensions as the input map.
     lmax : int
         Maximum multipole to be considered for the power spectrum estimation.
     delta_ell : int
@@ -384,10 +447,15 @@ def uncouple_spectra_all(
 
     Returns
     -------
-    ell_b : array
-        Effective ell values for the binned power spectra.
-    cl_coupled_00 : array
-        Decoupled TT power spectrum.
+    ell_b : np.ndarray
+        Effective ell values for the binned decoupled power spectra.
+    cl_coupled : np.ndarray
+        Decoupled binned power spectrum, with the ordering of the spectra being TT, EE, BB, TE, TB, EB, BE.
+
+    Notes
+    -----
+    The NaMaster library needs to be installed to use this function, but is not 
+    installed by default with SMARTIES. Please refer to the NaMaster documentation for installation instructions.
     """
 
     try:
@@ -465,12 +533,12 @@ def uncouple_spectra_all(
 
 
 def uncouple_spectra_pspy(
-    input_map,
-    mask_apodized,
-    lmax,
-    delta_ell,
-    input_map_2=None,
-    niter=0,
+    input_map: enmap.ndmap,
+    mask_apodized: enmap.ndmap,
+    lmax: int,
+    delta_ell: int,
+    input_map_2: enmap.ndmap = None,
+    niter: int = 0,
     spectra_ordering_output: list | None = [
         "TT",
         "TE",
@@ -484,24 +552,34 @@ def uncouple_spectra_pspy(
     ],
     type_output: str = "Cl",
     return_dictionary: bool = False,
-):
-    """Compute the uncoupled power spectra in temperature of one enmap maps.
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Compute the uncoupled power spectra in temperature and polarization of the input maps, either auto-spectra or cross-spectra
+    if a second map is provided. The input maps need to be provided in CAR pixelization. 
+    The computation is done using the pspy library.
 
     Parameters
     ----------
-    input_map : enmap
-        First input enmap map.
-    mask_apodized : enmap
+    input_map : enmap.ndmap
+        First input map.
+    mask_apodized : enmap.ndmap
         Apodized mask to be applied to the maps.
+    lmax : int
+        Maximum multipole to be considered for the power spectrum estimation.
     delta_ell : int
         Width of the bins for the power spectrum.
-    input_map2 : enmap
-        Second input enmap map.
+    input_map2 : enmap.ndmap, optional
+        Second input map.
 
     Returns
     -------
     binned_cls : array
         Binned power spectra between the two maps.
+    
+    Notes
+    -----
+    The pspy library needs to be installed to use this function, but is not 
+    installed by default with SMARTIES. Please refer to the pspy documentation for installation instructions.
     """
 
     try:
@@ -544,15 +622,6 @@ def uncouple_spectra_pspy(
     window = pspy.so_map.from_enmap(mask_apodized)
 
     window.data[:] = mask_apodized
-
-    # binning_scheme = nmt.NmtBin.from_lmax_linear(lmax, delta_ell)
-
-    # dict_ell_binning = {
-    #     'bin_lo': binning_scheme.get_effective_ells() - (binning_scheme.get_nell_list()-1) / 2,
-    #     'bin_hi': binning_scheme.get_effective_ells() + (binning_scheme.get_nell_list()-1) / 2,
-    #     'bin_c': binning_scheme.get_effective_ells(),
-    #     'bin_size': binning_scheme.get_nell_list()
-    # }
 
     binning_file = "binning.dat"
 

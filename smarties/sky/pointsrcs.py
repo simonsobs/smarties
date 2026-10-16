@@ -19,7 +19,7 @@ planck_constant = scipy.constants.h  # J.s
 light_speed = scipy.constants.c  # m/s
 
 
-def convert_flux_mJy_to_muK(flux_mJy, frequency, beam_fwhm):
+def convert_flux_mJy_to_muK(flux_mJy: float, frequency: float, beam_fwhm: float) -> float:
     """
     Convert flux density in mJy to temperature in K
     using the Rayleigh-Jeans approximation.
@@ -52,7 +52,8 @@ def convert_flux_mJy_to_muK(flux_mJy, frequency, beam_fwhm):
     return temperature * 1e6
 
 
-def get_coordinates_from_healpix_mask(mask, degree_output=True, nest=False):
+
+def get_coordinates_from_healpix_mask(mask: np.ndarray, degree_output: bool = True, nest: bool = False) -> tuple[float, float, float, float]:
     """
     Get the extremal coordinates of the pixels in a HEALPix mask,
     assuming a sqaure patch of the sky.
@@ -70,10 +71,18 @@ def get_coordinates_from_healpix_mask(mask, degree_output=True, nest=False):
 
     Returns
     -------
-    theta: np.ndarray
-        Array of theta coordinates in radians.
-    phi: np.ndarray
-        Array of phi coordinates in radians.
+    tuple[float, float, float, float]
+        Extremal coordinates of the pixels in the mask: (theta_min, theta_max, phi_min, phi_max).
+        If degree_output is True, the coordinates are in degrees. If False, they are in radians.
+        with:
+        theta_min: np.ndarray
+            Minimum of theta polar angle coordinates in radians.
+        theta_max: np.ndarray
+            Maximum of theta polar angle coordinates in radians.
+        phi_min: np.ndarray
+            Minimum of phi azimuthal coordinates in radians.
+        phi_max: np.ndarray
+            Maximum of phi azimuthal coordinates in radians.
     """
 
     npix = mask.shape[-1]
@@ -91,8 +100,8 @@ def get_coordinates_from_healpix_mask(mask, degree_output=True, nest=False):
 
 
 def generate_circular_profile_point_sources(
-    radius_max, fwhm_pointsrcs, n_points_profile=1000
-):
+    radius_max: float, fwhm_pointsrcs: float, n_points_profile: int = 1000
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Generate a circular profile for point sources.
 
@@ -119,18 +128,18 @@ def generate_circular_profile_point_sources(
         -(4 * np.log(2) * radius_profile**2) / (fwhm_pointsrcs**2)
     )
 
-    return [radius_profile * 1 / 60 * np.pi / 180, beam_point_source_profile]
+    return (radius_profile * 1 / 60 * np.pi / 180, beam_point_source_profile)
 
 
 def generate_point_source_map(
-    nside,
-    n_point_sources,
-    log_amplitude_pointsource_min=2.0,
-    log_amplitude_pointsource_max=5.0,
-    fwhm_pointsrcs=5.0,
-    mask=None,
-    return_CAR_map=False,
-):
+    nside: int,
+    n_point_sources: int,
+    log_amplitude_pointsource_min: float = 2.0,
+    log_amplitude_pointsource_max: float = 5.0,
+    fwhm_pointsrcs: float = 5.0,
+    mask: np.ndarray | None = None,
+    return_CAR_map: bool = False,
+) -> np.ndarray | enmap.ndmap:
     """
     Generate a point source map in HEALPix format.
 

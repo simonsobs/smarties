@@ -16,6 +16,9 @@ __all__ = [
 ]
 
 class Spin_nm(tuple):
+    """
+    Class to handle fundamental operations related to the spin numbers.
+    """
     def __neg__(self):
         return Spin_nm([-item for item in self.__iter__()])
 
@@ -29,6 +32,9 @@ class Spin_nm(tuple):
 class Spin_maps(dict):
     """
     Class to handle fundamental operations related to the spin maps.
+
+    The class can be defined from a dictionary, or from a list of maps and a list of spins. 
+    The keys of the dictionary are the spins, and the values are the corresponding maps.
 
     WARNNING: The wcs and shape attributes as 'shape_fullsky' and 'wcs_car' are
     not set and neither updated dynamically when creating the Spin_maps object,

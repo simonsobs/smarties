@@ -17,10 +17,29 @@ __all__ = [
 
 
 def _ducc_dictionary(
-        spin,
-        nside,
-        lmax,
-        mmax=None):
+        spin: int,
+        nside: int,
+        lmax: int,
+        mmax: int = None) -> dict:
+    """
+    Create a dictionary of parameters for ducc0 SHT functions.
+
+    Parameters
+    ----------
+    spin : int
+        Spin of the spherical harmonics.
+    nside : int
+        HEALPix nside parameter.
+    lmax : int
+        Maximum multipole moment.
+    mmax : int, optional
+        Maximum order of the spherical harmonics. If None, defaults to lmax.
+
+    Returns
+    -------
+    dict
+        Dictionary containing the parameters for ducc0 healpix SHT functions.
+    """
 
     ducc_healpix_obj = ducc0.healpix.Healpix_Base(nside, 'RING')
     if mmax is None:
@@ -33,7 +52,17 @@ def _ducc_dictionary(
               **ducc_healpix_obj.sht_info()
     }
 
-def _alm2map_ducc0(alms, spin, nside, lmax=None, mmax=None, nthreads=-1):
+def _alm2map_ducc0(
+    alms: np.ndarray, 
+    spin: int, 
+    nside: int, 
+    lmax: int = None, 
+    mmax: int = None, 
+    nthreads: int = -1
+) -> np.ndarray:
+    """
+    Perform spherical harmonic synthesis using ducc0, to produce healpix maps from spherical harmonic coefficients.
+    """
 
     if nthreads < 0:
         nthreads = process_cpu_count()
@@ -62,7 +91,16 @@ def _alm2map_ducc0(alms, spin, nside, lmax=None, mmax=None, nthreads=-1):
     return maps
 
 
-def _map2alm_ducc0(maps, spin, lmax=None, mmax=None, nthreads=-1):
+def _map2alm_ducc0(
+    maps: np.ndarray, 
+    spin: int, 
+    lmax: int = None, 
+    mmax: int = None, 
+    nthreads: int = -1
+) -> np.ndarray:
+    """
+    Perform spherical harmonic analysis using ducc0, from healpix maps. 
+    """
 
     nside = hp.npix2nside(maps.shape[-1])
 
@@ -88,7 +126,35 @@ def _map2alm_ducc0(maps, spin, lmax=None, mmax=None, nthreads=-1):
     )
     return alm
 
-def map2alm_ducc0_iter(maps, spin, lmax=None, mmax=None, niter=3):
+def map2alm_ducc0_iter(
+    maps: np.ndarray, 
+    spin: int, 
+    lmax: int = None, 
+    mmax: int = None, 
+    niter: int = 3
+) -> np.ndarray:
+    """
+    Perform spherical harmonic analysis using ducc0 with iterative refinement,
+    for healpix maps. 
+
+    Parameters
+    ----------
+    maps : np.ndarray
+        Input map(s) in HEALPix format.
+    spin : int
+        Spin of the spherical harmonics.
+    lmax : int, optional
+        Maximum multipole moment. If None, defaults to 3*nside-1.
+    mmax : int, optional
+        Maximum order of the spherical harmonics. If None, defaults to lmax.
+    niter : int, optional
+        Number of iterations for refinement. Default is 3.
+
+    Returns
+    -------
+    np.ndarray
+        Spherical harmonic coefficients (alm) corresponding to the input map(s).
+    """
     nside = hp.npix2nside(maps.shape[-1]) if type(maps) != enmap.ndmap else None
 
     alms_output = _map2alm_ducc0(maps, spin=spin, lmax=lmax, mmax=mmax)
@@ -99,13 +165,38 @@ def map2alm_ducc0_iter(maps, spin, lmax=None, mmax=None, niter=3):
     return alms_output
 
 def map2alm_anypix(
-        maps,
-        spin,
-        niter=0,
-        lmax=None,
-        mmax=None,
-        shape_car=None
-    ):
+        maps: np.ndarray | enmap.ndmap,
+        spin: int,
+        niter: int = 0,
+        lmax: int = None,
+        mmax: int = None,
+        shape_car: tuple | None = None
+    ) -> np.ndarray:
+    """
+    Performs map2alm to retrieve SHT coefficients from pixel map, independant
+    of the input pixelization (either CAR or HEALPIX).
+
+    Parameters
+    __________
+    maps: np.ndarray | enmap.ndmap
+        Pixel map from which the SHT coefficients will be computed, can be either 
+        a CAR map (enmap.ndmap) or a HEALPIX map (np.ndarray).
+    spin: int
+        Input spin in terms of spin-weighted spherical harmonics
+    niter: int
+        Number of iterations for refinement (only used for HEALPIX maps)
+    lmax: int
+        Maximum multipole moment
+    mmax: int
+        Maximum order of the spherical harmonics
+    shape_car: tuple | None
+        Shape of the CAR map (only used for CAR maps, if flattened), if None, the shape of the input map will be used.
+
+    Returns
+    -------
+    np.ndarray
+        Spherical harmonic coefficients (alm) corresponding to the input map(s).
+    """
     if type(maps) == enmap.ndmap:
         # CAR pixelization expected
         if shape_car is not None:
@@ -132,13 +223,13 @@ def map2alm_anypix(
         )
 
 def alm2map_anypix(
-        alms,
-        spin,
-        shape_pixels_output,
-        map_output=None,
-        lmax=None,
-        mmax=None,
-):
+        alms: np.ndarray,
+        spin: int,
+        shape_pixels_output: tuple | int,
+        map_output: enmap.ndmap | None = None,
+        lmax: int | None = None,
+        mmax: int | None = None,
+) -> np.ndarray | enmap.ndmap:
     """
     Performs alm2map to retrieve pixel map from SHT coefficients, independant
     of the expected output pixelization (either CAR or HEALPIX).
@@ -154,6 +245,19 @@ def alm2map_anypix(
         Pixel shape of the output pixel map (only the last dimensions of the output),
         the parameter can be either an int or 1d tuple representing an HEALPIX map,
         or a 2d tuple representing a CAR map.
+    map_output: enmap.ndmap | None
+        Output map to which the pixel map will be written, only used for CAR maps and
+        need to be provided if the output pixelization is CAR, otherwise it should be None.
+    lmax: int | None
+        Maximum multipole moment 
+    mmax: int | None
+        Maximum order of the spherical harmonics 
+
+    Returns
+    -------
+    np.ndarray | enmap.ndmap
+        Pixel map corresponding to the input SHT coefficients, either in CAR or 
+        HEALPIX pixelization depending on the input parameters.
     """
 
     if map_output is not None:
@@ -190,8 +294,9 @@ def alm2map_anypix(
 
 def convert_alm_plusminus_to_spin(
     alm_plus: np.ndarray, alm_minus: np.ndarray, spin: int = 2
-):
-    """Convert +/- basis alms coefficients to spin-weighted alms.
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Convert +/- basis alms coefficients to spin-weighted alms.
 
     Parameters
     ----------
@@ -217,8 +322,9 @@ def convert_alm_plusminus_to_spin(
 
 def convert_alm_spin_to_plusminus(
     alm_pos_spin: np.ndarray, alm_neg_spin: np.ndarray, spin: int = 2
-):
-    """Convert spin-weighted alms coefficients to the +/- basis.
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Convert spin-weighted alms coefficients to the +/- basis.
 
     Parameters
     ----------
@@ -238,9 +344,11 @@ def convert_alm_spin_to_plusminus(
     alm_plus = -1 * (alm_pos_spin + (-1) ** (spin) * alm_neg_spin) / (2)
     alm_minus = -1 * (alm_pos_spin - (-1) ** (spin) * alm_neg_spin) / (2j)
     return alm_plus, alm_minus
-def almxfl(alm:np.ndarray,fl:np.ndarray,mmax:int|None=None):
+
+def almxfl(alm:np.ndarray, fl:np.ndarray, mmax:int|None=None) -> np.ndarray:
     """
     Multiply alm by a function of ell, f(ell)
+
     Parameters
     ----------
     alm : array_like
@@ -249,10 +357,16 @@ def almxfl(alm:np.ndarray,fl:np.ndarray,mmax:int|None=None):
         Function of ell to multiply the alm by.
     mmax : int
         Maximum m of the alm array, if None assumes mmax=lmax.
+
     Returns
     -------
     array_like
         Output alm array after multiplication.
+    
+    Notes
+    -----
+    This function mimics the behavior of healpy's almxfl, but uses numba for parallel processing,
+    and allowing the alms to be kept in single-precision or double-precision, depending on the input alm type.
     """
     lmax= hp.Alm.getlmax(alm.size,mmax)
     assert lmax != -1, "Invalid alm size for given mmax"
@@ -268,7 +382,10 @@ def almxfl(alm:np.ndarray,fl:np.ndarray,mmax:int|None=None):
 
 
 @njit(parallel=True)
-def _compute_almxfl_prange(alm,alm_out, fl,flsize,lmax, mmax):
+def _compute_almxfl_prange(alm: np.ndarray, alm_out: np.ndarray, fl: np.ndarray, flsize: int, lmax: int, mmax: int) -> np.ndarray:
+    """
+    Multiply alm by a function of ell, f(ell) using parallel processing.
+    """
     for m in prange(mmax+ 1): # type: ignore[not-iterable]
 
         idx_m=m * (2 * lmax + 1 - m) // 2

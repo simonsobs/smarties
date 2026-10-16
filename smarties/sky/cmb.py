@@ -14,23 +14,23 @@ __all__ = ["generate_power_spectra_CAMB", "generate_CMB_map", "create_CMB_spin_m
 
 
 def generate_power_spectra_CAMB(
-    lmax,
-    r=0,
-    Alens=1,
-    H0=67.5,
-    ombh2=0.022,
-    omch2=0.122,
-    mnu=0.06,
-    omk=0,
-    tau=0.06,
-    ns=0.965,
-    As=2e-9,
-    lens_potential_accuracy=1,
-    nt=0,
-    ntrun=0,
-    type_power="total",
-    typeless_bool=False,
-):
+    lmax: int,
+    r: float =0,
+    Alens: float =1,
+    H0: float =67.5,
+    ombh2: float =0.022,
+    omch2: float =0.122,
+    mnu: float =0.06,
+    omk: float =0,
+    tau: float =0.06,
+    ns: float =0.965,
+    As: float =2e-9,
+    lens_potential_accuracy: int =1,
+    nt: float =0,
+    ntrun: float =0,
+    type_power: str = "total",
+    typeless_bool: bool =False,
+) -> dict | np.ndarray:
     """
     Generate power spectra from CAMB
     Return [Cl^TT, Cl^EE, Cl^BB, Cl^TE]
@@ -66,7 +66,7 @@ def generate_power_spectra_CAMB(
     ntrun: float
         tensor running index
     type_power: str
-        type of power spectra to return
+        type of power spectra to return, can be 'total', 'unlensed_scalar', 'lensed_scalar', 'tensor', 'lens_potential'
     typeless_bool: bool
         return the full power spectra if True, otherwise only the power spectrum of type type_power
 
@@ -117,9 +117,23 @@ def generate_power_spectra_CAMB(
     return powers[type_power][: lmax + 1, :]
 
 
-def generate_CMB_map(nside, lmax, seed=42):
+def generate_CMB_map(nside: int, lmax: int, seed: int=42) -> np.ndarray:
     """
     Returns CMB maps generated with CAMB
+
+    Parameters
+    ----------
+    nside: int
+        HEALPix nside parameter.
+    lmax: int
+        Maximum multipole moment.
+    seed: int
+        Seed for the random generation of the CMB maps.
+
+    Returns
+    -------
+    cmb_map: np.ndarray
+        CMB map in HEALPix format, with shape (3, npix). 
     """
 
     # Generating the CMB power spectra
@@ -130,14 +144,16 @@ def generate_CMB_map(nside, lmax, seed=42):
     return hp.synfast(all_spectra, nside, lmax=lmax, new=True)
 
 
-def create_CMB_spin_maps(nside, nstokes, lmax, fwhm=0.0, seed=42):
+
+
+def create_CMB_spin_maps(nside: int, nstokes: int, lmax: int, fwhm: float = 0.0, seed: int = 42) -> Spin_maps:
     """
     Create spin maps for the CMB contribution, the $\Tilde{S}_k$ maps, defined
     as
         $\Tilde{S}_0 = I$
         $\Tilde{S}_2 = \frac{1}{2} (Q + iU)$
         $\Tilde{S}_{-2} = \frac{1}{2} (Q - iU)$
-    by generating them from CAMB
+    by generating them from CAMB, and smoothing them with a Gaussian beam of fwhm arcmin.
 
     Parameters
     ----------

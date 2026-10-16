@@ -6,7 +6,7 @@ import logging
 
 import healpy as hp
 import numpy as np
-from pixell import enmap
+from pixell import enmap, wcsutils
 
 from smarties.hn import Spin_maps
 from smarties.utils.harmonics import (
@@ -29,7 +29,7 @@ def gaussian_circular_beam_blms(
     mmax: int,
     pol_angle_rad: float | None = None,
     single_precision: bool = False
-):
+) -> np.ndarray:
     """Compute harmonic coefficients of a circular Gaussian beam.
     Uses the analytic Gaussian beam coefficients from Challinor et al. (2000,
     astro-ph/0008228), includes the polarization-angle phase factor in the blms.
@@ -105,11 +105,11 @@ def get_beam_convolution_spins_maps(
     fwhm: np.ndarray | None = None,
     pol_angles_rad: np.ndarray | None = None,
     spins: np.ndarray | None = None,
-    wcs=None,
+    wcs: wcsutils.WCS = None,
     substract_gaussian_beam=False,
     single_precision: bool = False,
     return_only_positive_spins: bool = True
-):
+) -> Spin_maps:
     """Compute systematic spin maps from sky and beam harmonic coefficents.
 
     For each detector, this subtracts a symmetric Gaussian beam (computed from
@@ -146,7 +146,7 @@ def get_beam_convolution_spins_maps(
     Returns
     -------
     dict[int, np.ndarray]
-        Spin -> complex maps of shape ``(n_det, npix)``.
+        Spin -> complex maps of shape ``(n_det, npix)``, either in healpix or CAR pixelization depending on the ``wcs`` parameter.
     """
     n_det = len(det_names)
     if spins is None:

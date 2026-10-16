@@ -22,7 +22,7 @@ Routines taken from s4cmb and readapted including diverse tools to manipulate al
 
 import healpy as hp
 import numpy as np
-from pixell import enmap
+from pixell import enmap, wcsutils
 
 from smarties.utils.harmonics import alm2map_anypix, map2alm_anypix
 
@@ -41,12 +41,14 @@ __all__ = [
 ]
 
 
-def get_healpix_ring_pixel_layout(nside, th_idx):
+def get_healpix_ring_pixel_layout(nside: int, th_idx: int) -> tuple[int, int, int, float, float]:
     """Healpix ring layout.
 
     From 'get_pixel_layout' subroutine in healpix f90 package.
+    Given an nside and the ring index, returns the starting pixel number, 
+    number of pixels in the ring, starting pixel number in the ring, cosine and sine of the theta polar angle.
 
-    Author: Julien Carron (j.carron@sussex.ac.uk)
+    Original author: Julien Carron (j.carron@sussex.ac.uk)
 
     Parameters
     ----------
@@ -94,7 +96,23 @@ def get_healpix_ring_pixel_layout(nside, th_idx):
     return startpix, nphi, kphi0, cth, sth
 
 
-def get_car_ring_layout(shape, wcs):
+def get_car_ring_layout(shape: tuple[int], wcs: wcsutils.WCS) -> tuple[np.ndarray, np.ndarray]:
+    """Get the layout of the CAR pixelization, returning the cosine and sine of the theta polar angle for each pixel.
+
+    Parameters
+    ----------
+    shape : tuple[int]
+        Shape of the CAR map (ny, nx).
+    wcs : wcsutils.WCS
+        WCS object for the CAR map.
+
+    Returns
+    -------
+    cth : np.ndarray
+        Cosine of the polar angle for each pixel.
+    sth : np.ndarray
+        Sine of the polar angle for each pixel.
+    """
     pixel_coordinates_th = (
         np.pi / 2
         - enmap.pix2sky(
@@ -110,12 +128,35 @@ def get_car_ring_layout(shape, wcs):
 
 
 def compute_phi_1st_derivative(
-    input_map,
-    spin_derivatives_dict,
-    input_spin,
-    shape_pixels_output=None,
-    zbounds=(-1.0, 1.0),
-):
+    input_map: np.ndarray | enmap.ndmap,
+    spin_derivatives_dict: dict[int, np.ndarray],
+    input_spin: int,
+    shape_pixels_output: tuple[int, int] | None = None,
+    zbounds: tuple[float, float] = (-1.0, 1.0),
+) -> np.ndarray | enmap.ndmap:
+    """
+    Compute the first derivative of the input map with respect to phi, using the spin-raising and spin-lowering operators.
+
+    Parameters
+    ----------
+    input_map : np.ndarray | enmap.ndmap
+        Input map in either CAR or HEALPIX format.
+    spin_derivatives_dict : dict
+        Dictionary containing the spin derivatives of the input map:
+        * 'input_spin + 1': map after application of the spin-raising operator on the input map
+        * 'input_spin - 1': map after application of the spin-lowering operator on the input map
+    input_spin : int
+        The spin of the input map.
+    shape_pixels_output : tuple[int], optional
+        Shape of the output map in pixels (ny, nx). If None, it will be inferred from the input_map.
+    zbounds : tuple[float], optional
+        The bounds for the z-coordinate (cosine of the polar angle) to consider (default to full sky).
+
+    Returns
+    -------
+    spherical_derivatives_phi : np.ndarray | enmap.ndmap
+        The first derivative of the input map with respect to phi.
+    """
     if type(input_map) == enmap.ndmap:
         if input_map.ndim == 1:
             assert len(shape_pixels_output) == 2, (
@@ -166,13 +207,42 @@ def compute_phi_1st_derivative(
 
 
 def compute_phi_2nd_derivatives(
-    input_map,
-    spin_derivatives_dict,
-    spherical_derivatives_dict,
-    input_spin,
-    shape_car=None,
-    zbounds=(-1.0, 1.0),
-):
+    input_map: np.ndarray | enmap.ndmap,
+    spin_derivatives_dict: dict[int, np.ndarray],
+    spherical_derivatives_dict: dict[str, np.ndarray],
+    input_spin: int,
+    shape_car: tuple[int, int] | None = None,
+    zbounds: tuple[float, float] = (-1.0, 1.0),
+) -> tuple[np.ndarray, np.ndarray] | tuple[enmap.ndmap, enmap.ndmap]:
+    """
+    Compute the second derivatives of the input map with respect to phi, using the spin-raising and spin-lowering operators.
+
+    Parameters
+    ----------
+    input_map : np.ndarray | enmap.ndmap
+        Input map in either CAR or HEALPIX format.
+    spin_derivatives_dict : dict
+        Dictionary containing the spin derivatives of the input map:
+        * 'input_spin + 2': map after double application of the spin-raising operator on the input map
+        * 'input_spin - 2': map after double application of the spin-lowering operator on the input map
+    spherical_derivatives_dict : dict
+        Dictionary containing the spherical derivatives of the input map:
+        * 'theta': first derivative of the input map with respect to theta
+        * 'phi': first derivative of the input map with respect to phi
+    input_spin : int
+        The spin of the input map.
+    shape_car : tuple[int], optional
+        Shape of the output map in pixels (ny, nx). If None, it will be inferred from the input_map.
+    zbounds : tuple[float], optional
+        The bounds for the z-coordinate (cosine of the polar angle) to consider (default to full sky).
+
+    Returns
+    -------
+    spherical_derivatives_theta_phi : np.ndarray | enmap.ndmap
+        The second derivative of the input map with respect to theta and phi.
+    spherical_derivatives_phi_phi : np.ndarray | enmap.ndmap
+        The second derivative of the input map with respect to phi.
+    """
     spherical_derivatives_theta_phi = (
         -0.25
         * 1j
@@ -248,27 +318,30 @@ def compute_phi_2nd_derivatives(
 
 
 def multiply_tan_theta_power(
-    input_map,
-    power=-1,
-    zbounds=(-1.0, 1.0),
-    shape_car=None,
-):
+    input_map: np.ndarray | enmap.ndmap,
+    power: int = -1,
+    zbounds: tuple[float, float] = (-1.0, 1.0),
+    shape_car: tuple[int, int] | None = None,
+) -> np.ndarray | enmap.ndmap:
     """
     Function to multiply the input map by (tan(theta))**power.
 
     Parameters
     ----------
-    input_map : np.ndarray
-        Input map in healpix format.
-    nside : int
-        Healpix nside parameter.
+    input_map : np.ndarray | enmap.ndmap
+        Input map in either CAR or HEALPIX format.
     power : int
         Power of the tan(theta) factor to multiply the input map.
+    zbounds : tuple[float], optional
+        The bounds for the z-coordinate (cosine of the polar angle) to consider (default to full sky).
+    shape_car : tuple[int], optional
+        Shape of the output map in pixels (ny, nx), if the input_map is in CAR format. 
+        If None, it will be inferred from the input_map.
 
     Returns
     -------
-    output_map : np.ndarray
-        Output map in healpix format after multiplication by (tan(theta))**power.
+    output_map : np.ndarray | enmap.ndmap
+        Output map after multiplication by (tan(theta))**power.
     """
 
     output_map = input_map.copy()
@@ -309,14 +382,15 @@ def multiply_tan_theta_power(
     return output_map
 
 
-def get_alpha_raise(s, lmax):
+
+def get_alpha_raise(spin: int, lmax: int) -> np.ndarray:
     """Response coefficient of spin-s spherical harmonic to spin raising operator.
 
     Author: Julien Carron (j.carron@sussex.ac.uk)
 
     Parameters
     ----------
-    s : int
+    spin : int
         Input spin of the spherical harmonic.
     lmax : int
         Maximum multipole moment.
@@ -329,25 +403,26 @@ def get_alpha_raise(s, lmax):
     Notes
     -----
     The response coefficient is defined as:
-        alpha(s, l) = sqrt((l - s) * (l + s + 1))
-    where l is the multipole moment.
-    The response coefficient is zero for l < |s|.
+        alpha(spin, ell) = sqrt((ell - spin) * (ell + spin + 1))
+    where ell is the multipole moment.
+    The response coefficient is zero for ell < |spin|.
     """
     ret = np.zeros(lmax + 1, dtype=float)
-    ret[abs(s) :] = np.sqrt(
-        np.arange(abs(s) - s, lmax - s + 1) * np.arange(abs(s) + s + 1, lmax + s + 2)
+    ret[abs(spin) :] = np.sqrt(
+        np.arange(abs(spin) - spin, lmax - spin + 1) * np.arange(abs(spin) + spin + 1, lmax + spin + 2)
     )
     return ret
 
 
-def get_alpha_lower(s, lmax):
+
+def get_alpha_lower(spin: int, lmax: int) -> np.ndarray:
     """Response coefficient of spin-s spherical harmonic to spin lowering operator.
 
     Author: Julien Carron (j.carron@sussex.ac.uk)
 
     Parameters
     ----------
-    s : int
+    spin : int
         Input spin of the spherical harmonic.
     lmax : int
         Maximum multipole moment.
@@ -360,20 +435,23 @@ def get_alpha_lower(s, lmax):
     Notes
     -----
     The response coefficient is defined as:
-        alpha(s, l) = sqrt((l + s) * (l - s + 1))
-    where l is the multipole moment.
-    The response coefficient is zero for l < |s|.
+        alpha(spin, ell) = sqrt((ell + spin) * (ell - spin + 1))
+    where ell is the multipole moment.
+    The response coefficient is zero for ell < |spin|.
     """
     ret = np.zeros(lmax + 1, dtype=float)
-    ret[abs(s) :] = -np.sqrt(
-        np.arange(s + abs(s), lmax + s + 1) * np.arange(abs(s) - s + 1, lmax - s + 2)
+    ret[abs(spin) :] = -np.sqrt(
+        np.arange(spin + abs(spin), lmax + spin + 1) * np.arange(abs(spin) - spin + 1, lmax - spin + 2)
     )
     return ret
 
 
 def get_first_spin_derivative(
-    grad_curl_alms, shape_pixels_output, input_spin, wcs=None
-):
+    grad_curl_alms: list[np.ndarray], 
+    shape_pixels_output: tuple, 
+    input_spin: int, 
+    wcs=None
+) -> dict[int, np.ndarray | enmap.ndmap]:
     """
     Function to obtain the maps after applying the spin-raising and spin-lowering operators on the input alms of arbitrary spin.
 
@@ -383,8 +461,8 @@ def get_first_spin_derivative(
         List of two arrays containing the grad and curl parts of the spherical harmonic coefficients.
         grad_curl_alms[0] is the grad part and grad_curl_alms[1] is the curl part, and the last dimension is the healpix ordering
         of the alms.
-    nside : int
-        Healpix nside parameter.
+    shape_pixels_output : tuple or int
+        Pixel shape of the output pixel map.
     input_spin : int
         Input spin of the spherical harmonic coefficients grad_curl_alms.
 
@@ -392,8 +470,8 @@ def get_first_spin_derivative(
     -------
     dictionary_spin_derivative : dict
         Dictionary containing the spin-s transform of the input spherical harmonic with keys being:
-        * '1': map after application of the spin-raising operator on the input alms
-        * '-1': map after application of the spin-lowering operator on the input alms
+        * input_spin + 1: map after application of the spin-raising operator on the input alms
+        * input_spin + -1: map after application of the spin-lowering operator on the input alms
 
     """
 
@@ -451,8 +529,11 @@ def get_first_spin_derivative(
 
 
 def get_second_spin_derivative(
-    grad_curl_alms, shape_pixels_output, input_spin, wcs=None
-):
+    grad_curl_alms: list[np.ndarray], 
+    shape_pixels_output: tuple, 
+    input_spin: int, 
+    wcs: wcsutils.WCS | None = None
+) -> dict[int, np.ndarray | enmap.ndmap]:
     """
     Function to obtain the maps after applying any combination of two applications of the spin-raising and spin-lowering operators on the input alms of arbitrary spin.
 
@@ -460,19 +541,20 @@ def get_second_spin_derivative(
     ----------
     grad_curl_alms : list of np.ndarray
         List of two arrays containing the grad and curl parts of the spherical harmonic coefficients.
-        grad_curl_alms[0] is the grad part and grad_curl_alms[1] is the curl part, and the last dimension is the healpix ordering
-        of the alms.
-    nside : int
-        Healpix nside parameter.
+        grad_curl_alms[0] is the grad part and grad_curl_alms[1] is the curl part
+    shape_pixels_output : tuple
+        Pixel shape of the output pixel map.
     input_spin : int
         Input spin of the spherical harmonic coefficients grad_curl_alms.
+    wcs : wcsutils.WCS, optional
+        WCS object for the output map. If None, the output will be in HEALPIX format.
 
     Returns
     -------
     dictionary_spin_derivative : dict
         Dictionary containing the spin-s transform of the input spherical harmonic with keys being:
-        * '2': map after application of two spin-raising operator on the input alms
-        * '-2': map after application of two spin-lowering operator on the input alms
+        * input_spin + 2: map after application of two spin-raising operator on the input alms
+        * input_spin + -2: map after application of two spin-lowering operator on the input alms
         * '+1-1': map after application of the spin-raising then the spin-lowering operators on the input alms
         * '-1+1': map after application of the spin-lowering then the spin-raising operators on the input alms
 
@@ -614,23 +696,29 @@ def get_second_spin_derivative(
 
 
 def get_first_spherical_derivatives_from_spin_derivatives(
-    input_map,
-    spin_derivatives_dict,
-    shape_pixels_output,
-    input_spin,
-    zbounds=(-1.0, 1.0),
-):
+    input_map: np.ndarray | enmap.ndmap,
+    spin_derivatives_dict: dict[int, np.ndarray | enmap.ndmap],
+    shape_pixels_output: tuple,
+    input_spin: int,
+    zbounds: tuple[float, float] = (-1.0, 1.0),
+) -> dict[str, np.ndarray | enmap.ndmap]:
     """
     Function to obtain the spherical derivatives from the spin derivatives.
 
     Parameters
     ----------
+    input_map : np.ndarray | enmap.ndmap
+        Input map in either CAR or HEALPIX format.
     spin_derivatives_dict : dict
         Dictionary containing the spin-s transform of the input spherical harmonic with keys being:
-        * '1': map after application of the spin-raising operator on the input alms
-        * '-1': map after application of the spin-lowering operator on the input alms
+        * input_spin + 1: map after application of the spin-raising operator on the input alms
+        * input_spin - 1: map after application of the spin-lowering operator on the input alms
+    shape_pixels_output : tuple
+        Pixel shape of the output pixel map.
     input_spin : int
         Input spin of the spherical harmonic coefficients grad_curl_alms.
+    zbounds : tuple[float, float], optional
+        The bounds for the z-coordinate (cosine of the polar angle) to consider (default to full sky).
 
     Returns
     -------
@@ -668,38 +756,55 @@ def get_first_spherical_derivatives_from_spin_derivatives(
 
 
 def get_second_spherical_derivatives_from_spin_derivatives(
-    input_map,
-    spin_derivatives_dict,
-    shape_pixels_output,
-    input_spin,
-    lmax,
-    zbounds=(-1.0, 1.0),
+    input_map: np.ndarray | enmap.ndmap,
+    spin_derivatives_dict: dict,
+    shape_pixels_output: tuple,
+    input_spin: int,
+    lmax: int,
+    zbounds: tuple[float, float] = (-1.0, 1.0),
     spherical_derivatives_dict: dict = dict(),
-    niter=10,
-):
+    niter: int =10,
+) -> dict[str, np.ndarray | enmap.ndmap]:
     """
     Function to obtain the spherical derivatives from the spin derivatives.
 
     Parameters
     ----------
-
+    input_map : np.ndarray | enmap.ndmap
+        Input map in either CAR or HEALPIX format.
     spin_derivatives_dict : dict
         Dictionary containing the spin-s transform of the input spherical harmonic with keys being:
-        * '2': map after application of two spin-raising operator on the input alms
-        * '-2': map after application of two spin-lowering operator on the input alms
+        * input_spin+2: map after application of two spin-raising operator on the input alms
+        * input_spin-2: map after application of two spin-lowering operator on the input alms
         * '+1-1': map after application of the spin-raising then the spin-lowering operators on the input alms
         * '-1+1': map after application of the spin-lowering then the spin-raising operators on the input alms
+        If spherical_derivatives_dict is not provided, then spin_derivatives_dict will recompute the keys
+        input_spin+2 and input_spin-2, which are needed for the second derivatives.
+    shape_pixels_output : tuple
+        Pixel shape of the output pixel map.
     input_spin : int
         Input spin of the spherical harmonic coefficients grad_curl_alms.
+    lmax : int
+        Maximum multipole moment.
+    zbounds : tuple[float, float], optional
+        The bounds for the z-coordinate (cosine of the polar angle) to consider (default to full sky).
+    spherical_derivatives_dict : dict, optional
+        Dictionary containing the spherical derivatives with keys being:
+        * 'theta': first derivative with respect to theta
+        * 'phi': first derivative with respect to phi (including factor 1/sin(theta))
+        If not provided, it will be computed from the input map. 
+    niter : int, optional
+        Number of iterations for the map2alm function (default is 10, only relevant for healpix).
 
     Returns
     -------
     spherical_derivatives_dict : dict
-        Dictionary containing the spherical derivatives with keys being:
+        The same dictionary spherical_derivatives_dict as the input,
+        but with additional keys for the second derivatives, containing the spherical derivatives with keys being:
         * 'theta_theta': second derivative with respect to theta
         * 'phi_phi': second derivative with respect to phi (including factor 1/sin^2(theta))
         * 'theta_phi': mixed second derivative with respect to theta and phi (including factor 1/sin(theta))
-        * 'phi': first derivative with respect to phi (including factor 1/sin(theta))
+        * 'phi': first derivative with respect to phi (including factor 1/sin(theta)) 
         * 'theta': first derivative with respect to theta
     """
 

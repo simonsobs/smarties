@@ -26,19 +26,20 @@ __all__ = [
     'create_dict_template_differential_ellipticity_BICEP'
 ]
 def _build_central_term_differential_ellipticity_BICEP(
-        intensity_sky_map,
-        lmax=None,
-        mask=None,
-        spherical_derivatives=None,
-        shape_car=None,
-        shape_fullsky_car=None
-    ):
+        intensity_sky_map: np.ndarray | enmap.ndmap,
+        lmax: int | None = None,
+        mask: np.ndarray | enmap.ndmap | None = None,
+        spherical_derivatives: dict[str, np.ndarray] | None = None,
+        shape_car: tuple[int, int] | None = None,
+        shape_fullsky_car: tuple[int, int] | None = None
+    ) -> np.ndarray | enmap.ndmap:
     """
-    Get the differential ellipticity maps for a given intensity sky map and 
-    ellipticity parameters using BICEP templates as described in the formalism 
-    described in BICEP2 III: INSTRUMENTAL SYSTEMATICS, arXiv:1502.00608, with 
-    the derivatives being computed directly from the spherical derivatives of 
-    the provided intensity sky map. 
+    Get the central term of the differential ellipticity maps for a given intensity sky map,
+    defined by:
+    central_term = (d^2 I / d phi^2 - d^2 I / d theta^2) - i * (1/sin^2(theta) * dI/dphi - 2 * d^2 I / d theta d phi)
+
+    where the derivatives are computed from the spherical derivatives of the provided intensity sky map,
+    and which is independent of the ellipticity parameters, and can be used to compute the differential ellipticity maps for any set of ellipticity parameters.
     
     Parameters
     ----------
@@ -46,15 +47,6 @@ def _build_central_term_differential_ellipticity_BICEP(
         Full sky intensity sky map assumed to be already convolved with Gaussian 
         circularly-symmetric beam of the parameter sigma_FWHP, the output maps 
         will have the same dimension
-    ellipticity: dict
-        Dictionary of the ellipticity parameters provided for each detector, see
-        must contain keys 'ellipticity_parameter_convention', see the function
-        `convert_ellipticities_conventions` in `tools.py` for more details
-    sigma_fwhm: np.ndarray | float
-        Full width at half maximum of the beam in arcmin, provided for each detector
-        or as a float, assumed to have been used to compute the circularly-symmetric 
-        beam smoothing the intensity_sky_map map, and around which the Taylor expansion 
-        of the beam ellipticity is performed in the BICEP formalism
     lmax: int (optional)
         Maximum multipole for the computation of the spin derivatives of the intensity sky map
     mask: np.ndarray (optional)
@@ -69,6 +61,11 @@ def _build_central_term_differential_ellipticity_BICEP(
         sky map using the spin-derivative formalism. If provided, they will be 
         used directly to compute the differential ellipticity maps, which can 
         save time if multiple systematics maps are computed from the same intensity sky map.
+    shape_car: tuple[int, int], optional
+        Shape of the output CAR map, if the intensity_sky_map is provided as an enmap.ndmap.
+    shape_fullsky_car: tuple[int, int], optional
+        Shape of the full sky CAR map, if the intensity_sky_map is provided as an enmap.ndmap.
+
     Returns
     -------
     differential_ellipticity_spin_maps: dictionary
@@ -187,15 +184,15 @@ def _build_central_term_differential_ellipticity_BICEP(
     return central_term
 
 def get_differential_ellipticity_BICEP(
-        intensity_sky_map,
-        ellipticity_parameters_dict,
-        sigma_fwhm,
-        lmax=None,
-        mask=None,
-        spherical_derivatives=None,
-        shape_car=None,
-        shape_fullsky_car=None
-    ):
+        intensity_sky_map: np.ndarray | enmap.ndmap,
+        ellipticity_parameters_dict: dict[str, float],
+        sigma_fwhm: np.ndarray | float,
+        lmax: int | None = None,
+        mask: np.ndarray | enmap.ndmap | None = None,
+        spherical_derivatives: dict[str, np.ndarray] | None = None,
+        shape_car: tuple[int, int] | None = None,
+        shape_fullsky_car: tuple[int, int] | None = None
+    ) -> Spin_maps:
     """
     Get the differential ellipticity maps for a given intensity sky map and 
     ellipticity parameters using BICEP templates as described in the formalism 
@@ -232,6 +229,11 @@ def get_differential_ellipticity_BICEP(
         sky map using the spin-derivative formalism. If provided, they will be 
         used directly to compute the differential ellipticity maps, which can 
         save time if multiple systematics maps are computed from the same intensity sky map.
+    shape_car: tuple[int, int], optional
+        Shape of the output CAR map, if the intensity_sky_map is provided as an enmap.ndmap.
+    shape_fullsky_car: tuple[int, int], optional
+        Shape of the full sky CAR map, if the intensity_sky_map is provided as an enmap.ndmap.
+
     Returns
     -------
     differential_ellipticity_spin_maps: dictionary 
@@ -310,15 +312,15 @@ def get_differential_ellipticity_BICEP(
     return differential_ellipticity_spin_maps
 
 def create_dict_template_differential_ellipticity_BICEP(
-        intensity_sky_map,
-        ellipticity_parameters_dict,
-        sigma_fwhm,
-        lmax=None,
-        mask=None,
-        spherical_derivatives=None,
-        shape_car=None,
-        shape_fullsky_car=None
-    ):
+        intensity_sky_map: np.ndarray | enmap.ndmap,
+        ellipticity_parameters_dict: dict[str, float],
+        sigma_fwhm: np.ndarray | float,
+        lmax: int | None = None,
+        mask: np.ndarray | enmap.ndmap | None = None,
+        spherical_derivatives: dict[str, np.ndarray] | None = None,
+        shape_car: tuple[int, int] | None = None,
+        shape_fullsky_car: tuple[int, int] | None = None
+    ) -> tuple[dict[int, np.ndarray], Spin_maps]:
     """
     Get the differential ellipticity maps for a given intensity sky map and 
     ellipticity parameters using BICEP templates as described in the formalism 
@@ -355,6 +357,11 @@ def create_dict_template_differential_ellipticity_BICEP(
         sky map using the spin-derivative formalism. If provided, they will be 
         used directly to compute the differential ellipticity maps, which can 
         save time if multiple systematics maps are computed from the same intensity sky map.
+    shape_car: tuple[int, int], optional
+        Shape of the output CAR map, if the intensity_sky_map is provided as an enmap.ndmap.
+    shape_fullsky_car: tuple[int, int], optional
+        Shape of the full sky CAR map, if the intensity_sky_map is provided as an enmap.ndmap.
+
     Returns
     -------
     differential_ellipticity_spin_maps: dictionary 
@@ -421,38 +428,42 @@ def create_dict_template_differential_ellipticity_BICEP(
 
 
 def get_differential_ellipticity_no_calibration(
-        intensity_sky_map,
-        ellipticity_parameters_dict,
-        sigma_fwhm,
-        lmax=None,
-        mask=None,
-        spherical_derivatives=None,
-        shape_car=None,
-        shape_fullsky_car=None,
-        bool_secondary_term=False,
-        single_precision=False,
-    ):
+        intensity_sky_map: np.ndarray | enmap.ndmap,
+        ellipticity_parameters_dict: dict[str, float],
+        sigma_fwhm: np.ndarray | float,
+        lmax: int | None = None,
+        mask: np.ndarray | enmap.ndmap | None = None,
+        spherical_derivatives: dict[str, np.ndarray] | None = None,
+        shape_car: tuple[int, int] | None = None,
+        shape_fullsky_car: tuple[int, int] | None = None,
+        single_precision: bool = False,
+    ) -> Spin_maps:
     """
-    Get the differential ellipticity maps for a given intensity sky map and ellipticity parameters as described in the formalism describe in arXiv:2011.13910, with output spins 0, 2, -2. 
+    Get the differential ellipticity maps for a given intensity sky map and ellipticity parameters 
+    as described in the formalism describe in arXiv:2011.13910, with output spins 0, 2, -2,
+    following a different approach than the BICEP formalism.
     
     Parameters
     ----------
     intensity_sky_map: np.ndarray | enmap.ndmap
         Full sky intensity sky map already convolved with Gaussian circularly-symmetric beam (as assumed in the formalism), the output maps will have the same dimension
-    ellipticity: np.ndarray
-        Ellipticity parameter provided for each detector, defined as the ratio of the difference between the squares of the major and minor axes of the ellipse to their sum, i.e. $\epsilon = (\sigma_{\rm maj}^2 - \sigma_{\rm min}^2) / (\sigma_{\rm maj}^2 + \sigma_{\rm min}^2)$, which is also two times the third eccentricity parameter
-    ellipse_angle: np.ndarray
-        Angle of the ellipse in radians, defined as the angle between the major axis and the x-axis, for each detector
+    ellipticity_parameters_dict: dict[str, float]
+        Dictionary containing the ellipticity parameters for each detector, must contain keys 'ellipticity_parameter_convention', see the function `convert_ellipticities_conventions` in `tools.py` for more details
     sigma_fwhm: np.ndarray
-        Full width at half maximum of the beam in arcmin, for each detector, used to compute the circularly-symmetric (cs) beam width $\sigma_{\rm cs}$ as $\sigma_{\rm cs} = \frac{\rm FWHM}{\sqrt{8 \ln(2)}}$
+        Full width at half maximum of the beam in arcmin, for each detector
     lmax: int
         Maximum multipole for the computation of the spin derivatives of the intensity sky map
-    mask: np.ndarray, optional
-        HEALPix mask to define the area of the sky to compute the differential systematics maps. If None, the full sky is used.
-    bool_secondary_term: bool, optional
-        If False, ignore the secondary term in the differential ellipticity formalism.
-    ellipticity_parameter_convention: str, optional
-        Convention used for the ellipticity parameter, either 'Third flattening' or 'Third eccentricity', default is 'Third flattening'
+    mask: np.ndarray | enmap.ndmap, optional
+        Mask defining the area of the sky to output the computation of the differential systematics maps. If None, the full sky is used.
+    spherical_derivatives: dict[str, np.ndarray], optional
+        Dictionary of the spherical derivatives of the intensity sky map, with keys 'phi_phi', 'theta_phi', 'theta_theta' for the second derivatives, and 'phi' for the first derivative with respect to phi, including the factor 1/sin^2(theta) for the derivatives with respect to phi. If not provided, the spherical derivatives will be computed from the intensity sky map using the spin-derivative formalism. 
+    shape_car: tuple[int, int], optional
+        Shape of the output CAR map, if the intensity_sky_map is provided as an enmap.ndmap.
+    shape_fullsky_car: tuple[int, int], optional
+        Shape of the full sky CAR map, if the intensity_sky_map is provided as an enmap.ndmap.
+    single_precision: bool, optional
+        If True, the output maps will be in single precision (np.complex64), otherwise they will be in double precision (np.complex128). Default is False.
+
     Returns
     -------
     differential_ellipticity_spin_maps: dictionary
@@ -497,11 +508,6 @@ def get_differential_ellipticity_no_calibration(
     assert delta_sigma.shape == ellipticity_angle.shape, (
         "The parameter p and c provided must have the same shape"
     )
-
-    # if bool_secondary_term:
-    #     coefficient_secondary_term = 1
-    # else:
-    #     coefficient_secondary_term = 0
 
     rotation_matrix_ellipse_angle = get_rotation_matrix(ellipticity_angle)
     propagation_perturbation_ellipse = np.einsum(

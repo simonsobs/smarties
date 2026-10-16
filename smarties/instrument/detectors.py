@@ -9,12 +9,14 @@ import logging
 import numpy as np
 import yaml
 
+from smarties.hn import Spin_maps
+
 logger = logging.getLogger(__name__)
 
 __all__ = [
     "get_polarization_angles",
     "get_quantities_from_sotodlib",
-    "save_extended_final_maps",
+    "save_spin_maps",
     "get_ellipticities_values_from_yaml_file",
     "get_detector_names_from_dictionary_detector",
     "get_detector_names_from_yaml_file",
@@ -24,15 +26,15 @@ __all__ = [
 
 
 def get_polarization_angles(
-    detector_features,
-    telescope="LAT",
-):
+    detector_features: list[str],
+    telescope: str = "LAT",
+) -> np.ndarray:
     """
     Get the polarization angles for a list of detectors using sotodlib.
 
     Parameters
     ----------
-    detector_features : list of str
+    detector_features : list
         List of detector names for which to retrieve polarization angles.
     telescope : str, optional
         The telescope name. Supported values are 'SAT1', 'SAT2', 'SAT3', and 'LAT'. Default is 'LAT'.
@@ -70,10 +72,10 @@ def get_polarization_angles(
 
 
 def get_quantities_from_sotodlib(
-    detector_features,
-    list_keys_to_get,
-    telescope="LAT",
-):
+    detector_features: list[str],
+    list_keys_to_get: list[str],
+    telescope: str = "LAT",
+) -> dict[str, np.ndarray]:
     """
     Get the specified quantities for a list of detectors using sotodlib.
 
@@ -83,7 +85,7 @@ def get_quantities_from_sotodlib(
         List of detector names for which to retrieve polarization angles.
     list_keys_to_get : list of str
         List of keys corresponding to the quantities to retrieve from sotodlib.
-        Examples of valid keys include 'pol_ang', 'fwhm', 'sigma', etc.
+        Examples of valid keys include 'pol_ang', 'wafer_x_mm', 'wafer_y_mm', etc.
     telescope : str, optional
         The telescope name. Supported values are 'SAT1', 'SAT2', 'SAT3', and 'LAT'. Default is 'LAT'.
     
@@ -127,31 +129,89 @@ def get_quantities_from_sotodlib(
         )
 
 
-def save_extended_final_maps(
-    final_spin_maps, mask_mpi_from_total_mask, nstokes, nside, path_output
-):
-
-    extended_final_maps = np.zeros((nstokes, 12 * nside**2), dtype=complex)
+def save_spin_maps(
+    spin_maps: Spin_maps, 
+    mask: np.ndarray, 
+    nstokes: int, 
+    nside: int, 
+    path_output: str, 
+    dtype: type | np.dtype = complex
+) -> None:
+    """
+    Save the final spin maps into a file, assuming the corresponding pixels are 
+    not given full sky coverage, and extending them to the full sky using the provided mask. 
+    Only works for a healpix map with nside parameter.
+    
+    Parameters
+    ----------
+    spin_maps : Spin_maps
+        Spin_maps object containing the spin maps to be saved.
+    mask : np.ndarray
+        Mask indicating the valid pixels in the spin maps. Non-zero values indicate valid pixels.
+    nstokes : int
+        The number of Stokes parameters.
+    nside : int
+        The nside parameter for the Healpix map.
+    path_output : str
+        The path to the output file.
+    dtype : type | np.dtype, optional
+        The data type of the output array. Default is complex.
+    """
+    assert nstokes in [1, 2, 3], (
+        "The number of Stokes parameters must be 1 (only temperature), 2 (only polarization) or 3 (both temperature and polarization)"
+    )
+    extended_maps = np.zeros((nstokes, 12 * nside**2), dtype=dtype)
     if nstokes == 3 or nstokes == 1:
-        extended_final_maps[0, mask_mpi_from_total_mask != 0] = final_spin_maps[0]
+        extended_maps[0, mask != 0] = spin_maps[0]
     if nstokes == 3 or nstokes == 2:
-        final_Q_map = (final_spin_maps[-2] + final_spin_maps[2]) / 2.0
-        final_U_map = 1j * (final_spin_maps[-2] - final_spin_maps[2]) / 2.0
-
-        extended_final_maps[-2, mask_mpi_from_total_mask != 0] = final_Q_map.real
-        extended_final_maps[-1, mask_mpi_from_total_mask != 0] = final_U_map.real
+        extended_maps[-2, mask != 0] = ((spin_maps[-2] + spin_maps[2]) / 2.0).real
+        extended_maps[-1, mask != 0] = (1j * (spin_maps[-2] - spin_maps[2]) / 2.0).real
 
     logger.info(f"Saving map into {path_output}")
-    np.save(path_output, extended_final_maps[:, mask_mpi_from_total_mask != 0])
+    np.save(path_output, extended_maps[:, mask != 0])
 
 
 def get_ellipticities_values_from_yaml_file(
-    detector_features_all,
-    sigma_FWHM,  # arcmin
-    path_values,
-    ellipticity_parameter_convention="Third flattening",
-    input_type="ellipticity_parameters",
-):
+    detector_features_all: list[str],
+    sigma_FWHM: float,  # arcmin
+    path_values: str,
+    ellipticity_parameter_convention: str = "Third flattening",
+    input_type: str = "ellipticity_parameters",
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Get the ellipticity values and angles for a list of detectors from a YAML file.
+
+    Parameters
+    ----------
+    detector_features_all : list of str
+        List of detector names for which to retrieve ellipticity values and angles.
+    sigma_FWHM : float
+        Full width at half maximum (FWHM) of the beam in arcminutes.
+    path_values : str
+        Path to the YAML file containing ellipticity values and angles.
+    ellipticity_parameter_convention : str, optional
+        Convention for the output ellipticity parameter. 
+        Supported values are given in smarties.tools.list_conventions
+    input_type : str, optional
+        Type of input values in the YAML file. Supported values are:
+        - "ellipticity_parameters": The YAML file contains ellipticity values and angles.
+        - "dp_dc": The YAML file contains plus and cross parameter convention.
+        - "delta_sigma_angle": The YAML file contains delta sigma (the difference 
+        between the major and minor axes divided by 2) and angles.
+    
+    Returns
+    -------
+    tuple_output : tuple of np.ndarray
+        A tuple containing two arrays:
+        - ellipticity_parameter: Array of ellipticity values for the specified detectors.
+        - ellipticity_angle: Array of ellipticity angles (in radians) for the specified detectors
+
+    Note
+    ----
+    The output ellipticity values and angles will be converted from the ellipticity_parameter_convention
+    specified in the yaml file to the ellipticity_parameter_convention provided in the function arguments,
+    if the input type is "dp_dc" or "delta_sigma_angle".      
+    """
     assert input_type in ["ellipticity_parameters", "dp_dc", "delta_sigma_angle"], (
         "input_type must be either 'ellipticity_parameters' or 'dp_dc' or 'delta_sigma_angle'"
     )
@@ -234,7 +294,22 @@ def get_ellipticities_values_from_yaml_file(
     return ellipticity_parameter, ellipticity_angle
 
 
-def get_detector_names_from_dictionary_detector(dictionary_detector):
+def get_detector_names_from_dictionary_detector(
+    dictionary_detector: dict
+) -> list[str]:
+    """
+    Get the detector names as ordered by sotodlib from a dictionary containing detector information. 
+
+    Parameters
+    ----------
+    dictionary_detector : dict
+        Dictionary containing detector information, including detector wafers, detector pixels and suffixes.
+    
+    Returns
+    -------
+    detector_features : list of str
+        List of detector names with the sotodlib convention, constructed from the detector wafers, pixels and suffixes in the input dictionary.
+    """
 
     detector_features = []
 
@@ -287,20 +362,37 @@ def get_detector_names_from_dictionary_detector(dictionary_detector):
     return detector_features
 
 
-def get_detector_names_from_yaml_file(path_yaml):
+def get_detector_names_from_yaml_file(
+    path_yaml: str
+) -> list[str]:
+    """
+    Get the detector names as ordered by sotodlib from a YAML file containing detector information.
+    """
     with open(path_yaml) as file:
         dictionary_detector = yaml.safe_load(file)
     return get_detector_names_from_dictionary_detector(dictionary_detector)
 
 
-def get_list_detectors_from_yaml_and_h_n(path_yaml_detectors, directory_h_n):
+def get_list_detectors_from_yaml_and_h_n(
+    path_yaml_detectors: str, directory_h_maps: str
+) -> list[str]:
+    """
+    Get the list of detectors from a YAML file and a directory containing h_n files.
+
+    Parameters
+    ----------
+    path_yaml_detectors : str
+        Path to the YAML file containing detector information as well as the prefix for the h_n files.
+    directory_h_maps : str
+        Path to the directory containing h_n files for the detectors.
+    """
     with open(path_yaml_detectors) as file:
         dictionary_detectors = yaml.safe_load(file)
 
     detector_features = get_detector_names_from_dictionary_detector(
         dictionary_detectors
     )
-    path_h_n = directory_h_n + dictionary_detectors["h_n"]["file_prefix"][0]
+    path_h_n = directory_h_maps + dictionary_detectors["h_n"]["file_prefix"][0]
 
     h_n_names_npz = []
     list_detector_to_remove = []

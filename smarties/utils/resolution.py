@@ -1,3 +1,7 @@
+# This file is part of SMARTIES.
+# Copyright (c) 2024-2026 bers of the Simons Simons Observatory Collaboration.
+# lease refer to the LICENSE file in the root of this repository.
+
 from copy import deepcopy
 
 import healpy as hp
@@ -5,7 +9,7 @@ import numpy as np
 import toml
 import yaml
 from opt_einsum import contract
-from pixell import enmap, enplot, utils
+from pixell import enmap, enplot, utils, wcsutils
 
 from smarties.hn import Spin_maps, Spin_nm
 from smarties.sky.cmb import create_CMB_spin_maps
@@ -25,9 +29,25 @@ __all__ = [
 ]
 
 def get_chunks_from_shape(
-    shape_map,
-    number_chunks=10,
-):
+    shape_map: tuple,
+    number_chunks: int = 10,
+) -> list:
+    """
+    Split a map into chunks based on its shape.
+
+    Parameters
+    ----------
+    shape_map : tuple
+        Shape of the map to be split.
+    number_chunks : int, optional
+        Number of chunks to split the map into. Default is 10.
+
+    Returns
+    -------
+    list
+        List of tuples representing the chunks.
+    """
+
     array_shape_map = np.array(shape_map)
     if len(array_shape_map) == 1:
         assert np.array(number_chunks).size == 1, (
@@ -71,12 +91,35 @@ def get_chunks_from_shape(
 
 
 def get_projector_map_resolution(
-    wcs_downgraded,
-    shape_map_downgraded,
-    projection_pixel,
-    factor=2,
-    boolean_mask=None,
-):
+    wcs_downgraded: wcsutils.WCS,
+    shape_map_downgraded: tuple,
+    projection_pixel: str = "car",
+    factor: int = 2,
+    boolean_mask: bool = None,
+) -> enmap.ndmap:
+    """
+    Get the projector map resolution for a given downgraded map, allowing to 
+    upgrade a downgraded map to a higher resolution map only through indexation. 
+
+    Parameters
+    ----------
+    wcs_downgraded : wcsutils.WCS
+        WCS object of the downgraded map.
+    shape_map_downgraded : tuple
+        Shape of the downgraded map.
+    projection_pixel : str, optional
+        Type of pixelization used for the map. Options are 'healpix' or 'car'. Default is 'car'.
+    factor : int, optional
+        Factor by which to upgrade the resolution. Default is 2.
+    boolean_mask : bool, optional
+        Boolean mask to apply to the map. If None, no mask is applied. Default is None.
+    
+    Returns
+    -------
+    enmap.ndmap
+        An enmap.ndmap object representing the upgraded projector map: the indices
+        of the pixels in the downgraded map that correspond to each pixel in the upgraded map.
+    """
     assert projection_pixel in ["healpix", "car"], (
         f"Unknown projection pixel: {projection_pixel}"
     )
@@ -97,10 +140,27 @@ def get_projector_map_resolution(
 
 
 def get_chunks_final_map_from_downgraded_chunks(
-    shape_final_map,
-    shape_map_downgraded,
-    list_chunks_previous_map,
-):
+    shape_final_map: tuple,
+    shape_map_downgraded: tuple,
+    list_chunks_previous_map: list,
+) -> list:
+    """
+    Get the chunks of the final map based on the chunks of a downgraded map.
+
+    Parameters
+    ----------
+    shape_final_map : tuple
+        Shape of the final map.
+    shape_map_downgraded : tuple
+        Shape of the downgraded map.
+    list_chunks_previous_map : list
+        List of chunks of the downgraded map.
+    
+    Returns
+    -------
+    list
+        List of chunks of the final map.
+    """
     assert np.array(shape_final_map).size == np.array(shape_map_downgraded).size, (
         "Shape of the full map and the previous map should have the same number of dimensions."
     )
@@ -117,7 +177,31 @@ def get_chunks_final_map_from_downgraded_chunks(
         )
 
 
-def get_slice_1d_from_2d(shape_map, slice_x, slice_y, boolean_mask=None):
+def get_slice_1d_from_2d(
+    shape_map: tuple, 
+    slice_x: slice, 
+    slice_y: slice, 
+    boolean_mask: np.ndarray = None
+) -> enmap.ndmap:
+    """
+    Get the 1D slice of a 2D CAR map flattened based on the provided slices in x and y directions.
+
+    Parameters
+    ----------
+    shape_map : tuple
+        Shape of the 2D map.
+    slice_x : slice
+        Slice object for the x direction.
+    slice_y : slice
+        Slice object for the y direction.
+    boolean_mask : np.ndarray, optional
+        Boolean mask to apply to the map. If None, no mask is applied. Default is None.
+
+    Returns
+    -------
+    enmap.ndmap
+        1D array of indices corresponding to the sliced 2D map.
+    """
     if slice_y is ... or slice_x is ...:
         return slice_x if slice_x is not ... else slice_y
     indices_map = enmap.zeros(shape_map)
@@ -131,16 +215,18 @@ def get_slice_1d_from_2d(shape_map, slice_x, slice_y, boolean_mask=None):
     return np.int_(indices_output_1d[indices_output_1d >= 0])
 
 
-def ud_grade_hn(h_n_maps, nside_out):
+def _ud_grade_hn(h_n_maps, nside_out):
     """
-    Change the resolution of the $h_n$ maps to a lower or higher resolution,
+    Function WIP, not be used. 
+    _________
+    Change the resolution of the $h$-maps to a lower or higher resolution,
     by averaging or repeating the pixels in the provided output resolution
     using the `ud_grade` function from HEALPix.
 
     Parameters
     ----------
     h_n_maps: Spin_maps
-        Spin maps containing the $h_n$ maps, with keys being the spins and values being
+        Spin maps containing the $h$-maps, with keys being the spins and values being
         the maps of shape (n_det, n_pix) or (n_det,) for spin=0.
     nside_out: int
         The desired output resolution, given as nside.
@@ -148,7 +234,7 @@ def ud_grade_hn(h_n_maps, nside_out):
     Returns
     -------
     new_h_n: Spin_maps
-        A new Spin_maps object containing the $h_n$ maps at the desired resolution,
+        A new Spin_maps object containing the $h$-maps at the desired resolution,
         with the same spins as the input maps. The maps are of shape (n_det, n_pix) or
         (n_det,) for spin=0, where n_det is the number of detectors (1 for spin=0) and
         n_pix is the number of pixels at the output resolution.
@@ -158,7 +244,7 @@ def ud_grade_hn(h_n_maps, nside_out):
     Currently the corresponding operations only work with HEALPix maps, so the input maps must be provided in the HEALPix format.
     """
 
-    # TODO: Adapt in case h_n maps are not healpix or ful sky
+    # TODO: Adapt in case h_n maps are not healpix or full sky
 
     # TODO: Take gradient conjugate for the -spin?
 

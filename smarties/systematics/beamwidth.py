@@ -24,13 +24,13 @@ __all__ = [
 ]
 
 def _build_central_term_beamwidth_leakage(
-        intensity_sky_map,
-        lmax=None,
-        mask=None,
-        spherical_derivatives=None,
-        shape_car=None,
-        shape_fullsky_car=None
-    ):
+        intensity_sky_map: np.ndarray | enmap.ndmap,
+        lmax: int | None = None,
+        mask: np.ndarray | enmap.ndmap | None = None,
+        spherical_derivatives: dict[str, np.ndarray] | None = None,
+        shape_car: tuple[int, int] | None = None,
+        shape_fullsky_car: tuple[int, int] | None = None
+    ) -> np.ndarray | enmap.ndmap:
     """
     Build the central term of the beamwidth leakage maps from T, corresponding
     to a partial Laplacian applied to the intensity sky map 
@@ -38,15 +38,15 @@ def _build_central_term_beamwidth_leakage(
 
     Parameters
     ----------
-    intensity_sky_map: np.ndarray
+    intensity_sky_map: np.ndarray | enmap.ndmap
         Intensity sky map already convolved with Gaussian circularly-symmetric beam 
     lmax: int (optional)
         Maximum multipole for the computation of the spin derivatives of the 
         intensity sky map (if spherical_derivatives is not provided)
-    mask: np.ndarray (optional)
+    mask: np.ndarray | enmap.ndmap (optional)
         Mask to apply to the maps, of the same dimension as the intensity_sky_map map
-        If output maps will be flattened and only containing the pixels where 
-        the mask is not zero
+        If output maps will be flattened and only containing the pixels where the mask is not zero
+        If None, the output maps will be of the same shape as the input intensity_sky_map map
     spherical_derivatives: dict (optional)
         Dictionary containing the spherical derivatives of the intensity sky map, 
         must contain keys being 'theta_theta' and 'phi_phi' for the derivatives 
@@ -62,7 +62,7 @@ def _build_central_term_beamwidth_leakage(
 
     Returns
     -------
-    central_term: np.ndarray
+    central_term: np.ndarray | enmap.ndmap
         Central term of the beamwidth leakage maps, of shape (npix,) where npix is
         the number of pixels in the output maps (after masking if mask is provided)
 
@@ -168,15 +168,15 @@ def _build_central_term_beamwidth_leakage(
 
 
 def create_beamwidth_spin_leakage_map_BICEP(
-        intensity_sky_map, 
-        delta_sigma,
-        sigma_fwhm,
-        lmax=None,
-        mask=None,
-        spherical_derivatives=None,
-        shape_car=None,
-        shape_fullsky_car=None
-    ):
+        intensity_sky_map: np.ndarray | enmap.ndmap, 
+        delta_sigma: np.ndarray | float,
+        sigma_fwhm: float,
+        lmax: int | None = None,
+        mask: np.ndarray | enmap.ndmap | None = None,
+        spherical_derivatives: dict[str, np.ndarray] | None = None,
+        shape_car: tuple[int, int] | None = None,
+        shape_fullsky_car: tuple[int, int] | None = None
+    ) -> Spin_maps:
     """
     Get the differential beamwidth maps for a given intensity sky map and 
     differential beamwidth parameters using BICEP templates as described in the 
@@ -199,8 +199,8 @@ def create_beamwidth_spin_leakage_map_BICEP(
         intensity sky map if spherical_derivatives is not provided
     mask: np.ndarray (optional)
         Mask to apply to the maps, of the same dimension as the intensity_sky_map map
-        If output maps will be flattened and only containing the pixels where 
-        the mask is not zero 
+        If output maps will be flattened and only containing the pixels where the mask is not zero 
+        If None, the output maps will be of the same shape as the input intensity_sky_map map
     spherical_derivatives: dict (optional)
         Dictionary containing the spherical derivatives of the intensity sky map, 
         must contain keys being 'theta' and 'phi' for the derivatives with respect 
@@ -254,15 +254,15 @@ def create_beamwidth_spin_leakage_map_BICEP(
     return beamwidth_leakage_spin_maps
 
 def create_dict_template_beamwidth_leakage_map_BICEP(
-        intensity_sky_map, 
-        delta_sigma,
-        sigma_fwhm,
-        lmax=None,
-        mask=None,
-        spherical_derivatives=None,
-        shape_car=None,
-        shape_fullsky_car=None
-    ):
+        intensity_sky_map: np.ndarray | enmap.ndmap, 
+        delta_sigma: np.ndarray | float,
+        sigma_fwhm: float,
+        lmax: int | None = None,
+        mask: np.ndarray | enmap.ndmap | None = None,
+        spherical_derivatives: dict[str, np.ndarray] | None = None,
+        shape_car: tuple[int, int] | None = None,
+        shape_fullsky_car: tuple[int, int] | None = None
+    ) -> tuple[dict[int, np.ndarray], Spin_maps]:
     """
     Get the differential beamwidth maps for a given intensity sky map and 
     differential beamwidth parameters using BICEP templates as described in the 
@@ -275,15 +275,19 @@ def create_dict_template_beamwidth_leakage_map_BICEP(
 
     Parameters
     ----------
-    intensity_sky_map: np.ndarray
+    intensity_sky_map: np.ndarray | enmap.ndmap
         Intensity sky map already convolved with Gaussian circularly-symmetric 
         beam
     delta_sigma: np.ndarray | float
         Angular fwhm mismatch for each detector in radians 
+    sigma_fwhm: float
+        Full width at half maximum of the beam in arcmin, assumed to have been used to compute 
+        the circularly-symmetric beam smoothing the intensity_sky_map map, and around which the 
+        Taylor expansion of the beamwidth mismatch is performed in the BICEP formalism. 
     lmax: int (optional)
         Maximum multipole for the computation of the spin derivatives of the 
         intensity sky map if spherical_derivatives is not provided
-    mask: np.ndarray (optional)
+    mask: np.ndarray | enmap.ndmap (optional)
         Mask to apply to the maps, of the same dimension as the intensity_sky_map map
         If output maps will be flattened and only containing the pixels where 
         the mask is not zero 

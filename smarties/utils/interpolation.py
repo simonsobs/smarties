@@ -1,3 +1,7 @@
+# This file is part of SMARTIES.
+# Copyright (c) 2024-2026 bers of the Simons Simons Observatory Collaboration.
+# lease refer to the LICENSE file in the root of this repository.
+
 import numpy as np
 from scipy.interpolate import griddata
 
@@ -8,18 +12,53 @@ __all__ = [
 ]
 
 def perform_interpolation_scipy(
-    dictionary_detector_to_interpolate,
-    dictionary_known_values,
-    slice_known_values=None,
-    slice_output=None,
-    method_interpolation="linear",
-    position_x_key="wafer_x_mm",
-    position_y_key="wafer_y_mm",
-    return_as_spin_maps=True,
-    stack_output_with_known_values=False,
-):
+    dictionary_detector_to_interpolate: dict,
+    dictionary_known_values: dict,
+    slice_known_values: slice | None = None,
+    slice_output: slice | None = None,
+    method_interpolation: str = "linear",
+    position_x_key: str = "wafer_x_mm",
+    position_y_key: str = "wafer_y_mm",
+    return_as_spin_maps: bool = True,
+    stack_output_with_known_values: bool = False,
+) -> dict | Spin_maps:
     """
+    Interpolate values from known some detector positions on a focal plane and the known quantity values at those positions, 
+    to the unknown quantity values related to some other positions on the focal plane, using scipy's griddata.
+
+    Parameters
+    ----------
+    dictionary_detector_to_interpolate : dict
+        Dictionary containing the detector positions position_x_key and position_y_key to interpolate to.
+    dictionary_known_values : dict
+        Dictionary containing the detector positions position_x_key and position_y_key related to the known values to interpolate from,
+        as well as the known values themselves.
+    slice_known_values : slice, optional
+        Slice to apply to the known values before interpolation. Default is None (no slicing).
+    slice_output : slice, optional
+        Slice to apply to the output values after interpolation. Default is None (no slicing).
+    method_interpolation : str, optional
+        Interpolation method to use. Options are 'nearest', 'linear', or 'cubic. Default is 'linear'.
+    position_x_key : str, optional
+        Key in the dictionaries for the x positions. Default is 'wafer_x_mm'.
+    position_y_key : str, optional
+        Key in the dictionaries for the y positions. Default is 'wafer_y_mm'.
+    return_as_spin_maps : bool, optional
+        If True, return the results as a Spin_maps object. If False, return as a dictionary. Default is True.
+    stack_output_with_known_values : bool, optional
+        If True, stack the known values on top of the interpolated values in the output. Default is False.
+
+    Returns
+    -------
+    dict or Spin_maps
+        Interpolated values as a dictionary or Spin_maps object, depending on the return_as_spin_maps parameter.
+
+    Notes
+    -----
+    If the chosen as linear or cubic leads to NaN values, the nearest interpolation will be used to (silently) fill those NaNs.
+
     WARNING: If stack_output_with_known_values is True, the output will have the known values stacked on top of the interpolated values.
+
     """
 
     assert position_x_key in dictionary_known_values, (

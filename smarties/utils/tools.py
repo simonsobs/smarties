@@ -32,9 +32,9 @@ list_conventions = [
 ]
 
 
-def get_coupled_spin(reference_spin, available_h_n_spin, available_signal_spins):
+def get_coupled_spin(reference_spin: int, available_h_n_spin: list[int], available_signal_spins: list[int]) -> list[tuple]:
     """
-    Get the coupled spins for a reference spin $k$ given a set of $h_n$ and signal spin maps, involved in a typical sum:
+    Get the coupled spins for a reference spin $k$ given a set of $h$-maps and signal spin maps, involved in a typical sum:
         $ sum_{k' = -\infty}^{\infty} h_{k-k'} S_{k'}$
 
     Parameters
@@ -42,14 +42,19 @@ def get_coupled_spin(reference_spin, available_h_n_spin, available_signal_spins)
     reference_spin: int
         Reference spin $k$
     available_h_n_spin: list[int]
-        List of available $h_n$ spins, typically [-4, -2, 2, 4]
+        List of available $h$-maps spins
     available_signal_spins: list[int]
-        List of available signal spins, typically [-2, 2]
+        List of available signal spins
 
     Returns
     -------
     coupled_spin: list[tuple]
         List of available coupled spins, each tuple being the coupled spins $(k-k', k')$
+
+    Notes
+    -----
+    No checks are performed to verify that the provided spin lists are consistent and 
+    contain positive spins and their negative counterparts, as well as the spin 0. 
     """
 
     minimum_spin = np.min(list(available_h_n_spin) + list(available_signal_spins))
@@ -66,35 +71,47 @@ def get_coupled_spin(reference_spin, available_h_n_spin, available_signal_spins)
 
 
 def get_row_mapmaking_matrix(
-    reference_spin,
-    h_n_spin_dict,
-    list_spin_input,
-    polar_angle_coeff=None,
-    polar_efficiency_coeff=None,
-    dtype=complex,
-    slice_to_apply=None,
-):
+    reference_spin: int,
+    h_n_spin_dict: Spin_maps,
+    list_spin_input: list[int],
+    polar_angle_coeff: dict[int, np.ndarray] = None,
+    polar_efficiency_coeff: dict[int, np.ndarray] = None,
+    dtype: type = complex,
+    slice_to_apply: slice = None,
+) -> np.ndarray:
     """
-    The mapmaking matrix will always be multiplied to the vector ordered with spins [0, 2, -2] for the $\tilde{S}^{\rm pixel}_{k}$ term.
+    Build a row of the mapmaking matrix for a given reference spin $k$ and a set of $h$-maps. 
 
-    The $h_n$ dictionary must have the following structure:
-        h_n_spin_dict = {spin: np.array([n_det, n_pix])} (for spin != 0)
-        h_n_spin_dict = {0: np.array([1, 1])} (for spin = 0)
-    And the $h_n$ maps will be summed over the detectors in the mapmaking matrix, so that the mapmaking matrix will be of shape [n_spin, n_pix] with n_spin the number of spins involved in list_spin_input and n_pix the number of pixels in the $h_n$ maps.
+    The $h$-maps dictionary must have the following structure:
+        h_n_spin_dict = {spin: np.array([n_det, n_pix])} 
+    And the $h$-maps will be summed over the detectors in the mapmaking matrix, so that the mapmaking matrix will be of shape [n_spin, n_pix] 
+    with n_spin the number of spins involved in list_spin_input and n_pix the number of pixels in the $h$-maps.
 
     Parameters
     ----------
     reference_spin: int
-        Reference spin $k$ for the mapmaking matrix, typically 0, 2 or -2
+        Reference spin $k$ for the mapmaking matrix
     h_n_spin_dict: Spin_maps
-        Dictionary of the summed $h_n$ maps, with the keys being the spins and the values the $h_n$ maps
+        Dictionary of the summed $h$-maps, with the keys being the spins and the values the $h$-maps
     list_spin_input: list[int]
-        List of spins involved in the input signal maps, typically [-2, 2] for polarization maps
+        List of spins involved in the input signal maps
+    polar_angle_coeff: dict[int, np.ndarray], optional
+        Dictionary of detector polarization angle coefficients for each spin, with the keys being the spins 
+        and the values the polarization angle coefficients. If None, no polarization angle coefficients are applied. 
+        Default is None.
+    polar_efficiency_coeff: dict[int, np.ndarray], optional
+        Dictionary of detector polarization efficiency coefficients for each spin, with the keys being the spins
+        and the values the polarization efficiency coefficients. If None, no polarization efficiency coefficients are applied.
+        Default is None.
+    dtype: type, optional
+        Data type of the mapmaking matrix. Default is complex.
+    slice_to_apply: slice, optional
+        Slice to apply to the $h$-maps before building the mapmaking matrix. Default is None (no slicing).
 
     Returns
     -------
     mapmaking_matrix_row: np.ndarray
-        Row of the mapmaking matrix of shape [n_pix, n_spin] with n_spin the number of spins involved in list_spin_input and n_pix the number of pixels in the $h_n$ maps.
+        Row of the mapmaking matrix of shape [n_pix, n_spin] with n_spin the number of spins involved in list_spin_input and n_pix the number of pixels in the $h$-maps.
         The row is given by list_spin_input.
     """
     if polar_angle_coeff is None:
@@ -135,7 +152,7 @@ def get_row_mapmaking_matrix(
     return mapmaking_matrix_row
 
 
-def get_rotation_matrix(angle):
+def get_rotation_matrix(angle: np.ndarray) -> np.ndarray:
     """
     Get the rotation matrix for a given angle.
 
@@ -161,7 +178,12 @@ def get_rotation_matrix(angle):
     return rotation_matrix
 
 
-def transform_array_maps_into_spin_maps(array_maps, n_stokes_output=None):
+
+def transform_array_maps_into_spin_maps(
+    array_maps: np.ndarray | enmap.ndmap, 
+    n_stokes_output: int = None, 
+    dtype: type = complex
+) -> Spin_maps:
     """
     Transform an array of maps into a Spin_maps object,
     inheriting from the dictionary structure as
@@ -183,16 +205,13 @@ def transform_array_maps_into_spin_maps(array_maps, n_stokes_output=None):
     Returns
     -------
     spin_maps: Spin_maps
-        Spin_maps object with keys being the spins and values being the corresponding maps
+        Spin_maps object with keys being the spins and values being the corresponding maps,
+        either in healpix or CAR pixelization, depending on the input array_maps type.
 
     """
 
-    # if type(array_maps) == np.ndarray:
     n_stokes = array_maps.shape[-2] if array_maps.ndim > 1 else 1
     dimension_stokes = -2
-    # elif type(array_maps) == enmap.ndmap:
-    #     n_stokes = array_maps.shape[-3] if array_maps.ndim > 2 else 1
-    #     dimension_stokes = -3
 
     assert n_stokes in [1, 2, 3], (
         "The number of Stokes parameters must be 1 (only temperature), 2 (only polarization) or 3 (both temperature and polarization)"
@@ -230,10 +249,10 @@ def transform_array_maps_into_spin_maps(array_maps, n_stokes_output=None):
 
     if n_stokes_output != n_stokes:
         if n_stokes == 1:
-            output_spin_maps[2] = np.zeros_like(output_spin_maps[0], dtype=complex)
-            output_spin_maps[-2] = np.zeros_like(output_spin_maps[0], dtype=complex)
+            output_spin_maps[2] = np.zeros_like(output_spin_maps[0], dtype=dtype)
+            output_spin_maps[-2] = np.zeros_like(output_spin_maps[0], dtype=dtype)
         elif n_stokes == 2:
-            output_spin_maps[0] = np.zeros_like(output_spin_maps[-2], dtype=complex)
+            output_spin_maps[0] = np.zeros_like(output_spin_maps[-2], dtype=dtype)
 
     if type(array_maps) == enmap.ndmap:
         for spin in output_spin_maps.spins:
@@ -244,7 +263,7 @@ def transform_array_maps_into_spin_maps(array_maps, n_stokes_output=None):
     return output_spin_maps
 
 
-def transform_spin_maps_into_array_maps(spin_maps):
+def transform_spin_maps_into_array_maps(spin_maps: Spin_maps) -> np.ndarray | enmap.ndmap:
     """
     Transform a Spin_maps object into an array of maps,
     as:
@@ -299,10 +318,10 @@ def transform_spin_maps_into_array_maps(spin_maps):
 
 
 def convert_ellipticities_conventions(
-    dictionary_ellipticities,
-    sigma_fwhm,  # arcmin
-    input_ellipticity_convention="Third flattening",
-    output_ellipticity_convention="Third flattening",
+    dictionary_ellipticities: dict[str, float | np.ndarray],
+    sigma_fwhm: float | np.ndarray,  # arcmin
+    input_ellipticity_convention: str = "Third flattening",
+    output_ellipticity_convention: str = "Third flattening",
 ):
     """
     Convert ellipticity parameters from one convention to another.
@@ -475,12 +494,19 @@ def convert_ellipticities_conventions(
         )
 
 
-def flatten_CAR_maps(maps_CAR):
+def flatten_CAR_maps(maps_CAR: enmap.ndmap) -> enmap.ndmap:
+    """
+    Flatten a CAR map of shape (..., ny, nx) into a 1D map of shape (..., ny*nx).
+    """
     first_dimensions = maps_CAR.shape[:-2] if maps_CAR.shape[:-2] != (1,) else tuple()
     return maps_CAR.reshape(first_dimensions + (np.prod(maps_CAR.shape[-2:]),))
 
 
-def unflatten_CAR_maps(maps_CAR_flatten, original_shape_pixels):
+
+def unflatten_CAR_maps(maps_CAR_flatten: enmap.ndmap, original_shape_pixels: tuple[int, int]) -> enmap.ndmap:
+    """
+    Unflatten a CAR map of shape (..., ny*nx) into a 2D map of shape (..., ny, nx).
+    """
     return maps_CAR_flatten.reshape(maps_CAR_flatten.shape[:-1] + original_shape_pixels)
 
 
@@ -490,7 +516,23 @@ def reweight_hmaps_by_hits(
         list_spin: list[int],
         error_precision: float = None,
         in_place: bool = False
-):
+) -> None| dict| Spin_maps:
+    """
+    Reweight the h-maps in the dictionary by the number of hits per pixel, given a list of weights for each detector or not.
+
+    Parameters
+    ----------
+    h_dictionary: dict| Spin_maps
+        Dictionary of h-maps with keys being the spins and values being the corresponding maps for each detector.
+    list_weights: np.ndarray
+        List of weights for each detector, of shape (n_det,) or (n_det,n_pix) if the weights are pixel-dependent.
+    list_spin: list[int]
+        List of spins to consider for the reweighting.
+    error_precision: float, optional
+        Precision threshold to consider a pixel as observed by a detector. If None, a default value of 1e-8 is used.
+    in_place: bool, optional
+        If True, the h_dictionary is modified in place. If False, a new dictionary is returned. Default is False.
+    """
     if 0 not in h_dictionary.spins and Spin_nm((0, 0)) not in h_dictionary.spins:
         error_precision = 1e-8 if error_precision is None else error_precision
         spin_0 = Spin_nm((0, 0)) if np.size((h_dictionary.spins)[0]) == 2 else 0

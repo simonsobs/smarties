@@ -21,26 +21,27 @@ __all__ = [
 ]
 
 def _build_central_term_pointing_leakage(
-        intensity_sky_map,
-        lmax=None,
-        mask=None,
-        spherical_derivatives=None,
-        shape_car=None,
-        shape_fullsky_car=None
-    ):
+        intensity_sky_map: np.ndarray | enmap.ndmap,
+        lmax: int | None = None,
+        mask: np.ndarray | enmap.ndmap | None = None,
+        spherical_derivatives: dict[str, np.ndarray] | None = None,
+        shape_car: tuple[int, int] | None = None,
+        shape_fullsky_car: tuple[int, int] | None = None
+    ) -> np.ndarray | enmap.ndmap:
     """
     Build the central term of the pointing leakage maps from T, corresponding
     to the spin-raising and lowering operators applied to the intensity sky map 
-    $$\bar{\eth} I$$
+    $$\bar{\eth} I$$, which is independent of the pointing parameters, and can be 
+    used to compute the pointing leakage maps for any set of pointing parameters.
     
     Parameters
     ----------
-    intensity_sky_map: np.ndarray
+    intensity_sky_map: np.ndarray | enmap.ndmap
         Intensity sky map already convolved with Gaussian circularly-symmetric beam 
     lmax: int (optional)
         Maximum multipole for the computation of the spin derivatives of the 
         intensity sky map (if spherical_derivatives is not provided)
-    mask: np.ndarray (optional)
+    mask: np.ndarray | enmap.ndmap (optional)
         Mask to apply to the maps, of the same dimension as the intensity_sky_map
         If output maps will be flattened and only containing the pixels where 
         the mask is not zero
@@ -59,7 +60,7 @@ def _build_central_term_pointing_leakage(
 
     Returns
     -------
-    central_term: np.ndarray
+    central_term: np.ndarray | enmap.ndmap
         Central term of the pointing leakage maps, of shape (npix,) where npix is
         the number of pixels in the output maps (after masking if mask is provided)
         
@@ -136,15 +137,15 @@ def _build_central_term_pointing_leakage(
 
 
 def create_pointing_spin_leakage_map(
-        intensity_sky_map, 
-        amplitude_offset, 
-        angle_offset,
-        lmax=None,
-        mask=None,
-        spherical_derivatives=None,
-        shape_car=None,
-        shape_fullsky_car=None
-    ):
+        intensity_sky_map: np.ndarray | enmap.ndmap,
+        amplitude_offset: np.ndarray | float,
+        angle_offset: np.ndarray | float,
+        lmax: int | None = None,
+        mask: np.ndarray | enmap.ndmap | None = None,
+        spherical_derivatives: dict[str, np.ndarray] | None = None,
+        shape_car: tuple[int, int] | None = None,
+        shape_fullsky_car: tuple[int, int] | None = None
+    ) -> Spin_maps:
     """
     Create the pointing leakage maps for a given intensity sky map and angular amplitude offset,
     with output spins 1 and -1, resulting in maps
@@ -155,7 +156,7 @@ def create_pointing_spin_leakage_map(
 
     Parameters
     ----------
-    intensity_sky_map: np.ndarray
+    intensity_sky_map: np.ndarray | enmap.ndmap
         Intensity sky map already convolved with Gaussian circularly-symmetric beam (as assumed in the formalism), the output maps will have the same dimension
     amplitude_offset: np.ndarray | float
         Angular amplitude offset for each detector in radians
@@ -163,7 +164,11 @@ def create_pointing_spin_leakage_map(
         Angle offset for each detector in radians
     lmax: int, optional
         Maximum multipole for the computation of the spin derivatives of the intensity sky map, if None, defaults to 2 * nside where nside is the nside of the intensity_sky_map map
-    
+    mask: np.ndarray | enmap.ndmap, optional
+        Mask to apply to the maps, of the same dimension as the intensity_sky_map map
+    spherical_derivatives: dict, optional
+        Dictionary of the spherical derivatives of the intensity sky map, with keys 'phi' for the first derivative with respect to phi, including the factor 1/sin(theta) for the derivatives with respect to phi, and 'theta' for the first derivative with respect to theta. If not provided, the spherical derivatives will be computed from the intensity sky map using the spin-derivative formalism.
+
     Returns
     -------
     pointing_leakage_spin_maps: dictionary 
@@ -206,15 +211,15 @@ def create_pointing_spin_leakage_map(
 
 
 def create_pointing_spin_leakage_map_BICEP(
-        intensity_sky_map, 
-        delta_x, 
-        delta_y,
-        lmax=None,
-        mask=None,
-        spherical_derivatives=None,
-        shape_car=None,
-        shape_fullsky_car=None
-    ):
+        intensity_sky_map: np.ndarray | enmap.ndmap, 
+        delta_x: np.ndarray | float, 
+        delta_y: np.ndarray | float,
+        lmax: int | None=None,
+        mask: np.ndarray | enmap.ndmap = None,
+        spherical_derivatives: dict = None,
+        shape_car: tuple = None,
+        shape_fullsky_car: tuple = None
+    ) -> Spin_maps:
     """
     Get the differential pointing maps for a given intensity sky map and 
     differential pointing parameters using BICEP templates as described in the 
@@ -227,7 +232,7 @@ def create_pointing_spin_leakage_map_BICEP(
 
     Parameters
     ----------
-    intensity_sky_map: np.ndarray
+    intensity_sky_map: np.ndarray | enmap.ndmap
         Intensity sky map already convolved with Gaussian circularly-symmetric 
         beam
     delta_x: np.ndarray | float
@@ -237,7 +242,7 @@ def create_pointing_spin_leakage_map_BICEP(
     lmax: int (optional)
         Maximum multipole for the computation of the spin derivatives of the 
         intensity sky map if spherical_derivatives is not provided
-    mask: np.ndarray (optional)
+    mask: np.ndarray | enmap.ndmap (optional)
         Mask to apply to the maps, of the same dimension as the intensity_sky_map map
         If output maps will be flattened and only containing the pixels where 
         the mask is not zero 
@@ -303,15 +308,15 @@ def create_pointing_spin_leakage_map_BICEP(
     return pointing_leakage_spin_maps
 
 def create_dict_template_pointing_BICEP(
-        intensity_sky_map, 
-        delta_x, 
-        delta_y,
-        lmax=None,
-        mask=None,
-        spherical_derivatives=None,
-        shape_car=None,
-        shape_fullsky_car=None
-    ):
+        intensity_sky_map: np.ndarray | enmap.ndmap, 
+        delta_x: np.ndarray | float, 
+        delta_y: np.ndarray | float,
+        lmax: int | None=None,
+        mask: np.ndarray | enmap.ndmap = None,
+        spherical_derivatives: dict = None,
+        shape_car: tuple = None,
+        shape_fullsky_car: tuple = None
+    ) -> tuple[np.ndarray, Spin_maps]:
     """
     Get the differential pointing maps for a given intensity sky map and 
     differential pointing parameters using BICEP templates as described in the 
@@ -324,7 +329,7 @@ def create_dict_template_pointing_BICEP(
 
     Parameters
     ----------
-    intensity_sky_map: np.ndarray
+    intensity_sky_map: np.ndarray | enmap.ndmap
         Intensity sky map already convolved with Gaussian circularly-symmetric 
         beam
     delta_x: np.ndarray | float
@@ -334,7 +339,7 @@ def create_dict_template_pointing_BICEP(
     lmax: int (optional)
         Maximum multipole for the computation of the spin derivatives of the 
         intensity sky map if spherical_derivatives is not provided
-    mask: np.ndarray (optional)
+    mask: np.ndarray | enmap.ndmap (optional)
         Mask to apply to the maps, of the same dimension as the intensity_sky_map map
         If output maps will be flattened and only containing the pixels where 
         the mask is not zero 
