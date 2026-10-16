@@ -214,16 +214,16 @@ class FrameworkSystematics(object):
         if projector_h_n is None:
             projector_h_n = ... # Use all pixels
 
-        dict_coupled_maps = {spin: np.zeros((npix,), dtype=dtype) for spin in self.list_spin_output}
-
-        spin_h_maps = sorted(set(h_n_spin_dict.spins) | {-s for s in h_n_spin_dict.spins if s > 0})
-
-        list_spin_input_positive = [spin for spin in self.list_spin_output if spin >= 0]
+        
+        factor_func = lambda spin: 1 if np.sum(spin) == 0 else .5
 
         if optimize_computations:
             logger.info("Optimizing the computations for the spin convolution...")
             # Precompute the coupled spins for each spin in the list of spins to compute
-
+            
+            dict_coupled_maps = {spin: np.zeros((npix,), dtype=dtype) for spin in self.list_spin_output}
+            spin_h_maps = sorted(set(h_n_spin_dict.spins) | {-s for s in h_n_spin_dict.spins if s > 0})
+            list_spin_input_positive = [spin for spin in self.list_spin_output if spin >= 0]
             for i, spin in enumerate(list_spin_input_positive):
                 # Get all combinations of spins (k-k', k') such that k-k' = spin
                 coupled_spins = get_coupled_spin(
@@ -234,7 +234,7 @@ class FrameworkSystematics(object):
 
                 logger.info(f'Coupled spins for spin {spin}: {coupled_spins}')
 
-                factor_func = lambda spin: 1 if np.sum(spin) == 0 else .5
+                
                 
                 factor_correction = lambda spin: 1
                 if spin == 0:
@@ -258,11 +258,11 @@ class FrameworkSystematics(object):
                     )
                     
                 dict_coupled_maps[-spin] += np.conj(dict_coupled_maps[spin])
-                if return_array:
-                    spin_coupled_maps = np.zeros((npix, len(self.list_spin_output),), dtype=dtype)
-                    for i, spin in enumerate(self.list_spin_output):
-                        spin_coupled_maps[:, i] = dict_coupled_maps[spin]
-                    return spin_coupled_maps
+            if return_array:
+                spin_coupled_maps = np.zeros((npix, len(self.list_spin_output),), dtype=dtype)
+                for i, spin in enumerate(self.list_spin_output):
+                    spin_coupled_maps[:, i] = dict_coupled_maps[spin]
+                return spin_coupled_maps
                     
         else:
             spin_coupled_maps = np.zeros((npix, len(self.list_spin_output),), dtype=dtype)
@@ -290,11 +290,11 @@ class FrameworkSystematics(object):
                             spin_sky_maps[tuple_spins[1]]
                         ) # Polarization angle to remove for consistent modeling of the data
                     )
-                if not return_array:
-                    dict_coupled_maps = Spin_maps.from_dictionary(dict())
-                    for i, spin in enumerate(self.list_spin_output):
-                        dict_coupled_maps[spin] = spin_coupled_maps[...,i]
-                return spin_coupled_maps
+            if not return_array:
+                dict_coupled_maps = Spin_maps.from_dictionary(dict())
+                for i, spin in enumerate(self.list_spin_output):
+                    dict_coupled_maps[spin] = spin_coupled_maps[...,i]
+            return spin_coupled_maps
 
         return dict_coupled_maps
 

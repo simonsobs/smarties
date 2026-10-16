@@ -798,7 +798,7 @@ def save_partial_spin_maps(
     Save the partial spin maps to a file in the specified format.
     """
 
-    extended_final_maps = np.zeros((nstokes,) + (np.prod(shape_pixels),), dtype=codtypemplex)
+    extended_final_maps = np.zeros((nstokes,) + (np.prod(shape_pixels),), dtype=dtype)
     if nstokes == 3 or nstokes == 1:
         extended_final_maps[0, mask_on_full_map != 0] = partial_spin_maps[0]
     if nstokes == 3 or nstokes == 2:
