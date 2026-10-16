@@ -6,6 +6,7 @@
 import healpy as hp
 import numpy as np
 import scipy.constants
+from pixell import enmap, pointsrcs, reproject, utils
 
 __all__ = [
     "convert_flux_mJy_to_muK",
@@ -166,13 +167,6 @@ def generate_point_source_map(
         Point source map in HEALPix format or CAR projection, depending on the value of return_CAR_map.
 
     """
-    try:
-        import pixell as pxl
-        from pixell import enmap, pointsrcs, reproject, utils
-    except ImportError:
-        raise ImportError(
-            "pixell is not installed. Please install it to use this function."
-        )
 
     res = np.pi / (
         utils.nint(np.pi / (hp.nside2resol(nside, arcmin=True) * utils.arcmin))
@@ -184,7 +178,7 @@ def generate_point_source_map(
 
     else:
         theta_min, theta_max, phi_min, phi_max = get_coordinates_from_healpix_mask(mask)
-        box = np.array([[theta_min, phi_min], [theta_max, phi_max]]) * pxl.utils.degree
+        box = np.array([[theta_min, phi_min], [theta_max, phi_max]]) * utils.degree
 
         shape, wcs = enmap.geometry(pos=box, res=res, proj="car")
 

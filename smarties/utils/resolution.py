@@ -24,8 +24,7 @@ __all__ = [
     'get_chunks_from_shape',
     'get_projector_map_resolution',
     'get_chunks_final_map_from_downgraded_chunks',
-    'get_slice_1d_from_2d',
-    'ud_grade_hn'
+    'get_slice_1d_from_2d'
 ]
 
 def get_chunks_from_shape(
