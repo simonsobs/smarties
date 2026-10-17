@@ -1,6 +1,6 @@
 # This file is part of SMARTIES.
-# Copyright (c) 2024-2026 bers of the Simons Simons Observatory Collaboration.
-# lease refer to the LICENSE file in the root of this repository.
+# Copyright (C) 2024-2026 Members of the Simons Observatory collaboration.
+# Please refer to the LICENSE file in the root of this repository.
 
 import time
 import logging
@@ -548,6 +548,9 @@ class FrameworkSystematics(object):
         ----------
         mask: np.ndarray
             Mask of the maps, only the pixels in the observed area will be considered for the inversion
+        geometry_dictionary: dict
+            A dictionary containing the geometry information for the mapmaking process. Must contain 'wcs_car' if the maps are in CAR format.
+            Default is an empty dictionary.
         h_n_spin_dict: dict or Spin_maps
             Dictionary of the summed $h$-maps, with the keys being the spins and the values the $h$-maps
         spin_sky_maps: dict or Spin_maps
@@ -555,22 +558,37 @@ class FrameworkSystematics(object):
             (e.g. if nstokes=3, the keys are 0, -2, 2 and the fields (I, Q-iU, Q+iU))
         spin_systematics_maps: dict or Spin_maps (optional)
             Dictionary of the spin systematics maps, with the keys being the spins and the values the spin systematics maps,
-            of shape (n_det, npix), with n_det being the number of detectors (1 for spin=0) and npix the number of pixels.
+            of shape (n_det, npix), with n_det being the number of detectors and npix the number of pixels.
             If None, no systematics are considered (default is None).
         inverse_mapmaking_matrix: np.ndarray (optional)
             The inverse of the mapmaking matrix, with the shape (npix, nstokes, nstokes), with npix being the number of pixels
             in the observed area of the provided mask. If None, the inverse mapmaking matrix will be computed from the provided h_n maps.
             Default is None.
+        perform_det_interpolation: bool (optional)
+            If True, perform interpolation of the h_n maps to the detector locations provided in the dict_utils_interpolation_det, default is False.
+        dict_utils_interpolation_det: dict (optional)
+            Dictionary containing the information for the interpolation of the h_n maps to the detector locations, if perform_det_interpolation is True. Must contain the following keys:
+                * 'dict_positions_detector_known': dictionary containing the known detector positions
+                * 'dict_positions_detector_to_interpolate': dictionary containing the detector positions to interpolate
+                * 'dict_key_positions': dictionary containing the keys for the positions of the detectors
+                * 'list_weights': list of detector weights for the interpolation, default is None, then all weights are set to 1
         return_Q_U: bool (optional)
             If True, return the Q and U maps instead of the spin -2 and 2 maps, default is False.
         return_inverse_mapmaking_matrix: bool
             If True, return the inverse of the mapmaking matrix, default is False.
-        mask_input: bool (optional)
-            If True, the input maps will be copied and masked (WARNING: possibly very memory intensive), otherwise the input maps will not be masked,
-            and assumed to be provided in the right format. Default is True.
         polar_angle: np.ndarray (optional)
-            The polar angle to use for the mapmaking, if None, the polar angle will be computed from the provided h_n maps.
-            Must be provided in radians. Default is None.
+            The detector polarization angle to use for the mapmaking, if None, the polarization angle will be computed from the provided h_n maps. Must be provided in radians. Default is None.
+        number_chunks: int (optional)
+            Number of chunks to split the computation of the total maps, default is 10.
+        build_systematics_maps_from_templates: bool (optional)
+            If True, build the systematics maps from the provided templates in the dict_utils_template_systematics_maps, default is False.
+        dict_utils_template_systematics_maps: dict (optional)
+            Dictionary containing the information for the building of the systematics maps from the provided templates, if build_systematics_maps_from_templates is True. Must contain the following keys:
+                * 'template_spin_systematics_maps': dictionary containing the template spin systematics maps
+                * 'parameters_template_systematics': dictionary containing the detector parameters for the building of the systematics maps from the provided templates
+        single_precision: bool (optional)
+            If True, use single precision for the computations, otherwise use double precision. Default is False.
+        
 
         Returns
         -------

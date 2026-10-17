@@ -1,6 +1,6 @@
 # This file is part of SMARTIES.
-# Copyright (c) 2024-2026 bers of the Simons Simons Observatory Collaboration.
-# lease refer to the LICENSE file in the root of this repository.
+# Copyright (C) 2024-2026 Members of the Simons Observatory collaboration.
+# Please refer to the LICENSE file in the root of this repository.
 
 import logging
 import healpy as hp
@@ -206,7 +206,7 @@ def get_differential_ellipticity_BICEP(
         Full sky intensity sky map assumed to be already convolved with Gaussian 
         circularly-symmetric beam of the parameter sigma_FWHP, the output maps 
         will have the same dimension
-    ellipticity: dict
+    ellipticity_parameters_dict: dict
         Dictionary of the ellipticity parameters provided for each detector, see
         must contain keys 'ellipticity_parameter_convention', see the function
         `convert_ellipticities_conventions` in `tools.py` for more details
@@ -334,7 +334,7 @@ def create_dict_template_differential_ellipticity_BICEP(
         Full sky intensity sky map assumed to be already convolved with Gaussian 
         circularly-symmetric beam of the parameter sigma_FWHP, the output maps 
         will have the same dimension
-    ellipticity: dict
+    ellipticity_parameters_dict: dict
         Dictionary of the ellipticity parameters provided for each detector, see
         must contain keys 'ellipticity_parameter_convention', see the function
         `convert_ellipticities_conventions` in `tools.py` for more details

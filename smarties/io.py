@@ -1,6 +1,6 @@
 # This file is part of SMARTIES.
-# Copyright (c) 2024-2026 bers of the Simons Simons Observatory Collaboration.
-# lease refer to the LICENSE file in the root of this repository.
+# Copyright (C) 2024-2026 Members of the Simons Observatory collaboration.
+# Please refer to the LICENSE file in the root of this repository.
 
 
 import os
@@ -817,7 +817,8 @@ def save_partial_spin_maps(
     first_spin = 0 if (nstokes == 1 or nstokes == 3) else -2
     if type(partial_spin_maps[first_spin]) == enmap.ndmap:
         extended_final_maps = enmap.ndmap(
-            extended_final_maps, wcs=partial_spin_maps[first_spin].wcs
+            extended_final_maps.astype(np.float32 if dtype == np.complex64 else np.float64), 
+            wcs=partial_spin_maps[first_spin].wcs,
         )
         is_car = True
 

@@ -1,6 +1,6 @@
 # This file is part of SMARTIES.
-# Copyright (c) 2024-2026 bers of the Simons Simons Observatory Collaboration.
-# lease refer to the LICENSE file in the root of this repository.
+# Copyright (C) 2024-2026 Members of the Simons Observatory collaboration.
+# Please refer to the LICENSE file in the root of this repository.
 
 import os
 from copy import deepcopy
@@ -279,7 +279,7 @@ def uncouple_cross_spectra(
     ----------
     input_map : enmap.ndmap
         First input map.
-    input_map2 : enmap.ndmap
+    input_map_2 : enmap.ndmap
         Second input map.
     mask_apodized : enmap.ndmap
         Apodized mask to be applied to the maps.
@@ -568,7 +568,7 @@ def uncouple_spectra_pspy(
         Maximum multipole to be considered for the power spectrum estimation.
     delta_ell : int
         Width of the bins for the power spectrum.
-    input_map2 : enmap.ndmap, optional
+    input_map_2 : enmap.ndmap, optional
         Second input map.
 
     Returns
