@@ -164,7 +164,7 @@ cython_debug/
 .DS_store
 
 # Data files
-*.h5
+# *.h5
 *.npy
 *.npz
 *.par
