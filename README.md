@@ -23,7 +23,24 @@ The easiest way to install and use `smarties` is the following
     or, for development,
     ```bash
     pip install -e .
+    ```
 
+- or, with [uv](https://docs.astral.sh/uv/), create a virtual environment from the pinned
+  versions of `uv.lock`
+    ```bash
+    uv sync --extra test
+    uv run python -m pytest
+    ```
+
+## Documentation
+
+The documentation (user guide, examples and API reference) lives in [`docs/`](docs/) and is
+built with [Zensical](https://zensical.org):
+
+```bash
+pip install --group docs   # pip >= 25.1
+zensical serve             # live preview at http://localhost:8000
+```
 
 ## Contact
 For any solicitation, please contact `magdy.morshed at fe.infn.it`.
