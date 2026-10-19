@@ -34,7 +34,11 @@ The easiest way to install and use `smarties` is the following
 
 ## Documentation
 
-The documentation (user guide, examples and API reference) lives in [`docs/`](docs/) and is
+The documentation (user guide, examples and API reference) is available at [https://simonsobs.github.io/smarties](https://simonsobs.github.io/smarties). 
+
+The files live in [`docs/`](docs/) and can be locally built with [Zensical](https://zensical.org):
+
+```bash
 built with [Zensical](https://zensical.org):
 
 ```bash
