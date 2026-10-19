@@ -1,0 +1,149 @@
+[project]
+site_name = "SMARTIES documentation"
+site_description = "Spin MAp Reduction Toolkit for systematics Impact EStimation: map-based simulations of instrumental systematics for CMB experiments."
+site_author = "SMARTIES contributors"
+site_url = "https://smarties.readthedocs.io/en"
+copyright = "&copy; 2024-2026 Members of the Simons Observatory Collaboration"
+repo_url = "https://github.com/simonsobs/smarties"
+repo_name = "simonsobs/smarties"
+edit_uri = "edit/main/docs/"
+
+# https://zensical.org/docs/setup/navigation/
+nav = [
+  { "Home" = "index.md" },
+  { "Getting Started" = [
+      "getting_started/installation.md",
+      "getting_started/quickstart.md",
+      "getting_started/formalism.md",
+      "getting_started/spin_maps.md",
+      "getting_started/h_maps.md",
+      "getting_started/systematics.md",
+      "getting_started/mapmaking.md",
+  ] },
+  # { "Tutorials" = [
+  #     "tutorials/litebird_healpix_tutorial.md",
+  #     "tutorials/sotodlib_car_tutorial.md",
+  # ] },
+  # { "Development" = [
+  #     "development/contributing.md",
+  #     "development/changelog.md",
+  # ] },
+]
+
+# https://zensical.org/docs/authoring/math/
+extra_javascript = [
+    "javascripts/mathjax.js",
+    "https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"
+]
+
+# Generate the API reference from the source tree (static analysis: smarties does not need
+# to be importable, nor its dependencies installed, to build the documentation).
+# https://zensical.org/docs/setup/extensions/mkdocstrings/
+[project.plugins.api-autonav]
+modules = ["smarties"]
+nav_section_title = "API reference"
+api_root_uri = "api"
+# Work-in-progress modules that are not part of the public API yet.
+exclude = ["smarties.maps", "smarties.systematics.gain", "smarties.mapmaking_chunks", "smarties.utils.resolution_proposed"]
+
+[project.plugins.mkdocstrings.handlers.python]
+inventories = [
+    "https://docs.python.org/3/objects.inv",
+    "https://numpy.org/doc/stable/objects.inv",
+    "https://docs.scipy.org/doc/scipy/objects.inv",
+    "https://healpy.readthedocs.io/en/latest/objects.inv",
+    "https://pixell.readthedocs.io/en/latest/objects.inv",
+]
+paths = ["."]
+
+[project.plugins.mkdocstrings.handlers.python.options]
+# SMARTIES docstrings follow the numpydoc convention.
+docstring_style = "numpy"
+docstring_section_style = "list"
+# Keep source order.
+members_order = "source"
+# Cross-references: resolve [`Name`][] by scope, by dotted relative path, and in signatures.
+relative_crossrefs = true
+scoped_crossrefs = true
+signature_crossrefs = true
+# Render a heading for the symbol requested directly by a `:::` block.
+show_root_heading = true
+# Render symbols with no docstring; document only public (non-_) names.
+show_if_no_docstring = true
+filters = "public"
+# Drop the __init__ summary line (merged into the class).
+docstring_options.ignore_init_summary = true
+merge_init_into_class = true
+# Member summary tables at the top of each page.
+summary = true
+# Symbol-type tags in headings and the right-hand table of contents.
+show_symbol_type_heading = true
+show_symbol_type_toc = true
+
+[project.markdown_extensions]
+admonition = {}
+pymdownx.details = {}
+pymdownx.superfences = {}
+pymdownx.highlight = { anchor_linenums = true, line_spans = "__span", pygments_lang_class = true }
+pymdownx.inlinehilite = {}
+pymdownx.snippets = {}
+pymdownx.tabbed = { alternate_style = true }
+footnotes = {}
+pymdownx.caret = {}
+pymdownx.keys = {}
+pymdownx.mark = {}
+pymdownx.tilde = {}
+pymdownx.arithmatex = { generic = true }
+pymdownx.magiclink = { repo_url_shorthand = true, user = "simonsobs", repo = "smarties" }
+pymdownx.emoji = {}
+abbr = {}
+attr_list = {}
+def_list = {}
+pymdownx.tasklist = { custom_checkbox = true }
+toc = { permalink = true }
+
+[project.theme]
+language = "en"
+icon.repo = "fontawesome/brands/github"
+
+features = [
+    "announce.dismiss",
+    "content.action.edit",
+    "content.action.view",
+    "content.code.annotate",
+    "content.code.copy",
+    "content.footnote.tooltips",
+    "content.tabs.link",
+    "content.tooltips",
+    "navigation.footer",
+    "navigation.indexes",
+    "navigation.instant",
+    "navigation.instant.progress",
+    "navigation.path",
+    "navigation.sections",
+    "navigation.tabs",
+    "navigation.tabs.sticky",
+    "navigation.top",
+    "navigation.tracking",
+    "search.highlight",
+    "search.share",
+    "search.suggest",
+    "toc.follow",
+]
+
+palette = [
+  {
+    media = "(prefers-color-scheme: light)",
+    scheme = "default",
+    primary = "pink",
+    accent = "deep orange",
+    toggle = { icon = "lucide/sun", name = "Switch to dark mode" }
+  },
+  {
+    media = "(prefers-color-scheme: dark)",
+    scheme = "slate",
+    primary = "pink",
+    accent = "amber",
+    toggle = { icon = "lucide/moon", name = "Switch to system preference" }
+  },
+]

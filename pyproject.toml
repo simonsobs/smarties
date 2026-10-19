@@ -38,7 +38,8 @@ dependencies = [
     'ducc0',
     'h5py',
     'pixell',
-    'tqdm'
+    'tqdm',
+    'pyyaml',
 ]
 
 dynamic = ['version']
@@ -49,11 +50,29 @@ optional = [
     'toml',
     'matplotlib',
 ]
+test = [
+    'pytest',
+]
 
+
+[dependency-groups]
+docs = [
+    'zensical>=0.0.66',
+    'mkdocstrings-python>=2.0.5',
+]
+tutorials = [
+    'camb',
+    'matplotlib',
+    'jupyter',
+    'nbconvert',
+    'nbclient',
+]
 
 [project.urls]
-# homepage = ''
-# repository = ''
+documentation = 'https://smarties.readthedocs.io/en/latest/'
+repository = 'https://github.com/simonsobs/smarties'
+issues = 'https://github.com/simonsobs/smarties/issues'
+changelog = 'https://smarties.readthedocs.io/en/latest/development/changelog/'
 
 [[tool.mypy.overrides]]
 module = [
@@ -64,3 +83,13 @@ ignore_missing_imports = true
 [tool.setuptools.packages.find]
 include = ["smarties*"]
 [tool.setuptools_scm]
+
+
+[tool.pytest.ini_options]
+testpaths = ['tests']
+# '.' : test the working tree rather than an installed copy; 'tests' : shared `_helpers` module
+pythonpath = ['.', 'tests']
+markers = [
+    'integration: end-to-end tests chaining several modules (deselect with -m "not integration")',
+]
+
