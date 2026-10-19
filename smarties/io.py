@@ -5,7 +5,7 @@
 
 import os
 import logging
-
+from copy import deepcopy
 import h5py
 import healpy as hp
 import numpy as np
@@ -110,6 +110,7 @@ def read_toast_h_maps(
     reweight_by_hits: bool = True,
     single_precision: bool = False,
     duplicate_maps_with_prefix=False,
+    return_only_positive_spins: bool = True,
     projection_pixel: str = "healpix",
 ) -> Spin_maps:
     """
@@ -146,6 +147,8 @@ def read_toast_h_maps(
         If True, read the $h$-maps in single precision (float32). If False, read in double precision (float64). Default is False.
     duplicate_maps_with_prefix: bool, optional
         If True, duplicate the maps for each prefix in list_prefix (so that the h-maps for each pair are identical). Default is False.
+    return_only_positive_spins: bool, optional
+        If True, only load the positive spins from list_spin. Default is False.
     projection_pixel: str, optional
         Projection of the pixelization of the map to be read, either 'healpix' or 'car'. Default is 'healpix'.
 
@@ -222,9 +225,12 @@ def read_toast_h_maps(
         shape_fullsky = shape_fullsky[1:]
     fake_h_map = None
 
-    total_list_spin = list_spin + [-spin for spin in list_spin]
-    if 0 in total_list_spin and total_list_spin.count(0) > 1:
-        total_list_spin.remove(0)
+    total_list_spin = deepcopy(list_spin)
+    if not return_only_positive_spins:
+        total_list_spin += [-spin for spin in list_spin]
+
+        if 0 in total_list_spin and total_list_spin.count(0) > 1:
+            total_list_spin.remove(0)
 
     h_n_spinmaps = Spin_maps.from_dictionary(
         {spin: np.zeros((n_det, n_pix), dtype=dtype) for spin in total_list_spin}
@@ -276,8 +282,9 @@ def read_toast_h_maps(
                 ].imag = sin_spin_h_n * list_weights[j]
         spin_h_n = None
 
-    for spin in list_spin:
-        h_n_spinmaps[-spin] = np.conj(h_n_spinmaps[spin])
+    if not return_only_positive_spins:
+        for spin in list_spin:
+            h_n_spinmaps[-spin] = np.conj(h_n_spinmaps[spin])
 
     logger.info("Finalizing h_n dictionary...")
 
@@ -301,6 +308,7 @@ def read_lbs_h_maps(
     mask: np.ndarray = None,
     format_file: str = "h5",
     reweight_by_hits: bool = True,
+    return_only_positive_spins: bool = True,
     single_precision: bool = False,
 ) -> Spin_maps:
     """
@@ -328,6 +336,8 @@ def read_lbs_h_maps(
         Format of the file to read, must be 'h5', 'hdf5', 'H5' or 'hdf', otherwise a ValueError is raised, as other formats are not supported for litebird_sim h maps
     reweight_by_hits: bool, optional
         If True, the weights are computed from the number of pixels with non-zero $h$-maps values, so that the total $h$-maps are weighted by the number of detectors observing each pixel.
+    return_only_positive_spins: bool, optional
+        If True, only load the positive spins from list_spin. Default is False.
     single_precision: bool, optional
         If True, read the $h_{n,m}$ maps in single precision (float32/complex64). If False, read in double precision (float64/complex128). Default is False.
 
@@ -392,7 +402,9 @@ def read_lbs_h_maps(
         boolean_mask = np.bool_(mask)
         n_pix = boolean_mask[boolean_mask].size
 
-    total_list_spin = list_spin + [-spin for spin in list_spin if np.sum(spin) != 0]
+    total_list_spin = deepcopy(list_spin) 
+    if not return_only_positive_spins:
+        total_list_spin += [-spin for spin in list_spin if np.sum(spin) != 0]
     # if 0 in total_list_spin and total_list_spin.count(0) > 1:
     #     total_list_spin.remove(0)
 
@@ -425,8 +437,9 @@ def read_lbs_h_maps(
             )
         h_map_file.close()
 
-    for spin in list_spin:
-        h_n_spinmaps[-spin] = np.conj(h_n_spinmaps[spin])
+    if not return_only_positive_spins:
+        for spin in list_spin:
+            h_n_spinmaps[-spin] = np.conj(h_n_spinmaps[spin])
 
     logger.info("Finalizing h_n dictionary...")
 
@@ -518,17 +531,23 @@ def build_mask_from_toast_h_maps(
 
     dtype = np.float32 if single_precision else np.float64
 
-    mask = np.zeros_like(
-        read_file(
-            list_name_files[0]+'_{}_sin_{}'.format(list_prefix[0].replace('_',''),spin_to_read), format_file=format_file,
-            projection_pixel=projection_pixel,
-        flatten_output=False
-        ), 
-        dtype=dtype)
-    shape_fullsky = mask.shape
+    fake_h_map = read_file(
+        list_name_files[0]
+        + "_{}_sin_{}".format(list_prefix[0].replace("_", ""), spin_to_read),
+        format_file=format_file,
+        boolean_mask=None,
+        projection_pixel=projection_pixel,
+        flatten_output=False,
+    )
+    wcs = None if projection_pixel == "healpix" else fake_h_map.wcs
+    shape_fullsky = fake_h_map.shape
     if shape_fullsky[0] == 1:
         shape_fullsky = shape_fullsky[1:]
-    mask = mask.ravel()
+
+    mask = np.zeros_like(
+        fake_h_map, 
+        dtype=dtype).ravel()
+    fake_h_map = None
     mask_detectors = np.int64(np.bool_(mask))
 
     for name_file in tqdm(list_name_files):
@@ -556,6 +575,8 @@ def build_mask_from_toast_h_maps(
 
     if format_file in ["h5", "hdf5", "H5", "hdf"] and projection_pixel == "healpix":
         reorder_output = lambda x: hp.reorder(x, n2r=True)
+    elif projection_pixel == "car" and wcs is not None:
+        reorder_output = lambda x: enmap.enmap(x, wcs=wcs)
     else:
         reorder_output = lambda x: x
 
