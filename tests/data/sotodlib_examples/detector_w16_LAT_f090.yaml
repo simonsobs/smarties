@@ -1,0 +1,24 @@
+h_n:
+    list_suffix:
+        - _LAT_f090
+    
+    list_prefix:
+        - A_
+        - B_
+
+    file_prefix:
+        - h_n_
+    format_h_n: hdf #npy #hdf5
+
+    projection_pixel: car  # healpix or car
+
+pol_ang:
+  file_path: /Users/mag/Documents/Ferrara1Y/Mapbased_systematics/smarties/tests/data/sotodlib_examples/pol_angles.toml
+
+detector_wafers:
+    default: 
+        - p000:p209
+        - p211:p219
+        - p221:p431 # default pixels for all wafer
+    w16: 
+        default:
