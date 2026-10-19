@@ -28,7 +28,7 @@ def _build_central_term_pointing_leakage(
         shape_car: tuple[int, int] | None = None,
         shape_fullsky_car: tuple[int, int] | None = None
     ) -> np.ndarray | enmap.ndmap:
-    """
+    r"""
     Build the central term of the pointing leakage maps from T, corresponding
     to the spin-raising and lowering operators applied to the intensity sky map 
     $$\bar{\eth} I$$, which is independent of the pointing parameters, and can be 
@@ -146,7 +146,7 @@ def create_pointing_spin_leakage_map(
         shape_car: tuple[int, int] | None = None,
         shape_fullsky_car: tuple[int, int] | None = None
     ) -> Spin_maps:
-    """
+    r"""
     Create the pointing leakage maps for a given intensity sky map and angular amplitude offset,
     with output spins 1 and -1, resulting in maps
         $ \Tilde{S}_1 = - \frac{\rho_B}{2} \eth I$

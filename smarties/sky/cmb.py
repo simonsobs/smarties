@@ -147,7 +147,7 @@ def generate_CMB_map(nside: int, lmax: int, seed: int=42) -> np.ndarray:
 
 
 def create_CMB_spin_maps(nside: int, nstokes: int, lmax: int, fwhm: float = 0.0, seed: int = 42) -> Spin_maps:
-    """
+    r"""
     Create spin maps for the CMB contribution, the $\Tilde{S}_k$ maps, defined
     as
         $\Tilde{S}_0 = I$

@@ -33,7 +33,7 @@ list_conventions = [
 
 
 def get_coupled_spin(reference_spin: int, available_h_n_spin: list[int], available_signal_spins: list[int]) -> list[tuple]:
-    """
+    r"""
     Get the coupled spins for a reference spin $k$ given a set of $h$-maps and signal spin maps, involved in a typical sum:
         $ sum_{k' = -\infty}^{\infty} h_{k-k'} S_{k'}$
 
@@ -282,6 +282,11 @@ def transform_spin_maps_into_array_maps(spin_maps: Spin_maps) -> np.ndarray | en
     -------
     array_maps: np.ndarray
         Array of maps of shape (..., n_stokes, n_pix)
+
+    Notes
+    -----
+    If the input spin_maps is of type enmap.ndmap, the output array_maps will also be of type enmap.ndmap, inheriting the same WCS information,
+    and they will be assumed to contain two spatial dimensions.
     """
 
     n_stokes = 0
@@ -297,11 +302,11 @@ def transform_spin_maps_into_array_maps(spin_maps: Spin_maps) -> np.ndarray | en
     boolean_car_pixelization = type(spin_maps[first_spin]) == enmap.ndmap
     dimension_pixels = -1 if not boolean_car_pixelization else -2
 
-    shape_pix = (spin_maps[first_spin].shape[-dimension_pixels:],)
+    shape_pix = (spin_maps[first_spin].shape[dimension_pixels:],)
     dtype = spin_maps[first_spin].dtype
 
     array_maps = np.zeros(
-        spin_maps[first_spin].shape[:-dimension_pixels] + (n_stokes,) + shape_pix,
+        spin_maps[first_spin].shape[:dimension_pixels] + (n_stokes,) + (np.prod(shape_pix).astype(int),),
         dtype=dtype,
     )
 
@@ -313,7 +318,7 @@ def transform_spin_maps_into_array_maps(spin_maps: Spin_maps) -> np.ndarray | en
         array_maps[..., 2, :] = -1j * (spin_maps[2] - spin_maps[-2])
 
     if boolean_car_pixelization:
-        array_maps = enmap.ndmap(array_maps, wcs=spin_maps[first_spin].wcs)
+        array_maps = enmap.ndmap(array_maps.reshape(-1, *array_maps.shape[-2:]), wcs=spin_maps[first_spin].wcs)
     return array_maps
 
 

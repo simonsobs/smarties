@@ -6,10 +6,7 @@ from copy import deepcopy
 
 import healpy as hp
 import numpy as np
-import toml
-import yaml
-from opt_einsum import contract
-from pixell import enmap, enplot, utils, wcsutils
+from pixell import enmap, wcsutils
 
 from smarties.hn import Spin_maps, Spin_nm
 from smarties.sky.cmb import create_CMB_spin_maps

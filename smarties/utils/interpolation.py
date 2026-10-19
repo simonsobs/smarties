@@ -2,10 +2,13 @@
 # Copyright (C) 2024-2026 Members of the Simons Observatory collaboration.
 # Please refer to the LICENSE file in the root of this repository.
 
+import logging
 import numpy as np
 from scipy.interpolate import griddata
 
 from smarties.hn import Spin_maps
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     'perform_interpolation_scipy'
@@ -95,18 +98,6 @@ def perform_interpolation_scipy(
     results = dict() if not return_as_spin_maps else Spin_maps.from_dictionary(dict())
 
     for key in keys_values_to_fit:
-        nearest_values = griddata(
-            (
-                dictionary_known_values[position_x_key],
-                dictionary_known_values[position_y_key],
-            ),
-            dictionary_known_values[key][_slice],
-            (
-                dictionary_detector_to_interpolate[position_x_key],
-                dictionary_detector_to_interpolate[position_y_key],
-            ),
-            method="nearest",
-        )
 
         interpolated_values = griddata(
             (
@@ -121,9 +112,24 @@ def perform_interpolation_scipy(
             method=method_interpolation,
         )
         # Replace possible nans with nearest interpolation values
-        interpolated_values[np.isnan(interpolated_values)] = nearest_values[
-            np.isnan(interpolated_values)
-        ]
+        values_to_replace = np.isnan(interpolated_values)
+        if values_to_replace.any():
+            logger.warning(
+                f"Warning: {np.sum(values_to_replace)} NaN values found in the interpolated values for key '{key}' using method '{method_interpolation}'. Replacing them with nearest interpolation values."
+            )
+            nearest_values = griddata(
+                (
+                    dictionary_known_values[position_x_key],
+                    dictionary_known_values[position_y_key],
+                ),
+                dictionary_known_values[key][_slice],
+                (
+                    dictionary_detector_to_interpolate[position_x_key],
+                    dictionary_detector_to_interpolate[position_y_key],
+                ),
+                method="nearest",
+            )
+            interpolated_values[values_to_replace] = nearest_values[values_to_replace]
 
         if not stack_output_with_known_values:
             results[key] = interpolated_values[_slice_output]

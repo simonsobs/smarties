@@ -154,8 +154,12 @@ class FrameworkSystematics(object):
                 polar_efficiency_coeff=polar_efficiency_coeff,
                 slice_to_apply=slice_to_apply
             )
+        tol = 1e-6 if dtype == np.complex64 else 1e-14
+        hermitian = np.allclose(mapmaking_matrix, mapmaking_matrix.conj().transpose((0, 2, 1)), atol=tol, rtol=tol)
+        if not hermitian:
+            logger.warning("WARNING: The mapmaking matrix is not Hermitian, the building of the mapmaking matrix may be incorrect, check the h_n maps and the polar angle coefficients")
         # Then, compute the inverse of the mapmaking matrix
-        return np.linalg.pinv(mapmaking_matrix)
+        return np.linalg.pinv(mapmaking_matrix, hermitian=hermitian)
 
     
     def compute_spin_convolution(
@@ -302,10 +306,10 @@ class FrameworkSystematics(object):
 
     def compute_total_maps(
             self,
-            mask: np.ndarray | enmap.ndmap,
             h_n_spin_dict: dict | Spin_maps,
             spin_sky_maps: dict | Spin_maps,
             spin_systematics_maps: dict | Spin_maps = None,
+            mask: np.ndarray | enmap.ndmap = None,
             inverse_mapmaking_matrix : np.ndarray = None,
             return_Q_U: bool = False,
             return_inverse_mapmaking_matrix: bool = False,
@@ -322,8 +326,6 @@ class FrameworkSystematics(object):
 
         Parameters
         ----------
-        mask: np.ndarray
-            Mask of the maps, only the pixels in the observed area will be considered for the inversion
         h_n_spin_dict: dict or Spin_maps
             Dictionary of the summed $h$-maps, with the keys being the spins and the values the $h$-maps
         spin_sky_maps: dict or Spin_maps
@@ -333,6 +335,8 @@ class FrameworkSystematics(object):
             Dictionary of the spin systematics maps (detector-dependent), with the keys being the spins and the values the spin systematics maps,
             of shape (n_det, npix), with n_det being the number of detectors and npix the number of pixels.
             If None, no systematics are considered (default is None).
+        mask: np.ndarray
+            Mask of the maps, only the pixels in the observed area will be considered for the inversion
         inverse_mapmaking_matrix: np.ndarray (optional)
             The inverse of the mapmaking matrix to use, with the shape (npix, nstokes, nstokes), with npix being the number of pixels
             in the observed area of the provided mask. If None, the inverse mapmaking matrix will be computed from the provided h_n maps.
@@ -525,11 +529,11 @@ class FrameworkSystematics(object):
 
     def compute_total_maps_chunks(
             self,
-            mask: np.ndarray,
             geometry_dictionary: dict,
             h_n_spin_dict: dict | Spin_maps,
             spin_sky_maps: dict | Spin_maps,
             spin_systematics_maps: dict | Spin_maps = None,
+            mask: np.ndarray = None,
             inverse_mapmaking_matrix : np.ndarray = None,
             perform_det_interpolation: bool = False,
             dict_utils_interpolation_det: dict = None,
@@ -539,7 +543,8 @@ class FrameworkSystematics(object):
             number_chunks: int = 10,
             build_systematics_maps_from_templates: bool = False,
             dict_utils_template_systematics_maps: dict = None,
-            single_precision: bool = False
+            single_precision: bool = False,
+            optimize_computations: bool = True
         ):
         """
         Compute the total maps from the $h$-maps, the spin sky maps and the spin systematics maps
@@ -741,8 +746,6 @@ class FrameworkSystematics(object):
 
         logger.info("Finishing the mapmaking process, computing the total maps...")
         # Second, form the data vector composed of (<d_j>, <d_j cos 2\phi_j>, <d_j sin 2\phi_j>)
-
-
 
         final_sky_fields = np.zeros((len(self.list_spin_output),npix), dtype=dtype)
 
@@ -956,18 +959,28 @@ class FrameworkSystematics(object):
 
             logger.info("Computing the final sky fields...")
             # Finally, compute the final sky fields
-            final_sky_fields[...,slice_1d_final_map] = contract(
-                        '...ij,...j->i...',
-                        final_inverse_mapmaking_matrix_sliced,
-                        spin_coupled_maps,
-                    )
+            time_final_maps = time.time()
+            if not optimize_computations:
+                final_sky_fields[...,slice_1d_final_map] = contract(
+                            '...ij,...j->i...',
+                            final_inverse_mapmaking_matrix_sliced,
+                            spin_coupled_maps,
+                        )
+            else:
+                for i, spin in enumerate(self.list_spin_output):
+                    if spin<0:
+                        continue
+                    final_sky_fields[i,slice_1d_final_map] = get_final_map((final_inverse_mapmaking_matrix_sliced[..., i,:]*spin_coupled_maps).sum(axis=-1))
+                coupled_indices_positive_negative = [(i, self.list_spin_output.index(-spin)) for i, spin in enumerate(self.list_spin_output) if spin > 0 and -spin in self.list_spin_output]
+                for spin_pos, spin_neg in coupled_indices_positive_negative:
+                    final_sky_fields[spin_neg,slice_1d_final_map] = get_final_map(np.conj(final_sky_fields[spin_pos,slice_1d_final_map]))
 
             if rebuild_mapmaking_matrix:
                 final_inverse_mapmaking_matrix[slice_1d_final_map] = final_inverse_mapmaking_matrix_sliced
 
         final_sky_fields = get_final_map(final_sky_fields)
+        logger.info(f"Final maps computed in {time.time() - time_final_maps:.2f} seconds...")
 
-        logger.info("Final sky fields computed, transforming them into Spin_maps...")
         dict_final_sky_fields = Spin_maps.from_list_maps(
             final_sky_fields,
             self.list_spin_output
