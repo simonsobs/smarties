@@ -149,10 +149,11 @@ def get_beam_convolution_spins_maps(
         Spin -> complex maps of shape ``(n_det, npix)``, either in healpix or CAR pixelization depending on the ``wcs`` parameter.
     """
     n_det = len(det_names)
+    assert mmax_beam <= np.iinfo(np.int16).max, "mmax_beam is too large for np.int16"
     if spins is None:
-        spins_needed = np.arange(-mmax_beam, mmax_beam + 1)
+        spins_needed = np.arange(-mmax_beam, mmax_beam + 1,dtype=np.int16) # avoid upcasting of alms to double precision when using single_precison=True
     else:
-        spins_needed = np.array(spins)
+        spins_needed = np.array(spins,dtype=np.int16)
     spins_needed_pos = spins_needed[spins_needed >= 0]
     assert np.max(spins_needed_pos) <= mmax_beam, (
         "The spin wanted must be smaller than mmax"
@@ -223,7 +224,6 @@ def get_beam_convolution_spins_maps(
         curr_blmB = np.zeros(lmax + 1, dtype=dtype)
 
         for spin in spins_needed:
-            spin = int(spin) # avoid double precision upcasting
             curr_blm0.fill(0)
             curr_blmE.fill(0)
             curr_blmB.fill(0)
@@ -258,7 +258,6 @@ def get_beam_convolution_spins_maps(
             dict_harm_coeff[spin][idet] = output_alms
 
     for spin in spins_needed_pos:  # We computes the maps from the alms
-        spin=int(spin) # avoid double precision upcasting
         for idet in range(n_det):
             map_output = (
                 enmap.empty((int(spin != 0) + 1,) + shape_pixels_output, wcs=wcs)
