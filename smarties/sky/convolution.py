@@ -149,10 +149,11 @@ def get_beam_convolution_spins_maps(
         Spin -> complex maps of shape ``(n_det, npix)``, either in healpix or CAR pixelization depending on the ``wcs`` parameter.
     """
     n_det = len(det_names)
+    assert mmax_beam <= np.iinfo(np.int16).max, "mmax_beam is too large for np.int16"
     if spins is None:
-        spins_needed = np.arange(-mmax_beam, mmax_beam + 1)
+        spins_needed = np.arange(-mmax_beam, mmax_beam + 1,dtype=np.int16) # avoid upcasting of alms to double precision when using single_precison=True
     else:
-        spins_needed = np.array(spins)
+        spins_needed = np.array(spins,dtype=np.int16)
     spins_needed_pos = spins_needed[spins_needed >= 0]
     assert np.max(spins_needed_pos) <= mmax_beam, (
         "The spin wanted must be smaller than mmax"
@@ -161,6 +162,7 @@ def get_beam_convolution_spins_maps(
         "Please provide only positive spins"
     )
     dtype = np.complex64 if single_precision else np.complex128
+    real_dtype = np.float32 if single_precision else np.float64
     if return_only_positive_spins:
         dict_spin_maps = {
             spin: np.zeros((n_det,) + shape_pixels_output, dtype=dtype)
@@ -177,7 +179,7 @@ def get_beam_convolution_spins_maps(
     }
 
     ell_array = np.arange(lmax + 1)
-    sqrt_factor = np.sqrt(4.0 * np.pi / (2 * ell_array + 1))
+    sqrt_factor = np.sqrt(4.0 * np.pi / (2 * ell_array + 1)).astype(real_dtype)
 
     for idet, det_name in enumerate(det_names):
         alms_det = alms[det_name]
@@ -209,6 +211,7 @@ def get_beam_convolution_spins_maps(
                 pol_angle_rad=pol_angles_rad[idet]
                 if pol_angles_rad is not None
                 else None,
+                single_precision=single_precision,
             )
 
             for m in range(min(2 + 1, mmax_beam + 1)):
@@ -229,7 +232,7 @@ def get_beam_convolution_spins_maps(
 
             m_beam = -spin  # Z_{spin} uses b*_{ell,-spin}
 
-            prefactor = sqrt_factor * (-1.0) ** (-spin)
+            prefactor = (sqrt_factor * (-1.0) ** int(-spin)).astype(real_dtype)
             idx_beam = hp.Alm.getidx(
                 lmax, np.arange(abs(m_beam), lmax + 1), abs(m_beam)
             )  # Get indices for all ell where |m_beam| <= ell
@@ -254,7 +257,6 @@ def get_beam_convolution_spins_maps(
             spin_minus_2_term = almxfl(alm_m2, np.conj(curr_blm_m2)*prefactor)
 
             output_alms =  (spin_0_term + 0.5 * (spin_plus_2_term + spin_minus_2_term))
-
             dict_harm_coeff[spin][idet] = output_alms
 
     for spin in spins_needed_pos:  # We computes the maps from the alms

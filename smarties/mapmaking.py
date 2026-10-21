@@ -52,12 +52,12 @@ class FrameworkSystematics(object):
         lmax: int
             Maximum multipole (useful for CMB and systematics generation)
         list_spin_output: list[int]
-            List of spins on which the mapmaking will be performed. 
+            List of spins on which the mapmaking will be performed.
         """
         assert np.unique(list_spin_output).size == np.array(list_spin_output).size, 'The list of spins must be unique'
         assert np.all(np.isin(np.array(list_spin_output), -np.array(list_spin_output))), 'The list of spins must be symmetric around 0, i.e. if spin k is in the list, then spin -k must also be in the list'
-        
-        self.list_spin_output = list_spin_output 
+
+        self.list_spin_output = list_spin_output
         self.nstokes = nstokes
         self.lmax = lmax
         self.map_shape = map_shape
@@ -110,11 +110,11 @@ class FrameworkSystematics(object):
         npix: int
             Number of pixels in the observed area, default is None, then the number of pixels is inferred from the input maps
         polar_angle_coeff: np.ndarray
-            The polar angle coefficients to use for the mapmaking, if None, they will be set to 1. 
+            The polar angle coefficients to use for the mapmaking, if None, they will be set to 1.
         polar_efficiency_coeff: np.ndarray
-            The polar efficiency coefficients to use for the mapmaking, if None, they will be set to 1. 
+            The polar efficiency coefficients to use for the mapmaking, if None, they will be set to 1.
         slice_to_apply: slice
-            Slice to apply to the h_n maps, to only compute the mapmaking matrix for a portion of the pixels. 
+            Slice to apply to the h_n maps, to only compute the mapmaking matrix for a portion of the pixels.
             If None, no slice is applied. Default is None.
 
         Returns
@@ -161,7 +161,7 @@ class FrameworkSystematics(object):
         # Then, compute the inverse of the mapmaking matrix
         return np.linalg.pinv(mapmaking_matrix, hermitian=hermitian)
 
-    
+
     def compute_spin_convolution(
         self,
         spin_sky_maps: dict | Spin_maps,
@@ -207,7 +207,7 @@ class FrameworkSystematics(object):
 
         base_spins = list(np.unique(spin_sky_maps.spins + spin_systematics_maps.spins))
         list_spin_maps = sorted(set(base_spins) | {-s for s in base_spins if s > 0})
-        
+
 
         def polar_efficiency_func(spin):
             if spin in [-2, 2]:
@@ -218,13 +218,13 @@ class FrameworkSystematics(object):
         if projector_h_n is None:
             projector_h_n = ... # Use all pixels
 
-        
+
         factor_func = lambda spin: 1 if np.sum(spin) == 0 else .5
 
         if optimize_computations:
             logger.info("Optimizing the computations for the spin convolution...")
             # Precompute the coupled spins for each spin in the list of spins to compute
-            
+
             dict_coupled_maps = {spin: np.zeros((npix,), dtype=dtype) for spin in self.list_spin_output}
             spin_h_maps = sorted(set(h_n_spin_dict.spins) | {-s for s in h_n_spin_dict.spins if s > 0})
             list_spin_input_positive = [spin for spin in self.list_spin_output if spin >= 0]
@@ -238,14 +238,14 @@ class FrameworkSystematics(object):
 
                 logger.info(f'Coupled spins for spin {spin}: {coupled_spins}')
 
-                
-                
+
+
                 factor_correction = lambda spin: 1
                 if spin == 0:
-                    coupled_spins = [tuple_spin for tuple_spin in coupled_spins if tuple_spin[0] >= 0] 
-                    factor_correction = lambda spin: 1 if spin != 0 else .5 
+                    coupled_spins = [tuple_spin for tuple_spin in coupled_spins if tuple_spin[0] >= 0]
+                    factor_correction = lambda spin: 1 if spin != 0 else .5
 
-                
+
                 # \sum_{k' = -\infty}^{\infty} h_{k-k'} S_{k'} on all (k-k', k') pairs
                 for tuple_spins in coupled_spins:
                     dict_coupled_maps[spin] += factor_func(spin) * factor_correction(tuple_spins[0]) * contract(
@@ -260,14 +260,14 @@ class FrameworkSystematics(object):
                             spin_sky_maps[tuple_spins[1]]
                         )
                     )
-                    
+
                 dict_coupled_maps[-spin] += np.conj(dict_coupled_maps[spin])
             if return_array:
                 spin_coupled_maps = np.zeros((npix, len(self.list_spin_output),), dtype=dtype)
                 for i, spin in enumerate(self.list_spin_output):
                     spin_coupled_maps[:, i] = dict_coupled_maps[spin]
                 return spin_coupled_maps
-                    
+
         else:
             spin_coupled_maps = np.zeros((npix, len(self.list_spin_output),), dtype=dtype)
             for i, spin in enumerate(self.list_spin_output):
@@ -362,7 +362,7 @@ class FrameworkSystematics(object):
             If True, use single precision for the computations, otherwise use double precision. Default is False.
         optimize_computations: bool (optional)
             If True, optimize the computations for the mapmaking process, default is True.
-        
+
 
         Returns
         -------
@@ -423,7 +423,7 @@ class FrameworkSystematics(object):
         else:
             assert polar_angle.size == h_n_spin_dict[spin_0].shape[0], 'The polar angle map must have the same shape as the h-maps'
 
-            polar_angle_coeff = {spin: np.exp(spin * 1j * polar_angle) for spin in spin_h_maps}
+            polar_angle_coeff = {spin: np.exp(spin * 1j * polar_angle).astype(dtype) for spin in spin_h_maps}
             #TODO: Generalize to m != 0 for HWP angles
 
         if polar_efficiency_coeff is not None:
@@ -433,20 +433,20 @@ class FrameworkSystematics(object):
 
         if spin_systematics_maps is None:
             logger.warning("No systematics maps provided, assuming no systematics")
-            spin_systematics_maps = Spin_maps.from_dictionary({spin: np.zeros(1) for spin in spin_sky_maps.spins})
+            spin_systematics_maps = Spin_maps.from_dictionary({spin: np.zeros(1,dtype=dtype) for spin in spin_sky_maps.spins})
 
         for spin in set(spin_systematics_maps.spins):
             if (spin not in spin_sky_maps) and (-spin not in spin_sky_maps):
-                spin_sky_maps[spin] = np.zeros(1) 
-                spin_sky_maps[-spin] = np.zeros(1)
+                spin_sky_maps[spin] = np.zeros(1,dtype=dtype)
+                spin_sky_maps[-spin] = np.zeros(1,dtype=dtype)
                 # If a spin is not provided in the sky maps, we assume that the sky maps for this spin are zero
             if (spin in spin_systematics_maps) and (-spin in spin_systematics_maps):
                 assert np.all((spin_systematics_maps[spin]+spin_systematics_maps[-spin]).imag < precision), 'The sum of the input systematics maps must be real, the total imaginary part is not expected to be non-zero'
 
         for spin in set(spin_sky_maps.spins):
             if (spin not in spin_systematics_maps) and (-spin not in spin_systematics_maps):
-                spin_systematics_maps[spin] = np.zeros(1) 
-                spin_systematics_maps[-spin] = np.zeros(1)
+                spin_systematics_maps[spin] = np.zeros(1,dtype=dtype)
+                spin_systematics_maps[-spin] = np.zeros(1,dtype=dtype)
                 # If a spin is not provided in the systematics maps, we assume that the systematics maps for this spin are zero
 
             if (spin in spin_sky_maps) and (-spin in spin_sky_maps):
@@ -481,9 +481,9 @@ class FrameworkSystematics(object):
             dtype = dtype,
             return_array = True,
             optimize_computations = optimize_computations
-        )        
+        )
         logger.info(f"Spin coupled maps computed in {time.time() - time_spin_convolution:.2f} seconds, computing the final maps ...")
-        
+
         wcs_car = geometry_dictionary.get('wcs_car', None)
         get_final_map = lambda x: x if wcs_car is None else enmap.ndmap(
             x,
@@ -593,7 +593,7 @@ class FrameworkSystematics(object):
                 * 'parameters_template_systematics': dictionary containing the detector parameters for the building of the systematics maps from the provided templates
         single_precision: bool (optional)
             If True, use single precision for the computations, otherwise use double precision. Default is False.
-        
+
 
         Returns
         -------
@@ -648,7 +648,7 @@ class FrameworkSystematics(object):
             else:
                 assert polar_angle.ndim == 1, 'The polar angle map must have shape (n_det,) accounting first for detectors for which h-maps are known, and then the h-maps to be interpolated, with the same ordering as the detector locations'
 
-            polar_angle_coeff = {spin: np.exp(spin * 1j * polar_angle) for spin in h_n_spin_dict.spins}
+            polar_angle_coeff = {spin: np.exp(spin * 1j * polar_angle).astype(dtype) for spin in h_n_spin_dict.spins}
             #TODO: Generalize to m != 0 for HWP angles
 
         if spin_systematics_maps is None:
@@ -660,11 +660,11 @@ class FrameworkSystematics(object):
 
         for spin in set(spin_sky_maps.spins):
             if spin not in spin_systematics_maps:
-                spin_systematics_maps[spin] = np.zeros(1) # If a spin is not provided in the systematics maps, we assume that the systematics maps for this spin are zero
+                spin_systematics_maps[spin] = np.zeros(1,dtype=dtype) # If a spin is not provided in the systematics maps, we assume that the systematics maps for this spin are zero
 
         for spin in set(spin_systematics_maps.spins):
             if spin not in spin_sky_maps:
-                spin_sky_maps[spin] = np.zeros(1) # If a spin is not provided in the sky maps, we assume that the sky maps for this spin are zero
+                spin_sky_maps[spin] = np.zeros(1,dtype=dtype) # If a spin is not provided in the sky maps, we assume that the sky maps for this spin are zero
 
         if build_systematics_maps_from_templates and dict_utils_template_systematics_maps is not None:
             logger.info("Template systematics maps provided, checking their consistency...")
@@ -678,10 +678,10 @@ class FrameworkSystematics(object):
 
             for spin in set(spin_sky_maps.spins):
                 if spin not in dict_utils_template_systematics_maps['template_spin_systematics_maps'].spins:
-                    # If a spin is not provided in the template systematics maps, 
+                    # If a spin is not provided in the template systematics maps,
                     # we assume that the systematics maps for this spin and parameters are zero
-                    dict_utils_template_systematics_maps['template_spin_systematics_maps'][spin] = np.zeros(1) 
-                    dict_utils_template_systematics_maps['parameters_template_systematics'][spin] = np.zeros(1) 
+                    dict_utils_template_systematics_maps['template_spin_systematics_maps'][spin] = np.zeros(1, dtype=dtype)
+                    dict_utils_template_systematics_maps['parameters_template_systematics'][spin] = np.zeros(1, dtype=dtype)
 
         if projection_pixel == 'car':
             assert np.isin(
@@ -863,7 +863,7 @@ class FrameworkSystematics(object):
 
                 # If perform_det_interpolation and perform_resolution_change are both True,
                 # then the output of the interpolation will be directly projected to the final map resolution
-                
+
                 slice_hmaps_from_fullsky = (..., slice_hmaps_from_downgraded_slice) if perform_resolution_change else ...
 
                 spin_non_0 = [spin for spin in h_n_spin_dict.spins if spin != spin_0][0]
@@ -946,8 +946,8 @@ class FrameworkSystematics(object):
                         h_n_spin_to_use[tuple_spins[0]][slice_hmaps_from_fullsky],
                         sliced_spin_systematics_map
                         + contract(
-                        'd,...->d...', 
-                        polar_angle_coeff[-tuple_spins[1]], 
+                        'd,...->d...',
+                        polar_angle_coeff[-tuple_spins[1]],
                         sliced_spin_sky_map,
                     )
                 ) # Polarization angle to remove for consistent modeling of the data
