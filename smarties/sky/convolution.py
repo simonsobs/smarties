@@ -162,6 +162,7 @@ def get_beam_convolution_spins_maps(
         "Please provide only positive spins"
     )
     dtype = np.complex64 if single_precision else np.complex128
+    real_dtype = np.float32 if single_precision else np.float64
     if return_only_positive_spins:
         dict_spin_maps = {
             spin: np.zeros((n_det,) + shape_pixels_output, dtype=dtype)
@@ -178,7 +179,7 @@ def get_beam_convolution_spins_maps(
     }
 
     ell_array = np.arange(lmax + 1)
-    sqrt_factor = np.sqrt(4.0 * np.pi / (2 * ell_array + 1))
+    sqrt_factor = np.sqrt(4.0 * np.pi / (2 * ell_array + 1)).astype(real_dtype)
 
     for idet, det_name in enumerate(det_names):
         alms_det = alms[det_name]
@@ -210,6 +211,7 @@ def get_beam_convolution_spins_maps(
                 pol_angle_rad=pol_angles_rad[idet]
                 if pol_angles_rad is not None
                 else None,
+                single_precision=single_precision,
             )
 
             for m in range(min(2 + 1, mmax_beam + 1)):
@@ -230,7 +232,7 @@ def get_beam_convolution_spins_maps(
 
             m_beam = -spin  # Z_{spin} uses b*_{ell,-spin}
 
-            prefactor = sqrt_factor * (-1.0) ** (-spin)
+            prefactor = (sqrt_factor * (-1.0) ** int(-spin)).astype(real_dtype)
             idx_beam = hp.Alm.getidx(
                 lmax, np.arange(abs(m_beam), lmax + 1), abs(m_beam)
             )  # Get indices for all ell where |m_beam| <= ell

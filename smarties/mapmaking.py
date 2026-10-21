@@ -423,7 +423,7 @@ class FrameworkSystematics(object):
         else:
             assert polar_angle.size == h_n_spin_dict[spin_0].shape[0], 'The polar angle map must have the same shape as the h-maps'
 
-            polar_angle_coeff = {spin: np.exp(int(spin) * 1j * polar_angle) for spin in spin_h_maps}
+            polar_angle_coeff = {spin: np.exp(spin * 1j * polar_angle).astype(dtype) for spin in spin_h_maps}
             #TODO: Generalize to m != 0 for HWP angles
 
         if polar_efficiency_coeff is not None:
@@ -433,7 +433,7 @@ class FrameworkSystematics(object):
 
         if spin_systematics_maps is None:
             logger.warning("No systematics maps provided, assuming no systematics")
-            spin_systematics_maps = Spin_maps.from_dictionary({spin: np.zeros(1) for spin in spin_sky_maps.spins})
+            spin_systematics_maps = Spin_maps.from_dictionary({spin: np.zeros(1,dtype=dtype) for spin in spin_sky_maps.spins})
 
         for spin in set(spin_systematics_maps.spins):
             if (spin not in spin_sky_maps) and (-spin not in spin_sky_maps):
@@ -648,7 +648,7 @@ class FrameworkSystematics(object):
             else:
                 assert polar_angle.ndim == 1, 'The polar angle map must have shape (n_det,) accounting first for detectors for which h-maps are known, and then the h-maps to be interpolated, with the same ordering as the detector locations'
 
-            polar_angle_coeff = {spin: np.exp(int(spin) * 1j * polar_angle) for spin in h_n_spin_dict.spins}
+            polar_angle_coeff = {spin: np.exp(spin * 1j * polar_angle).astype(dtype) for spin in h_n_spin_dict.spins}
             #TODO: Generalize to m != 0 for HWP angles
 
         if spin_systematics_maps is None:
