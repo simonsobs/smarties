@@ -680,8 +680,8 @@ class FrameworkSystematics(object):
                 if spin not in dict_utils_template_systematics_maps['template_spin_systematics_maps'].spins:
                     # If a spin is not provided in the template systematics maps,
                     # we assume that the systematics maps for this spin and parameters are zero
-                    dict_utils_template_systematics_maps['template_spin_systematics_maps'][spin] = np.zeros(1)
-                    dict_utils_template_systematics_maps['parameters_template_systematics'][spin] = np.zeros(1)
+                    dict_utils_template_systematics_maps['template_spin_systematics_maps'][spin] = np.zeros(1, dtype=dtype)
+                    dict_utils_template_systematics_maps['parameters_template_systematics'][spin] = np.zeros(1, dtype=dtype)
 
         if projection_pixel == 'car':
             assert np.isin(
