@@ -223,6 +223,7 @@ def get_beam_convolution_spins_maps(
         curr_blmB = np.zeros(lmax + 1, dtype=dtype)
 
         for spin in spins_needed:
+            spin = int(spin) # avoid double precision upcasting
             curr_blm0.fill(0)
             curr_blmE.fill(0)
             curr_blmB.fill(0)
@@ -254,10 +255,10 @@ def get_beam_convolution_spins_maps(
             spin_minus_2_term = almxfl(alm_m2, np.conj(curr_blm_m2)*prefactor)
 
             output_alms =  (spin_0_term + 0.5 * (spin_plus_2_term + spin_minus_2_term))
-
             dict_harm_coeff[spin][idet] = output_alms
 
     for spin in spins_needed_pos:  # We computes the maps from the alms
+        spin=int(spin) # avoid double precision upcasting
         for idet in range(n_det):
             map_output = (
                 enmap.empty((int(spin != 0) + 1,) + shape_pixels_output, wcs=wcs)
