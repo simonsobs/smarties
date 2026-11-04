@@ -122,3 +122,8 @@ CMB surveys including effects of the scanning strategy*, MNRAS 513, 3610 (2022),
 [doi:10.1093/mnras/stac561](https://doi.org/10.1093/mnras/stac561), and on McCallum et al.,
 *Spin characterization of systematics in CMB surveys — a comprehensive formalism*, MNRAS 501,
 802 (2021), [doi:10.1093/mnras/staa3609](https://doi.org/10.1093/mnras/staa3609).
+
+## DISCLAIMER
+
+The documentation contents were partly produced using Claude, but were carefully reviewed and edited by the authors. 
+The authors take full responsibility for the content of this documentation.
