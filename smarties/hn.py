@@ -46,7 +46,7 @@ class Spin_maps(dict):
     _wcs_car = None
 
     def __missing__(self, key):
-        if (isinstance(key, int) or isinstance(key, Spin_nm)) and -key in self: 
+        if (isinstance(key, int) or isinstance(key, Spin_nm) or isinstance(key, np.integer)) and -key in self: 
             return np.conj(super().__getitem__(-key))
         raise  KeyError(key)
 

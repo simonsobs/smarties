@@ -11,7 +11,10 @@ from pixell import enmap
 from smarties.utils.tools import get_coupled_spin, get_row_mapmaking_matrix
 from smarties.sky.cmb import create_CMB_spin_maps
 from smarties.hn import Spin_maps, Spin_nm
-from smarties.utils.tools import reweight_hmaps_by_hits
+from smarties.utils.tools import (
+    _numba_spin_convolution_contract,
+    reweight_hmaps_by_hits
+)
 from smarties.utils.interpolation import perform_interpolation_scipy
 from smarties.utils.resolution import (
     get_slice_1d_from_2d,
@@ -221,14 +224,20 @@ class FrameworkSystematics(object):
 
         factor_func = lambda spin: 1 if np.sum(spin) == 0 else .5
 
+
         if optimize_computations:
-            logger.info("Optimizing the computations for the spin convolution...")
+            logger.info("Optimizing the computations with numba for the spin convolution...")
             # Precompute the coupled spins for each spin in the list of spins to compute
 
-            dict_coupled_maps = {spin: np.zeros((npix,), dtype=dtype) for spin in self.list_spin_output}
+            dict_coupled_maps = Spin_maps.from_dictionary(dict())
+            for i, spin in enumerate(self.list_spin_output):
+                    if spin >= 0:
+                        dict_coupled_maps[spin] = np.zeros((npix,), dtype=dtype)
+
             spin_h_maps = sorted(set(h_n_spin_dict.spins) | {-s for s in h_n_spin_dict.spins if s > 0})
-            list_spin_input_positive = [spin for spin in self.list_spin_output if spin >= 0]
-            for i, spin in enumerate(list_spin_input_positive):
+            list_spin_output_positive = [spin for spin in self.list_spin_output if spin >= 0]
+            
+            for i, spin in enumerate(list_spin_output_positive):
                 # Get all combinations of spins (k-k', k') such that k-k' = spin
                 coupled_spins = get_coupled_spin(
                     reference_spin=spin,
@@ -238,7 +247,50 @@ class FrameworkSystematics(object):
 
                 logger.info(f'Coupled spins for spin {spin}: {coupled_spins}')
 
+                factor_correction = lambda spin: 1
+                if spin == 0:
+                    coupled_spins = [tuple_spin for tuple_spin in coupled_spins if tuple_spin[0] >= 0]
+                    factor_correction = lambda spin: 1 if spin != 0 else .5
+                
 
+                dtype_scalar = np.dtype(dtype).type # np.complex64 or np.complex128 depending on single or double precision
+                zero = dtype_scalar(0)
+
+                # \sum_{k' = -\infty}^{\infty} h_{k-k'} S_{k'} on all (k-k', k') pairs
+                for tuple_spins in coupled_spins:
+                    _numba_spin_convolution_contract(
+                        h_maps=h_n_spin_dict[tuple_spins[0]][projector_h_n],
+                        systematics_maps=spin_systematics_maps[tuple_spins[1]],
+                        sky_maps=spin_sky_maps[tuple_spins[1]],
+                        polar_efficiency_coeff=polar_efficiency_func(spin),
+                        polar_angle_coeff_sky=polar_angle_coeff[-tuple_spins[1]],
+                        polar_angle_coeff_mapmaker=polar_angle_coeff[spin],
+                        prefactor = dtype_scalar(factor_func(spin)*factor_correction(tuple_spins[0])),
+                        zero = zero,
+                        output = dict_coupled_maps[spin],
+                    )
+                if spin == 0:
+                    dict_coupled_maps[-spin] += np.conj(dict_coupled_maps[spin])
+
+        else:
+            logger.info("Using the numpy computations for the spin convolution...")
+            dict_coupled_maps = Spin_maps.from_dictionary(dict())
+            for i, spin in enumerate(self.list_spin_output):
+                    if spin >= 0:
+                        dict_coupled_maps[spin] = np.zeros((npix,), dtype=dtype)
+
+            spin_h_maps = sorted(set(h_n_spin_dict.spins) | {-s for s in h_n_spin_dict.spins if s > 0})
+            list_spin_output_positive = [spin for spin in self.list_spin_output if spin >= 0]
+            
+            for i, spin in enumerate(list_spin_output_positive):
+                # Get all combinations of spins (k-k', k') such that k-k' = spin
+                coupled_spins = get_coupled_spin(
+                    reference_spin=spin,
+                    available_h_n_spin=spin_h_maps,
+                    available_signal_spins=list_spin_maps
+                )
+
+                logger.info(f'Coupled spins for spin {spin}: {coupled_spins}')
 
                 factor_correction = lambda spin: 1
                 if spin == 0:
@@ -260,48 +312,15 @@ class FrameworkSystematics(object):
                             spin_sky_maps[tuple_spins[1]]
                         )
                     )
+                if spin == 0:
+                    dict_coupled_maps[-spin] += np.conj(dict_coupled_maps[spin])
 
-                dict_coupled_maps[-spin] += np.conj(dict_coupled_maps[spin])
-            if return_array:
-                spin_coupled_maps = np.zeros((npix, len(self.list_spin_output),), dtype=dtype)
-                for i, spin in enumerate(self.list_spin_output):
-                    spin_coupled_maps[:, i] = dict_coupled_maps[spin]
-                return spin_coupled_maps
-
-        else:
+        if return_array:
             spin_coupled_maps = np.zeros((npix, len(self.list_spin_output),), dtype=dtype)
             for i, spin in enumerate(self.list_spin_output):
-                # Get all combinations of spins (k-k', k') such that k-k' = spin
-                coupled_spins = get_coupled_spin(
-                    reference_spin=spin,
-                    available_h_n_spin=h_n_spin_dict.spins,
-                    available_signal_spins=list_spin_maps
-                )
-
-                logger.info(f'Coupled spins for spin {spin}: {coupled_spins}')
-
-                # \sum_{k' = -\infty}^{\infty} h_{k-k'} S_{k'} on all (k-k', k') pairs
-                for tuple_spins in coupled_spins:
-                    spin_coupled_maps[...,i] += factor_func(spin) * contract(
-                        'd,d,d...,d...->...',
-                        polar_efficiency_func(spin),
-                        polar_angle_coeff[spin],
-                        h_n_spin_dict[tuple_spins[0]][projector_h_n],
-                        spin_systematics_maps[tuple_spins[1]]
-                        + contract(
-                            'd,...->d...',
-                            polar_angle_coeff[-tuple_spins[1]],
-                            spin_sky_maps[tuple_spins[1]]
-                        ) # Polarization angle to remove for consistent modeling of the data
-                    )
-            if not return_array:
-                dict_coupled_maps = Spin_maps.from_dictionary(dict())
-                for i, spin in enumerate(self.list_spin_output):
-                    dict_coupled_maps[spin] = spin_coupled_maps[...,i]
-            return spin_coupled_maps
-
+                spin_coupled_maps[:, i] = dict_coupled_maps[spin]
+            return spin_coupled_maps 
         return dict_coupled_maps
-
 
 
     def compute_total_maps(
@@ -442,6 +461,10 @@ class FrameworkSystematics(object):
                 # If a spin is not provided in the sky maps, we assume that the sky maps for this spin are zero
             if (spin in spin_systematics_maps) and (-spin in spin_systematics_maps):
                 assert np.all((spin_systematics_maps[spin]+spin_systematics_maps[-spin]).imag < precision), 'The sum of the input systematics maps must be real, the total imaginary part is not expected to be non-zero'
+            if spin_systematics_maps[spin].ndim == 2:
+                assert spin_systematics_maps[spin].size > 1, (
+                        'The systematics maps must be 2D arrays of shape (n_det, n_pix), or the length-1 np.zeros(1)'
+                    )
 
         for spin in set(spin_sky_maps.spins):
             if (spin not in spin_systematics_maps) and (-spin not in spin_systematics_maps):

@@ -5,6 +5,7 @@
 import logging
 import numpy as np
 from opt_einsum import contract
+from numba import jit, prange
 from pixell import enmap
 
 from smarties.hn import Spin_maps, Spin_nm
@@ -12,6 +13,7 @@ from smarties.hn import Spin_maps, Spin_nm
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "_numba_spin_convolution_contract",
     "get_coupled_spin",
     "get_row_mapmaking_matrix",
     "get_rotation_matrix",
@@ -30,6 +32,50 @@ list_conventions = [
     "Modified second flattening",
     "Plus-Cross ellipticity",
 ]
+
+
+@jit(nopython=True, parallel=True, cache=True)
+def _numba_spin_convolution_contract(
+    h_maps,
+    systematics_maps,
+    sky_maps,
+    polar_efficiency_coeff,
+    polar_angle_coeff_sky,
+    polar_angle_coeff_mapmaker,
+    prefactor,
+    zero,
+    output,
+):
+    """
+    Replaces the call to contract: accumulates ``prefactor * sum_j ...`` into ``output`` 
+
+    zero must be a zero of the same type as the output, e.g. 0.0 for float, 0.0j for complex,
+    as if zero is double precision and the other inputs are provided as single precision, 
+    the output might be cast to double precision
+    """
+
+    npix = h_maps.shape[1]
+    ndet = h_maps.shape[0]
+
+    has_systematics = systematics_maps.ndim == 2  # compile-time constant, removes the unused branches
+    sky_is_zero = sky_maps.shape[0] == 1
+
+    for i in prange(npix):
+            acc = zero
+            for j in range(ndet):
+                elem = (
+                    polar_efficiency_coeff[j]
+                    * polar_angle_coeff_mapmaker[j]
+                    * h_maps[j, i]
+                )
+                spin_map = zero
+                if has_systematics:
+                    spin_map += (systematics_maps[j, i])
+                if not sky_is_zero:
+                    spin_map += (polar_angle_coeff_sky[j] * sky_maps[i])
+
+                acc += elem * spin_map
+            output[i] += prefactor * acc
 
 
 def get_coupled_spin(reference_spin: int, available_h_n_spin: list[int], available_signal_spins: list[int]) -> list[tuple]:
