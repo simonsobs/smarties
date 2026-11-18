@@ -11,7 +11,8 @@ import healpy as hp
 import numpy as np
 import yaml
 from opt_einsum import contract
-from pixell import enmap
+from pixell import enmap, wcsutils
+from astropy.io import fits
 
 from smarties.hn import Spin_maps, Spin_nm
 from smarties.utils.tools import flatten_CAR_maps, reweight_hmaps_by_hits
@@ -50,6 +51,7 @@ def _read_geometry(file: h5py.File) -> dict:
         return {
             "projection_pixel": "car",
             "shape_fullsky": tuple(int(size) for size in attributes["wcs_shape"]),
+            # "wcs": wcsutils.WCS(fits.Header.fromstring(header)),
             "wcs": wcsutils.WCS(fits.Header.fromstring(header)),
             "to_ring": None,
             "coordinate_system": str(attributes.get("coordinate_system", "unknown")),

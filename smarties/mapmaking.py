@@ -534,7 +534,7 @@ class FrameworkSystematics(object):
         set_spins_maps = set(np.unique(spin_sky_maps.spins + spin_systematics_maps.spins))
         self.check_consistency_spin_maps(
             set_spin_maps = set_spins_maps,
-            spin_h_maps = spin_h_maps,
+            h_n_spin_dict = h_n_spin_dict,
         )
         all_spins = sorted(set_spins_maps | set(spin_h_maps) | set(self.list_spin_output))
 
@@ -746,15 +746,16 @@ class FrameworkSystematics(object):
             # assert (perform_det_interpolation and perform_resolution_change == False) and inverse_mapmaking_matrix.shape == (npix, self.nstokes, self.nstokes), 'Interpolation and resolution change of the mapmaking matrix are implemetend and the inverse mapmaking matrix will be recomputed, so it should not be provided as an input'
             #TODO: Change as a warning
 
+        spin_h_maps = sorted(set(h_n_spin_dict.spins) | {-s for s in h_n_spin_dict.spins if s > 0})
         if polar_angle is None:
-            polar_angle_coeff = {spin: np.ones(h_n_spin_dict[spin].shape[0], dtype=dtype) for spin in h_n_spin_dict.spins} # Default is to not apply any polar angle, i.e. the detectors are all aligned in the same direction
+            polar_angle_coeff = {spin: np.ones(h_n_spin_dict[spin].shape[0], dtype=dtype) for spin in spin_h_maps} # Default is to not apply any polar angle, i.e. the detectors are all aligned in the same direction
         else:
             if not perform_det_interpolation:
                 assert polar_angle.size == h_n_spin_dict[spin_0].shape[0], 'The polar angle map must have the same shape as the h_n maps'
             else:
                 assert polar_angle.ndim == 1, 'The polar angle map must have shape (n_det,) accounting first for detectors for which h-maps are known, and then the h-maps to be interpolated, with the same ordering as the detector locations'
 
-            polar_angle_coeff = {spin: np.exp(spin * 1j * polar_angle).astype(dtype) for spin in h_n_spin_dict.spins}
+            polar_angle_coeff = {spin: np.exp(spin * 1j * polar_angle).astype(dtype) for spin in spin_h_maps}
             #TODO: Generalize to m != 0 for HWP angles
 
         if spin_systematics_maps is None:
@@ -1552,7 +1553,7 @@ class FrameworkSystematicsChunks(FrameworkSystematics):
 
         self.check_consistency_spin_maps(
             set_spin_maps = set_spins_maps,
-            spin_h_maps = spin_h_maps,
+            h_n_spin_dict = h_n_spin_dict,
         )
 
         all_spins = sorted(set_spins_maps | set(spin_h_maps) | set(self.list_spin_output))
