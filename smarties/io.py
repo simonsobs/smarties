@@ -374,11 +374,14 @@ def read_lbs_h_maps(
         n_pix = boolean_mask[boolean_mask].size
         nside = hp.npix2nside(np.prod(mask.shape))
 
+    if Spin_nm((0, 0)) not in list_spin and reweight_by_hits:
+        raise ValueError("The list of spins must contain (0, 0) for the hits weighting the detectors")
+
     total_list_spin = deepcopy(list_spin) 
     if not return_only_positive_spins:
         total_list_spin += [-spin for spin in list_spin if spin[0] > 0]
 
-    spin_to_retain = 0 if ignore_hwp_spins else ...
+    func_spin_to_retain = lambda spin: spin[0] if ignore_hwp_spins else spin
     if ignore_hwp_spins:
         logger.info(
             "Ignoring HWP angle spins, removing m spins from the output...",
@@ -386,7 +389,7 @@ def read_lbs_h_maps(
 
 
     h_n_spinmaps = Spin_maps.from_dictionary(
-        {spin[spin_to_retain]: np.zeros((n_det, n_pix), dtype=dtype) for spin in total_list_spin}
+        {func_spin_to_retain(spin): np.zeros((n_det, n_pix), dtype=dtype) for spin in total_list_spin}
     )  # Initialize dictionary for spins
     shape_fullsky = (
         hp.nside2npix(nside),
@@ -404,10 +407,10 @@ def read_lbs_h_maps(
             hits = _read_dataset(file, "0,0", "Re", to_ring=None)[flattened_indices_mask]
             for spin in list_spin:
                 value = _read_dataset(file, f"{spin[0]},{spin[1]}", "Re", to_ring=None)[flattened_indices_mask] + 1j * _read_dataset(file, f"{spin[0]},{spin[1]}", "Im", to_ring=None)[flattened_indices_mask]
-                h_n_spinmaps[spin[spin_to_retain]][j, ...].real = (
+                h_n_spinmaps[func_spin_to_retain(spin)][j, ...].real = (
                     np.where(value.real != hp.UNSEEN, value.real, 0.0) * list_weights[j]
                 )
-                h_n_spinmaps[spin[spin_to_retain]][j, ...].imag = (
+                h_n_spinmaps[func_spin_to_retain(spin)][j, ...].imag = (
                     np.where(value.imag != hp.UNSEEN, value.imag, 0.0) * list_weights[j]
                 )
             for key, value in file.attrs.items():
@@ -474,7 +477,7 @@ def build_mask_from_toast_h_maps(
     for name in list_name_files:
         with h5py.File(_file_name(name, format_file), "r") as file:
             geometry = _read_geometry(file) if geometry is None else geometry
-            observed = _read_dataset(file, "0,0", "Re", geometry) > 0
+            observed = _read_dataset(file, "0,0", "Re", to_ring=geometry['to_ring']) > 0
         detectors_hits = observed.astype(np.int64) if detectors_hits is None else detectors_hits + observed
 
     as_map = (lambda x: x) if geometry["wcs"] is None else (lambda x: enmap.enmap(x, wcs=geometry["wcs"]))

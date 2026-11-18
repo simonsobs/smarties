@@ -139,6 +139,16 @@ class FrameworkSystematics(object):
 
         precision = 1e-6 if np.dtype(dtype) == np.complex64 else 1e-14
 
+        for spin in set(spin_sky_maps.spins):
+            assert spin_sky_maps[spin].size > 1, (
+                'The sky maps must be 1D arrays of shape (n_pix), or the length-1 np.zeros(1)'
+            )
+        
+        for spin in set(spin_systematics_maps.spins):
+            assert spin_systematics_maps[spin].size > 1, (
+                'The systematics maps must be 2D arrays of shape (n_det, n_pix), or the length-1 np.zeros(1)'
+            )
+
         for spin in set(spin_systematics_maps.spins):
             if (spin not in spin_sky_maps) and (-spin not in spin_sky_maps):
                 spin_sky_maps[spin] = np.zeros(1,dtype=dtype)
@@ -164,14 +174,16 @@ class FrameworkSystematics(object):
     def check_consistency_spin_maps(
         self, 
         set_spin_maps: set,
-        spin_h_maps: set
+        h_n_spin_dict: Spin_maps
     ):
         """
         Check the consistency of the spin h maps, i.e. that for each spin in the list of spins to compute, the corresponding spin h maps are provided.
         """
+        spin_h_maps = sorted(set(h_n_spin_dict.spins) | {-s for s in h_n_spin_dict.spins if s > 0})
         for spin_sky in set_spin_maps:
             for spin_output in self.list_spin_output:
                 assert (spin_output-spin_sky) in spin_h_maps or -(spin_output-spin_sky) in spin_h_maps, f'The spin {spin_output-spin_sky} or {-spin_output+spin_sky} is not provided in the h_n maps, but is required for the mapmaking process'
+                assert h_n_spin_dict[spin_output-spin_sky].squeeze().ndim == 2 or h_n_spin_dict[-spin_output+spin_sky].squeeze().ndim == 2, f'The spin {spin_output-spin_sky} or {-spin_output+spin_sky} should be a 2D array of shape (n_det, n_pix), but is not'
 
     def get_inverse_mapmaking_matrix(
             self,
@@ -427,7 +439,6 @@ class FrameworkSystematics(object):
             inverse_mapmaking_matrix : np.ndarray = None,
             return_Q_U: bool = False,
             return_inverse_mapmaking_matrix: bool = False,
-            mask_input: bool = False,
             polar_angle: np.ndarray = None,
             polar_efficiency_coeff: np.ndarray = None,
             projector_h_n: np.ndarray = None,
@@ -459,9 +470,6 @@ class FrameworkSystematics(object):
             If True, return the Q and U maps instead of the spin -2 and 2 maps, default is False.
         return_inverse_mapmaking_matrix: bool
             If True, return the inverse of the mapmaking matrix, default is False.
-        mask_input: bool (optional)
-            If True, the input maps will be copied and masked (WARNING: possibly very memory intensive), otherwise the input maps will not be masked,
-            and assumed to be provided in the right format. Default is False.
         polar_angle: np.ndarray (optional)
             The detector polarization angle to use for the mapmaking, if None, the polarization angle will be set to 0.
             Must be provided in radians. Default is None.
@@ -486,7 +494,7 @@ class FrameworkSystematics(object):
 
         # Few assert
         assert np.allclose([spin_sky_maps[spin].ndim for spin in spin_sky_maps.keys()], 1), 'The sky maps must be 1D arrays of shape (n_pix)'
-        assert np.allclose([h_n_spin_dict[spin].ndim for spin in h_n_spin_dict.keys() if spin != 0 ], 2), 'The h_n maps must be 2D arrays of shape (n_det, n_pix)'
+        assert np.allclose([h_n_spin_dict[spin].ndim for spin in h_n_spin_dict.keys()], 2), 'The h_n maps must be 2D arrays of shape (n_det, n_pix)'
         if spin_systematics_maps is not None:
             assert np.allclose([spin_systematics_maps[spin].ndim for spin in spin_systematics_maps.keys() if spin != 0 ], 2), 'The systematics maps must be 2D arrays of shape (n_det, n_pix)'
 
@@ -510,28 +518,6 @@ class FrameworkSystematics(object):
         if mask is None:
             mask = np.ones(self.map_shape, dtype=np.int8)
 
-        # Masking the h_n maps, sky maps and systematics maps
-        observed_pixels_array = mask != 0
-        if mask_input:
-            logger.warning("Masking the input maps, this may be very memory intensive if the input maps are large")
-            h_n_spin_dict = Spin_maps.from_dictionary(
-                {spin: h_n_spin_dict[spin][...,observed_pixels_array]
-                 if np.size(h_n_spin_dict[spin][0,...]) == mask.size
-                 else h_n_spin_dict[spin] for spin in h_n_spin_dict.keys()}
-            )
-            spin_sky_maps = Spin_maps.from_dictionary(
-                {spin: spin_sky_maps[spin][...,observed_pixels_array]
-                 if np.size(spin_sky_maps[spin]) == mask.size
-                 else spin_sky_maps[spin] for spin in spin_sky_maps.keys()}
-            )
-            if spin_systematics_maps is not None:
-                spin_systematics_maps = Spin_maps.from_dictionary(
-                    {spin: spin_systematics_maps[spin][...,observed_pixels_array]
-                     if np.size(spin_systematics_maps[spin][0,...]) == mask.size
-                     else spin_systematics_maps[spin] for spin in spin_systematics_maps.keys()}
-                )
-
-
         if spin_systematics_maps is None:
             logger.warning("No systematics maps provided, assuming no systematics")
             spin_systematics_maps = Spin_maps.from_dictionary({spin: np.zeros(1,dtype=dtype) for spin in spin_sky_maps.spins})
@@ -554,7 +540,8 @@ class FrameworkSystematics(object):
 
 
         if polar_angle is None:
-            polar_angle_coeff = {spin: np.ones(h_n_spin_dict[spin].shape[0], dtype=dtype) for spin in all_spins} # Default is to not apply any polar angle, i.e. the detectors are all aligned in the same direction
+            n_det = h_n_spin_dict[spin_0].shape[0]
+            polar_angle_coeff = {spin: np.ones(n_det, dtype=dtype) for spin in all_spins} # Default is to not apply any polar angle, i.e. the detectors are all aligned in the same direction
         else:
             assert polar_angle.size == h_n_spin_dict[spin_0].shape[0], 'The polar angle map must have the same shape as the h-maps'
 
@@ -566,6 +553,7 @@ class FrameworkSystematics(object):
         else:
             polar_efficiency_coeff = np.ones(h_n_spin_dict[spin_0].shape[0])
 
+        observed_pixels_array = mask != 0
         npix = mask[observed_pixels_array].size
         if inverse_mapmaking_matrix is None:
             logger.info("Starting the computation of the inverse mapmaking matrix...")
@@ -607,12 +595,12 @@ class FrameworkSystematics(object):
         time_final_maps = time.time()
         if optimize_computations:
             dict_final_sky_fields = Spin_maps.from_dictionary(
-                {spin: get_final_map(np.zeros((npix,), dtype=dtype)) for spin in self.list_spin_output if spin >= 0}
+                {spin: np.zeros((npix,), dtype=dtype) for spin in self.list_spin_output if spin >= 0}
             )
             for i, spin in enumerate(self.list_spin_output):
                 if spin<0:
                     continue
-                dict_final_sky_fields[spin] = (inverse_mapmaking_matrix[projector_h_n,i,:]*spin_coupled_maps).sum(axis=-1)
+                dict_final_sky_fields[spin] = get_final_map((inverse_mapmaking_matrix[projector_h_n,i,:]*spin_coupled_maps).sum(axis=-1))
                 # if spin != 0:
                 #     dict_final_sky_fields[-spin] = get_final_map(np.conj(dict_final_sky_fields[spin]))
         else:
@@ -646,7 +634,7 @@ class FrameworkSystematics(object):
     def compute_total_maps_chunks(
             self,
             geometry_dictionary: dict,
-            h_n_spin_dict: dict | Spin_maps,
+            h_n_spin_dict: Spin_maps,
             spin_sky_maps: dict | Spin_maps,
             spin_systematics_maps: dict | Spin_maps = None,
             mask: np.ndarray = None,
@@ -1252,7 +1240,7 @@ class FrameworkSystematicsChunks(FrameworkSystematics):
 
     def get_interpolated_h_maps_chunk(
         self,
-        h_n_spin_dict: dict | Spin_maps,
+        h_n_spin_dict: Spin_maps,
         slice_1d_hmap: np.ndarray,
         dict_utils_interpolation_det: dict,
         dtype: np.dtype = np.complex128,
@@ -1385,7 +1373,7 @@ class FrameworkSystematicsChunks(FrameworkSystematics):
     def compute_total_maps_chunks(
             self,
             geometry_dictionary: dict,
-            h_n_spin_dict: dict | Spin_maps,
+            h_n_spin_dict: Spin_maps,
             spin_sky_maps: dict | Spin_maps,
             spin_systematics_maps: dict | Spin_maps = None,
             mask: np.ndarray = None,
@@ -1502,8 +1490,10 @@ class FrameworkSystematicsChunks(FrameworkSystematics):
         dtype = np.complex64 if single_precision else np.complex128
         precision = 1e-6 if single_precision else 1e-14
 
-        if not isinstance(h_n_spin_dict, Spin_maps):
-            h_n_spin_dict = Spin_maps.from_dictionary(h_n_spin_dict)
+        assert isinstance(h_n_spin_dict, Spin_maps), 'The h_n_spin_dict must be a Spin_maps instance'
+
+        assert h_n_spin_dict.shape_fullsky is not None, 'The shape of the full sky h_n maps must be provided in h_n_spin_dict.shape_fullsky'
+
         list_spin_h_maps = sorted({abs(int(spin)) for spin in h_n_spin_dict.keys()})
         assert 0 in list_spin_h_maps, 'The h_0 maps must be provided'
 

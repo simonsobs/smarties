@@ -611,12 +611,6 @@ def reweight_hmaps_by_hits(
     ----------
     h_dictionary: dict| Spin_maps
         Dictionary of h-maps with keys being the spins and values being the corresponding maps for each detector.
-    list_weights: np.ndarray
-        List of weights for each detector, of shape (n_det,) or (n_det,n_pix) if the weights are pixel-dependent.
-    list_spin: list[int]
-        List of spins to consider for the reweighting.
-    error_precision: float, optional
-        Precision threshold to consider a pixel as observed by a detector. If None, a default value of 1e-8 is used.
     in_place: bool, optional
         If True, the h_dictionary is modified in place. If False, a new dictionary is returned. Default is False.
     spin_0: int | Spin_nm = 0
