@@ -249,6 +249,8 @@ def read_toast_h_maps(
             if spin != 0:
                 h_n_spinmaps[-spin] = np.conj(h_n_spinmaps[spin])
 
+    h_n_spinmaps.total_hits_map = h_n_spinmaps[0].sum(axis=0)
+
     if reweight_by_hits:
         reweight_hmaps_by_hits(
             h_dictionary=h_n_spinmaps,
@@ -421,7 +423,7 @@ def read_lbs_h_maps(
 
     logger.info("Finalizing h_n dictionary...")
 
-    print(spin_0, h_n_spinmaps.spins)
+    h_n_spinmaps.total_hits_map = h_n_spinmaps[spin_0].sum(axis=0)
     if reweight_by_hits:
         reweight_hmaps_by_hits(
             h_dictionary=h_n_spinmaps,

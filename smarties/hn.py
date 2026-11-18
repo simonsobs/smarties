@@ -44,6 +44,7 @@ class Spin_maps(dict):
     _projection_pixel = None
     _shape_fullsky = None
     _wcs_car = None
+    _total_hits_map = None
 
     def __missing__(self, key):
         if (isinstance(key, int) or isinstance(key, Spin_nm) or isinstance(key, np.integer)) and -key in self: 
@@ -212,3 +213,25 @@ class Spin_maps(dict):
             self[key] = np.broadcast_to(
                 self[key], (new_shape_first_dimension,) + np.asarray(self[key]).shape
             )
+
+    def copy_sliced(self, slice_1d):
+        """
+        Copy the spin maps with a slice on the first dimension
+
+        Parameters
+        ----------
+        slice_1d: slice
+            Slice to apply on the first dimension of each element of the dictionary.
+
+        Returns
+        -------
+        Spin_maps
+            A new Spin_maps object with the sliced elements.
+        """
+        result = Spin_maps()
+        for key in self.keys():
+            if self[key].size != 1:
+                result[key] = self[key][...,slice_1d]
+            else:
+                result[key] = self[key]
+        return result
