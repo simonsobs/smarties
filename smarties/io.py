@@ -698,6 +698,10 @@ def read_spherical_derivatives_from_file(
             derivative: get_final_map(spherical_derivatives_array[i + 1])
             for i, derivative in enumerate(list_derivatives)
         }
+    else:
+        logger.warning(
+            f"The spherical derivatives file {path_spherical_derivatives} does not exist. Returning None."
+        )
 
 
 def save_partial_spin_maps(
