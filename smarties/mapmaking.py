@@ -1043,7 +1043,7 @@ class FrameworkSystematics(object):
                 # Get all combinations of spins (k-k', k') such that k-k' = spin
                 coupled_spins = get_coupled_spin(
                     reference_spin=spin,
-                    available_h_n_spin=h_n_spin_dict.spins,
+                    available_h_n_spin=spin_h_maps,
                     available_signal_spins=list_spin_maps
                 )
 
