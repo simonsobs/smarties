@@ -517,7 +517,15 @@ class FrameworkSystematics(object):
 
         if spin_systematics_maps is None:
             logger.warning("No systematics maps provided, assuming no systematics")
-            spin_systematics_maps = Spin_maps.from_dictionary({spin: np.zeros(1,dtype=dtype) for spin in spin_sky_maps.spins})
+            spin_systematics_maps = Spin_maps.from_dictionary({})
+        else:
+            assert isinstance(spin_systematics_maps, Spin_maps), (
+                'The spin systematics maps must be a dictionary or a Spin_maps object'
+            )
+            for spin in set(spin_systematics_maps.spins):
+                assert spin_systematics_maps[spin].ndim == 2, (
+                    'The systematics maps must be 2D arrays of shape (n_det, n_pix)'
+                )
 
         spin_h_maps = sorted(set(h_n_spin_dict.spins) | {-s for s in h_n_spin_dict.spins if s > 0})
 
@@ -1403,12 +1411,9 @@ class FrameworkSystematicsChunks(FrameworkSystematics):
             Geometry of the mapmaking, with ``'projection_pixel'``: ``'car'`` or ``'healpix'``.
 
             * CAR: ``'shape_car'``, shape of the full output map (default: ``map_shape``);
-              ``'wcs_car'``, WCS of the output map, the output maps being ``enmap.ndmap``;
-              ``'shape_h_maps'`` (optional), shape of the full $h$-map grid
-              (default: ``h_n_spin_dict.shape_fullsky``, or the output shape).
-            * HEALPix: ``'nside'`` (optional, default from the mask or ``map_shape``);
-              ``'nside_h_maps'`` (optional, default from ``h_n_spin_dict.shape_fullsky``,
-              or ``nside``); ``'nest'`` (optional), ordering of both maps, NESTED if True,
+              ``'wcs_car'``, WCS of the output map, the output maps being ``enmap.ndmap``.
+            * HEALPix: ``'nside'`` (default from the mask or ``map_shape``);
+              ``'nest'`` (optional), ordering of both maps, NESTED if True,
               RING otherwise (default).
 
             The output resolution must be an integer multiple of the $h$-map resolution: CAR
@@ -1504,7 +1509,17 @@ class FrameworkSystematicsChunks(FrameworkSystematics):
         if spin_systematics_maps is None and dict_utils_template_systematics_maps is None:
             logger.warning("No systematics maps provided, assuming no systematics")
 
-        spin_systematics_maps = Spin_maps.from_dictionary({} if spin_systematics_maps is None else spin_systematics_maps)
+        if spin_systematics_maps is None:
+            logger.warning("No systematics maps provided, assuming no systematics")
+            spin_systematics_maps = Spin_maps.from_dictionary({spin: np.zeros(1,dtype=dtype) for spin in spin_sky_maps.spins})
+        else:
+            assert isinstance(spin_systematics_maps, Spin_maps), (
+                'The spin systematics maps must be a dictionary or a Spin_maps object'
+            )
+            for spin in set(spin_systematics_maps.spins):
+                assert spin_systematics_maps[spin].ndim == 2, (
+                    'The systematics maps must be 2D arrays of shape (n_det, n_pix)'
+                )
 
         self._check_spin_maps_sky_systematics(
             spin_sky_maps = spin_sky_maps, 

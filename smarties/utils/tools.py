@@ -580,6 +580,7 @@ def reweight_hmaps_by_hits(
         h_dictionary: Spin_maps,
         in_place: bool = False,
         spin_0: int | Spin_nm = 0,
+        list_weights: np.ndarray = None
 ) -> None| dict| Spin_maps:
     """
     Reweight the h-maps in the dictionary by the number of hits per pixel, given a list of weights for each detector or not.
@@ -596,6 +597,18 @@ def reweight_hmaps_by_hits(
     assert isinstance(h_dictionary, Spin_maps), (
         "h_dictionary must be a Spin_maps object, with keys being the spins and values being the corresponding maps for each detector."
     )
+
+    n_det = h_dictionary[spin_0].shape[0]
+    if list_weights is None:
+        list_weights = np.ones(n_det, dtype=float) 
+    else:
+        list_weights = np.asarray(list_weights, dtype=float)
+        assert list_weights.shape[0] == n_det, (
+            "list_weights must be a 1D array of size n_det"
+        )
+        if np.sum(list_weights) != 1:
+            list_weights = list_weights / np.sum(list_weights)
+
     
     if spin_0 not in h_dictionary.spins:
         raise ValueError(
@@ -605,22 +618,23 @@ def reweight_hmaps_by_hits(
     spin_0 = 0 if 0 in h_dictionary.spins else Spin_nm((0, 0))
     logger.info("--Spin 0 in h maps dictionary, re-weighting applied.")
     cond_non_zero = h_dictionary[spin_0] != 0
-    # inverse_weights = (
-    #     1 / list_weights[..., None]
-    #     if list_weights.ndim == 1
-    #     else np.where(cond_non_zero, 1 / list_weights[..., cond_non_zero], 0)
-    # )
 
-    sum_hits = h_dictionary[spin_0].sum(axis=0)
 
-    h_dictionary.total_hits_map = sum_hits #* inverse_weights
+    weighted_h_0 = h_dictionary[spin_0] * list_weights[..., None]
+    sum_hits = weighted_h_0.sum(axis=0) 
+
+    h_dictionary.total_hits_map = sum_hits
 
     for spin in h_dictionary.spins:
         if spin != spin_0:
             h_dictionary[spin][cond_non_zero] *= (
-                h_dictionary[spin_0] / sum_hits # * inverse_weights 
+                weighted_h_0 / sum_hits 
             )[cond_non_zero]
 
-    h_dictionary[spin_0] = np.where(cond_non_zero, h_dictionary[spin_0] / sum_hits, 0)
+    h_dictionary[spin_0] = np.where(
+        cond_non_zero, 
+        weighted_h_0 / sum_hits, 
+        0
+    )
     if not in_place:  
         return h_dictionary

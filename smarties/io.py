@@ -172,7 +172,7 @@ def read_toast_h_maps(
     list_spin: list[int]
         Spins $n \ge 0$ to read; must contain 0, the hits weighting the detectors.
     list_weights: np.ndarray, optional
-        Weights of the detectors, shape ``(n_det,)``. Default:the same weights 
+        Weights of the detectors, shape ``(n_det,)``. Default: the same weights 
         for all the detectors.
     mask: np.ndarray | enmap.ndmap, optional
         Mask of the full map (flattened or not; HEALPix in RING ordering): only the pixels
@@ -209,15 +209,11 @@ def read_toast_h_maps(
     dtype = np.complex64 if single_precision else np.complex128
     error_precision = 1e-8 if single_precision else 1e-15
     n_det = len(list_name_files)
-    if list_weights is None:
-        list_weights = np.ones(n_det) 
-    else:
-        list_weights = np.asarray(list_weights, dtype=float)
-        assert list_weights.shape[0] == n_det, (
-            "list_weights must be a 1D array of size n_det"
+    
+    if list_weights is not None and not reweight_by_hits:
+        logger.warning(
+            "The weights provided are not used to reweight the h_n maps by the hits, so that the total h_n maps are not weighted by the number of detectors observing each pixel."
         )
-        if np.sum(list_weights) != 1:
-            list_weights = list_weights / np.sum(list_weights)
 
 
     h_n_spinmaps, attributes, geometry = None, {}, None
@@ -237,8 +233,7 @@ def read_toast_h_maps(
             # hits = _read_dataset(file, "0,0", "Re", geometry["to_ring"])[flattened_indices_mask]
             for spin in list_spin:
                 value = _read_dataset(file, f"{spin},0", "Re", geometry["to_ring"])[flattened_indices_mask] + 1j * _read_dataset(file, f"{spin},0", "Im", geometry["to_ring"])[flattened_indices_mask]
-                # value = np.where(hits > 0, value, 0)
-                h_n_spinmaps[spin][j] = value * list_weights[j]
+                h_n_spinmaps[spin][j] = value
             for key, value in file.attrs.items():
                 attributes.setdefault(key, [None] * n_det)[j] = value.decode() if isinstance(value, bytes) else value
 
@@ -257,6 +252,7 @@ def read_toast_h_maps(
         reweight_hmaps_by_hits(
             h_dictionary=h_n_spinmaps,
             in_place=True,
+            list_weights=list_weights,
         )
 
     if return_attributes:
@@ -352,15 +348,10 @@ def read_lbs_h_maps(
 
     n_det = len(list_detector_names)
 
-    if list_weights is None:
-        list_weights = np.ones(n_det, dtype=float) 
-    else:
-        list_weights = np.asarray(list_weights, dtype=float)
-        assert list_weights.shape[0] == n_det, (
-            "list_weights must be a 1D array of size n_det"
+    if list_weights is not None and not reweight_by_hits:
+        logger.warning(
+            "The weights provided are not used to reweight the h_n maps by the hits, so that the total h_n maps are not weighted by the number of detectors observing each pixel."
         )
-        if np.sum(list_weights) != 1:
-            list_weights = list_weights / np.sum(list_weights)
 
     if mask is None:
         boolean_mask = ...
@@ -410,10 +401,10 @@ def read_lbs_h_maps(
             for spin in list_spin:
                 value = _read_dataset(file, f"{spin[0]},{spin[1]}", "Re", to_ring=None)[flattened_indices_mask] + 1j * _read_dataset(file, f"{spin[0]},{spin[1]}", "Im", to_ring=None)[flattened_indices_mask]
                 h_n_spinmaps[func_spin_to_retain(spin)][j, ...].real = (
-                    np.where(value.real != hp.UNSEEN, value.real, 0.0) * list_weights[j]
+                    np.where(value.real != hp.UNSEEN, value.real, 0.0) 
                 )
                 h_n_spinmaps[func_spin_to_retain(spin)][j, ...].imag = (
-                    np.where(value.imag != hp.UNSEEN, value.imag, 0.0) * list_weights[j]
+                    np.where(value.imag != hp.UNSEEN, value.imag, 0.0) 
                 )
             for key, value in file.attrs.items():
                 attributes.setdefault(key, [None] * n_det)[j] = value.decode() if isinstance(value, bytes) else value
@@ -433,7 +424,12 @@ def read_lbs_h_maps(
         reweight_hmaps_by_hits(
             h_dictionary=h_n_spinmaps,
             in_place=True,
-            spin_0=spin_0
+            spin_0=spin_0,
+            list_weights=list_weights
+        )
+    else:
+        logger.warning(
+            "The h_n maps are not reweighted by the hits, so that the total h_n maps are not weighted by the number of detectors observing each pixel."
         )
 
     if return_attributes:
