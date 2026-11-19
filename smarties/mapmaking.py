@@ -16,7 +16,6 @@ from smarties.sky.cmb import create_CMB_spin_maps
 from smarties.hn import Spin_maps, Spin_nm
 from smarties.utils.tools import (
     _numba_spin_convolution_contract,
-    _numba_hermitian_pinv,
     reweight_hmaps_by_hits
 )
 from smarties.utils.interpolation import perform_interpolation_scipy
@@ -253,8 +252,6 @@ class FrameworkSystematics(object):
             logger.warning("WARNING: The mapmaking matrix is not Hermitian, the building of the mapmaking matrix may be incorrect, check the h_n maps and the polar angle coefficients")
         # Then, compute the inverse of the mapmaking matrix
 
-        if hermitian:
-            return _numba_hermitian_pinv(mapmaking_matrix, rcond=1e-15)
         return np.linalg.pinv(mapmaking_matrix, hermitian=hermitian)
 
 

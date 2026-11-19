@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "_numba_spin_convolution_contract",
-    "_numba_hermitian_pinv",
     "get_coupled_spin",
     "get_row_mapmaking_matrix",
     "get_rotation_matrix",
@@ -86,28 +85,6 @@ def _numba_spin_convolution_contract(
 
             acc += elem * spin_map
         output[i] += prefactor * acc
-
-@jit(nopython=True, parallel=True, cache=True)
-def _numba_hermitian_pinv(matrices, rcond):
-    """
-    Pseudo-inverse of a stack of Hermitian matrices ``(npix, n, n)``, as
-    ``np.linalg.pinv(matrices, rcond=rcond, hermitian=True)``: one eigendecomposition per
-    pixel, the pixels in parallel, the eigenvalues ``|lambda| <= rcond * max |lambda|``
-    being discarded. Only the output is allocated for all the pixels.
-    """
-    size = matrices.shape[-1]
-    output = np.zeros_like(matrices)
-    for p in prange(matrices.shape[0]):
-        eigenvalues, eigenvectors = np.linalg.eigh(matrices[p])
-        cutoff = rcond * np.max(np.abs(eigenvalues))
-        for k in range(size):
-            if np.abs(eigenvalues[k]) > cutoff:
-                inverse_eigenvalue = 1 / eigenvalues[k]
-                for i in range(size):
-                    for j in range(size):
-                        output[p, i, j] += eigenvectors[i, k] * inverse_eigenvalue * np.conj(eigenvectors[j, k])
-    return output
- 
 
 def get_coupled_spin(reference_spin: int, available_h_n_spin: list[int], available_signal_spins: list[int]) -> list[tuple]:
     r"""
