@@ -36,18 +36,19 @@ files = sorted(name[: -len(".h5")] for name in glob.glob("tests/data/lbs_example
 polarisation_angles = np.deg2rad([float(name.split("_")[-1]) for name in files])
 
 mask = build_mask_from_lbs_h_maps(files)  # pixels observed by at least one detector
-h_maps = read_lbs_h_maps(
+h_maps, attributes = read_lbs_h_maps(
     files,
     prefix="",  # the names above are complete paths
     list_spin=[np.array([n, 0]) for n in range(0, 5)],  # (n, m): no half-wave plate, m = 0
     mask=mask,
-    list_weights=np.ones(len(files)),
-)
-print(sorted(int(spin) for spin in h_maps), h_maps[2].shape)  # spins -4..4, (n_det, n_pixels)
+)  # attributes: metadata of the files, one value per detector
+print(sorted(int(spin) for spin in h_maps), h_maps[2].shape)  # [0, 1, 2, 3, 4] (n_det, n_pixels)
 assert np.allclose(h_maps[0].sum(axis=0), 1.0)  # the mapmaker requires sum_d h_0 = 1
 ```
 Note that the $h$-maps are loaded with spins $(n,m)$ as per the convention of litbird_sim, with $m = 0$ because there is no half-wave plate. The mapmaker only uses the $n$ index. 
 With sotodlib, the current implementation loads $h$-maps with spins $(n)$ only.
+Only the spins $n \ge 0$ are stored: $h_{-n} = \overline{h_n}$ is reconstructed when needed
+(see [Spin maps](spin_maps.md#negative-spins)).
 
 ## Create the Sky
 
@@ -55,7 +56,7 @@ A CMB sky can be given as spin maps $S_0 = I$ and $S_{\pm 2} = (Q \pm iU)/2$ on 
 smoothed by a circular beam of FWHM 2 degrees. The following snippet creates a random realisation of a lensed $\Lambda CDM$ sky with:
 
 ```python
-from smarties import FrameworkSystematics, transform_array_maps_into_spin_maps
+from smarties import FrameworkSystematics, transform_spin_maps_into_array_maps
 
 nside, lmax = hp.npix2nside(mask.size), 128
 framework = FrameworkSystematics(map_shape=(mask.size,), nstokes=3, lmax=lmax)
@@ -104,14 +105,15 @@ print("rms residual (I, Q, U):", residual.std(axis=1))
 
 `residual` is the systematic map: what the pointing offsets add to the sky once the data are
 binned with this scan. Without `return_Q_U=True` the result is a
-[`Spin_maps`][smarties.hn.Spin_maps] with keys `0`, `2`, `-2` holding $I$ and $Q \pm iU$.
+[`Spin_maps`][smarties.hn.Spin_maps] with keys `0` and `2` holding $I$ and $Q + iU$ (`maps[-2]`
+returns $Q - iU$).
 
 ## Package Layout
 
 | Module | Content |
 |--------|---------|
 | [`smarties.hn`][smarties.hn] | [`Spin_maps`][smarties.hn.Spin_maps], the container for spin maps and $h$-maps, and [`Spin_nm`][smarties.hn.Spin_nm] for $(n, m)$ spins |
-| [`smarties.mapmaking`][smarties.mapmaking] | [`FrameworkSystematics`][smarties.mapmaking.FrameworkSystematics], the spin mapmaker |
+| [`smarties.mapmaking`][smarties.mapmaking] | [`FrameworkSystematics`][smarties.mapmaking.FrameworkSystematics], the spin mapmaker, and [`FrameworkSystematicsChunks`][smarties.mapmaking.FrameworkSystematicsChunks], the mapmaking per chunk |
 | [`smarties.io`][smarties.io] | readers for TOAST / sotodlib and litebird_sim $h$-maps, masks, YAML parameters; writers for output maps |
 | [`smarties.systematics`][smarties.systematics] | pointing, beamwidth and ellipticity spin maps and templates |
 | [`smarties.sky`][smarties.sky] | CMB generation, point sources, harmonic-space beam convolution |
@@ -127,5 +129,8 @@ all of them.
 - [Spin formalism](formalism.md): the equations behind the mapmaker.
 - [$h$-maps](h_maps.md): reading the outputs of TOAST / sotodlib and litebird_sim.
 - [Systematics](systematics.md): the available systematic effects and their conventions.
-- [Mapmaking](mapmaking.md): masks, polarisation angles, mapmaking per chunk.
+- [Mapmaking](mapmaking.md): masks, polarisation angles, reusing the inverse mapmaking matrix.
+- [Mapmaking per chunk](mapmaking_chunks.md): large maps, $h$-maps at a coarser resolution,
+  interpolated detectors, systematics from templates.
+- [Logs](logs.md): setting the level of the messages, or silencing them.
 <!-- - [Tutorials](../tutorials/litebird_healpix_tutorial.md): complete runs on HEALPix and CAR maps. -->
