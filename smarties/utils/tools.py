@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "_numba_spin_convolution_contract",
+    "_numba_apply_pixel_matrix",
     "get_coupled_spin",
     "get_row_mapmaking_matrix",
     "get_rotation_matrix",
@@ -47,16 +48,22 @@ def _numba_spin_convolution_contract(
     output,
     projector_h_n,
     conjugate_h_maps,
+    conjugate_systematics_maps,
+    conjugate_sky_maps,
 ):
     """
-    Replaces the call to contract: accumulates ``prefactor * sum_j ...`` into ``output`` 
+    Replaces the call to contract: accumulates ``prefactor * sum_j ...`` into ``output``
 
     zero must be a zero of the same type as the output, e.g. 0.0 for float, 0.0j for complex,
-    as if zero is double precision and the other inputs are provided as single precision, 
+    as if zero is double precision and the other inputs are provided as single precision,
     the output might be cast to double precision
 
     The h-map of the output pixel i is the column projector_h_n[i] of h_maps, conjugated if
     conjugate_h_maps: the h-maps are read through their indices, never copied.
+
+    The systematics and sky maps are conjugated on the fly when conjugate_systematics_maps
+    or conjugate_sky_maps is set, i.e. when the caller only has the positive spin and would
+    otherwise have to build a full conjugated copy of the map for every coupled pair.
     """
 
     npix = output.shape[0]
@@ -79,12 +86,51 @@ def _numba_spin_convolution_contract(
             )
             spin_map = zero
             if has_systematics:
-                spin_map += (systematics_maps[j, i])
+                if conjugate_systematics_maps:
+                    spin_map += np.conj(systematics_maps[j, i])
+                else:
+                    spin_map += systematics_maps[j, i]
             if not sky_is_zero:
-                spin_map += (polar_angle_coeff_sky[j] * sky_maps[i])
+                if conjugate_sky_maps:
+                    spin_map += polar_angle_coeff_sky[j] * np.conj(sky_maps[i])
+                else:
+                    spin_map += polar_angle_coeff_sky[j] * sky_maps[i]
 
             acc += elem * spin_map
         output[i] += prefactor * acc
+
+@jit(nopython=True, parallel=True, cache=True)
+def _numba_apply_pixel_matrix(
+    matrix_line: np.ndarray,
+    vector: np.ndarray,
+    output: np.ndarray,
+    zero: float | complex = 0.0
+):
+    """
+    Apply a matrix to a vector and accumulate the result into an output vector.
+
+    Parameters
+    ----------
+    matrix_line: np.ndarray
+        Matrix line of shape (n_cols,)
+    vector: np.ndarray
+        Vector of shape (n_cols,)
+    output: np.ndarray
+        Output vector of shape (n_rows,)
+
+    Notes
+    -----
+    The output vector is modified in place.
+    """
+    npix = matrix_line.shape[0]
+    n_cols = matrix_line.shape[1]
+
+    for i in prange(npix):
+        acc = zero
+        for j in range(n_cols):
+            acc += matrix_line[i,j] * vector[i,j]
+        output[i] += acc
+
 
 def get_coupled_spin(reference_spin: int, available_h_n_spin: list[int], available_signal_spins: list[int]) -> list[tuple]:
     r"""
