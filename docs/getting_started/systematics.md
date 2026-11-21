@@ -141,7 +141,8 @@ assert np.allclose(rebuilt, pointing[-1])
 
 Storing the templates instead of the `(n_det, npix)` maps saves memory for large focal
 planes; the mapmaking per chunk builds the maps on the fly from them
-(`build_systematics_maps_from_templates=True`, see [Mapmaking](mapmaking.md)).
+(`build_systematics_maps_from_templates=True`, see
+[Mapmaking per chunk](mapmaking_chunks.md#systematics-from-templates)).
 
 ## Spherical Derivatives
 
