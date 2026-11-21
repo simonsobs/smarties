@@ -292,8 +292,49 @@ def alm2map_anypix(
             mmax=mmax,
         )
 
+def _complex_scalar_types(dtype: np.dtype) -> tuple[complex, type]:
+    """Imaginary unit and real scalar type matching a complex output dtype.
+
+    ``1j`` and ``-1.0`` as Python literals are complex128/float64 to numba, which would
+    make the whole kernel expression double precision and cast the result back. The typed
+    scalars keep a complex64 calculation in single precision, bit for bit.
+    """
+    if dtype == np.complex64:
+        return np.complex64(1j), np.float32
+    if dtype == np.complex128:
+        return np.complex128(1j), np.float64
+    raise TypeError(f"Output alms must be complex64 or complex128, got {dtype}")
+
+
+@njit(parallel=True, cache=True)
+def _convert_plusminus_to_spin_prange(alm_plus, alm_minus, out_pos, out_neg, unit, sign):
+    """Write ``out_pos = -1*(plus + i*minus)``, ``out_neg = (plus - i*minus)*sign`` in place."""
+    for index in prange(alm_plus.size):
+        plus = alm_plus[index]
+        minus = alm_minus[index]
+        out_pos[index] = -(plus + unit * minus)
+        out_neg[index] = (plus - unit * minus) * sign
+
+
+@njit(parallel=True, cache=True)
+def _spin_to_plusminus_prange(coeff_pos, coeff_neg, out_plus, out_minus, flip, neg_half, pos_half_j):
+    """Write the +/- basis alms in place, coefficients read once.
+
+    ``(pos + flip*neg)*-0.5`` and ``(pos - flip*neg)*0.5j`` are the same values as
+    ``-1*(...)/2`` and ``-1*(...)/(2j)``: multiplying by -0.5 and by 0.5j (a swap of the real
+    and imaginary parts, halved) is exact in IEEE arithmetic, so the results are bit for bit
+    identical while the divisions and their temporaries are gone.
+    """
+    for index in prange(coeff_pos.size):
+        pos = coeff_pos[index]
+        neg = coeff_neg[index]
+        out_plus[index] = (pos + flip * neg) * neg_half
+        out_minus[index] = (pos - flip * neg) * pos_half_j
+
+
 def convert_alm_plusminus_to_spin(
-    alm_plus: np.ndarray, alm_minus: np.ndarray, spin: int = 2
+    alm_plus: np.ndarray, alm_minus: np.ndarray, spin: int = 2,
+    out: tuple[np.ndarray, np.ndarray] | None = None
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Convert +/- basis alms coefficients to spin-weighted alms.
@@ -306,22 +347,34 @@ def convert_alm_plusminus_to_spin(
         - basis coefficients (same shape as ``alm_plus``).
     spin: int (optional)
         Target spin (default 2).
+    out: tuple of two np.ndarray, optional
+        ``(out_pos, out_neg)`` buffers to write into, in place and in parallel. ``None``
+        returns the allocated numpy result, which is the reference for the kernel.
 
     Returns
     -------
     tuple[np.ndarray, np.ndarray]
         ``(alm_pos_spin, alm_neg_spin)`` following Healpix convention
     """
-    alms_pos_spin = -1 * (alm_plus + 1j * alm_minus)  # |spin| component
-    alms_neg_spin = (alm_plus - 1j * alm_minus) * (-1.0) ** (
-        -1 - spin
-    )  # -|spin| component
+    if out is None:
+        alms_pos_spin = -1 * (alm_plus + 1j * alm_minus)  # |spin| component
+        alms_neg_spin = (alm_plus - 1j * alm_minus) * (-1.0) ** (
+            -1 - spin
+        )  # -|spin| component
+        return alms_pos_spin, alms_neg_spin
 
-    return alms_pos_spin, alms_neg_spin
+    out_pos, out_neg = out
+    unit, real_dtype = _complex_scalar_types(out_pos.dtype)
+    _convert_plusminus_to_spin_prange(
+        alm_plus, alm_minus, out_pos, out_neg, unit,
+        real_dtype((-1.0) ** (-1 - spin)),
+    )
+    return out_pos, out_neg
 
 
 def convert_alm_spin_to_plusminus(
-    alm_pos_spin: np.ndarray, alm_neg_spin: np.ndarray, spin: int = 2
+    alm_pos_spin: np.ndarray, alm_neg_spin: np.ndarray, spin: int = 2,
+    out: tuple[np.ndarray, np.ndarray] | None = None
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Convert spin-weighted alms coefficients to the +/- basis.
@@ -334,18 +387,30 @@ def convert_alm_spin_to_plusminus(
         -spin coefficients (same shape as ``alm_pos_spin``).
     spin: int (optional)
         Spin of the input coefficients (default 2).
+    out: tuple of two np.ndarray, optional
+        ``(out_plus, out_minus)`` buffers to write into, in place and in parallel. ``None``
+        returns the allocated numpy result, which is the reference for the kernel.
 
     Returns
     -------
     tuple[np.ndarray, np.ndarray]
         ``(alm_plus, alm_minus)`` following Healpix convention
     """
+    if out is None:
+        alm_plus = -1 * (alm_pos_spin + (-1) ** (spin) * alm_neg_spin) / (2)
+        alm_minus = -1 * (alm_pos_spin - (-1) ** (spin) * alm_neg_spin) / (2j)
+        return alm_plus, alm_minus
 
-    alm_plus = -1 * (alm_pos_spin + (-1) ** (spin) * alm_neg_spin) / (2)
-    alm_minus = -1 * (alm_pos_spin - (-1) ** (spin) * alm_neg_spin) / (2j)
-    return alm_plus, alm_minus
+    out_plus, out_minus = out
+    _, real_dtype = _complex_scalar_types(out_plus.dtype)
+    half_unit = np.complex64(0.5j) if out_plus.dtype == np.complex64 else np.complex128(0.5j)
+    _spin_to_plusminus_prange(
+        alm_pos_spin, alm_neg_spin, out_plus, out_minus,
+        real_dtype((-1) ** spin), real_dtype(-0.5), half_unit,
+    )
+    return out_plus, out_minus
 
-def almxfl(alm:np.ndarray, fl:np.ndarray, mmax:int|None=None) -> np.ndarray:
+def almxfl(alm:np.ndarray, fl:np.ndarray, mmax:int|None=None, out:np.ndarray|None=None) -> np.ndarray:
     """
     Multiply alm by a function of ell, f(ell)
 
@@ -373,7 +438,7 @@ def almxfl(alm:np.ndarray, fl:np.ndarray, mmax:int|None=None) -> np.ndarray:
     if mmax is None:
         mmax= lmax
     flsize= fl.size
-    alm_out=np.empty_like(alm)
+    alm_out = np.empty_like(alm) if out is None else out
     _compute_almxfl_prange(alm=alm,alm_out=alm_out, fl=fl,flsize=flsize,lmax=lmax, mmax=mmax)
     # _compute_almxfl(alm=alm,alm_out=alm_out, fl=fl,flsize=flsize,lmax=lmax, mmax=mmax)
     # Multiply by fl using healpy's almxfl
