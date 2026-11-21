@@ -263,7 +263,7 @@ def read_toast_h_maps(
 def read_lbs_h_maps(
     list_detector_names: list[str],
     prefix: str = "h_maps_det_",
-    list_spin: list[int] = [np.array([2, 0]), np.array([4, 0])],
+    list_spin: list[int] = [np.array([0, 0]), np.array([2, 0]), np.array([4, 0])],
     list_weights=None,
     mask: np.ndarray = None,
     format_file: str = "h5",
@@ -371,6 +371,9 @@ def read_lbs_h_maps(
         raise ValueError("The list of spins must contain (0, 0) for the hits weighting the detectors")
 
     total_list_spin = deepcopy(list_spin) 
+    assert np.all([-spin not in total_list_spin for spin in total_list_spin if spin != Spin_nm((0, 0))]), (
+        "The list of spins must not contain the spin and its negative counterpart, as the negative spins will be computed from the positive ones, please use return_only_positive_spins=True if you want to compute the negative ones from the positive spins read."
+    )
     if not return_only_positive_spins:
         total_list_spin += [-spin for spin in list_spin if spin[0] > 0]
 
@@ -397,7 +400,6 @@ def read_lbs_h_maps(
     for j, name_file in enumerate(tqdm(list_detector_names)):
 
         with h5py.File(_file_name(name_file, format_file), "r") as file:
-            hits = _read_dataset(file, "0,0", "Re", to_ring=None)[flattened_indices_mask]
             for spin in list_spin:
                 value = _read_dataset(file, f"{spin[0]},{spin[1]}", "Re", to_ring=None)[flattened_indices_mask] + 1j * _read_dataset(file, f"{spin[0]},{spin[1]}", "Im", to_ring=None)[flattened_indices_mask]
                 h_n_spinmaps[func_spin_to_retain(spin)][j, ...].real = (
@@ -415,7 +417,7 @@ def read_lbs_h_maps(
 
     if not return_only_positive_spins:
         for spin in list_spin:
-            h_n_spinmaps[-spin] = np.conj(h_n_spinmaps[spin])
+            h_n_spinmaps[-func_spin_to_retain(spin)] = np.conj(h_n_spinmaps[func_spin_to_retain(spin)])
 
     logger.info("Finalizing h_n dictionary...")
 
