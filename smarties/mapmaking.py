@@ -184,6 +184,7 @@ class FrameworkSystematics(object):
         spin_sky_maps: Spin_maps, 
         spin_systematics_maps: Spin_maps,
         dtype: np.dtype = np.complex128,
+        npix: int = None
     ):
         """
         Check the consistency of the spin sky maps and the spin systematics maps,
@@ -219,6 +220,10 @@ class FrameworkSystematics(object):
             assert spin_sky_maps[spin].size > 1, (
                 'The sky maps must be 1D arrays of shape (n_pix), or the length-1 np.zeros(1)'
             )
+            if npix is not None:
+                assert spin_sky_maps[spin].size == npix, (
+                    f'The sky maps must be 1D arrays of shape (n_pix), where n_pix={npix}'
+                )
 
             if ((spin in spin_sky_maps) and (-spin in spin_sky_maps)) and (spin != 0):
                 assert np.max(np.abs(
@@ -231,6 +236,11 @@ class FrameworkSystematics(object):
             assert spin_systematics_maps[spin].size > 1, (
                 'The systematics maps must be 2D arrays of shape (n_det, n_pix), or the length-1 np.zeros(1)'
             )
+            if npix is not None:
+                assert spin_systematics_maps[spin].shape[-1] == npix, (
+                    f'The systematics maps must be 2D arrays of shape (n_det, n_pix), where n_pix={npix}'
+                )
+
             if ((spin in spin_systematics_maps) and (-spin in spin_systematics_maps)) and (spin != 0):
                 assert np.max(np.abs(
                     spin_systematics_maps[spin].imag+spin_systematics_maps[-spin].imag
@@ -252,7 +262,7 @@ class FrameworkSystematics(object):
 
 
         
-    def check_consistency_spin_maps(
+    def _check_consistency_spin_maps(
         self, 
         set_spin_maps: set,
         h_n_spin_dict: Spin_maps
@@ -265,6 +275,23 @@ class FrameworkSystematics(object):
             for spin_output in self.list_spin_output:
                 assert (spin_output-spin_sky) in spin_h_maps or -(spin_output-spin_sky) in spin_h_maps, f'The spin {spin_output-spin_sky} or {-spin_output+spin_sky} is not provided in the h_n maps, but is required for the mapmaking process'
                 assert h_n_spin_dict[spin_output-spin_sky].squeeze().ndim == 2 or h_n_spin_dict[-spin_output+spin_sky].squeeze().ndim == 2, f'The spin {spin_output-spin_sky} or {-spin_output+spin_sky} should be a 2D array of shape (n_det, n_pix), but is not'
+
+    def _remove_placeholders(
+        self,
+        spin_sky_maps: Spin_maps,
+        spin_systematics_maps: Spin_maps
+    ):
+        """
+        Remove the placeholder maps (np.zeros(1)) from the spin sky maps and the spin systematics maps.
+        """
+        for spin in list(spin_sky_maps.spins):
+            if spin_sky_maps[spin].size == 1:
+                del spin_sky_maps[spin]
+                # del spin_sky_maps[-spin]
+        for spin in list(spin_systematics_maps.spins):
+            if spin_systematics_maps[spin].size == 1:
+                del spin_systematics_maps[spin]
+                # del spin_systematics_maps[-spin]
 
     def get_inverse_mapmaking_matrix(
             self,
@@ -568,11 +595,12 @@ class FrameworkSystematics(object):
         self._check_spin_maps_sky_systematics(
             spin_sky_maps = spin_sky_maps, 
             spin_systematics_maps = spin_systematics_maps, 
-            dtype = dtype
+            dtype = dtype,
+            npix = npix_mask
         )
 
         set_spins_maps = set(np.unique(spin_sky_maps.spins + spin_systematics_maps.spins))
-        self.check_consistency_spin_maps(
+        self._check_consistency_spin_maps(
             set_spin_maps = set_spins_maps,
             h_n_spin_dict = h_n_spin_dict,
         )
@@ -649,6 +677,11 @@ class FrameworkSystematics(object):
             )
 
         logger.info(f"Final maps computed in {time.time() - time_final_maps:.2f} seconds...")
+
+        self._remove_placeholders(
+            spin_sky_maps=spin_sky_maps,
+            spin_systematics_maps=spin_systematics_maps
+        )
 
         if return_Q_U:
             final_Q = (dict_final_sky_fields[-2] + dict_final_sky_fields[2])/2.
@@ -1555,7 +1588,8 @@ class FrameworkSystematicsChunks(FrameworkSystematics):
         self._check_spin_maps_sky_systematics(
             spin_sky_maps = spin_sky_maps, 
             spin_systematics_maps = spin_systematics_maps, 
-            dtype = dtype
+            dtype = dtype,
+            npix = npix_mask
         )
 
         set_spins_maps = set(np.unique(spin_sky_maps.spins + spin_systematics_maps.spins))
@@ -1584,7 +1618,7 @@ class FrameworkSystematicsChunks(FrameworkSystematics):
 
         spin_h_maps = sorted(set(h_n_spin_dict.spins) | {-s for s in h_n_spin_dict.spins if s > 0})
 
-        self.check_consistency_spin_maps(
+        self._check_consistency_spin_maps(
             set_spin_maps = set_spins_maps,
             h_n_spin_dict = h_n_spin_dict,
         )
@@ -1761,6 +1795,10 @@ class FrameworkSystematicsChunks(FrameworkSystematics):
 
         logger.info(f"Mapmaking per chunk done in {time.time() - time_start:.2f} seconds")
 
+        _remove_placeholders(
+            spin_sky_maps = spin_sky_maps,
+            spin_systematics_maps = spin_systematics_maps,
+        )
         if return_Q_U:
             final_Q = (dict_final_sky_fields[-2] + dict_final_sky_fields[2])/2.
             final_U = 1j*(dict_final_sky_fields[-2] - dict_final_sky_fields[2])/2.
