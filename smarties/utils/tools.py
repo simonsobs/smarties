@@ -69,8 +69,8 @@ def _numba_spin_convolution_contract(
     npix = output.shape[0]
     ndet = h_maps.shape[0]
 
-    has_systematics = systematics_maps.ndim == 2  # compile-time constant, removes the unused branches
-    sky_is_zero = sky_maps.shape[0] == 1
+    has_systematics = systematics_maps is not None
+    sky_is_zero = sky_maps is None
 
     for i in prange(npix):
         column = projector_h_n[i]
@@ -345,10 +345,10 @@ def transform_array_maps_into_spin_maps(
         output_spin_maps[0] = array_maps[*index_T]  # [spin=0]
 
     if n_stokes >= 2:
-        output_spin_maps[-2] = 0.5 * (
-            array_maps[..., dimension_stokes, :]
-            - 1j * array_maps[..., dimension_stokes + 1, :]
-        )  # [spin=-2]
+        # output_spin_maps[-2] = 0.5 * (
+        #     array_maps[..., dimension_stokes, :]
+        #     - 1j * array_maps[..., dimension_stokes + 1, :]
+        # )  # [spin=-2]
         output_spin_maps[2] = 0.5 * (
             array_maps[..., dimension_stokes, :]
             + 1j * array_maps[..., dimension_stokes + 1, :]
@@ -357,9 +357,9 @@ def transform_array_maps_into_spin_maps(
     if n_stokes_output != n_stokes:
         if n_stokes == 1:
             output_spin_maps[2] = np.zeros_like(output_spin_maps[0], dtype=dtype)
-            output_spin_maps[-2] = np.zeros_like(output_spin_maps[0], dtype=dtype)
+            # output_spin_maps[-2] = np.zeros_like(output_spin_maps[0], dtype=dtype)
         elif n_stokes == 2:
-            output_spin_maps[0] = np.zeros_like(output_spin_maps[-2], dtype=dtype)
+            output_spin_maps[0] = np.zeros_like(output_spin_maps[2], dtype=dtype)
 
     if type(array_maps) == enmap.ndmap:
         for spin in output_spin_maps.spins:
@@ -396,13 +396,15 @@ def transform_spin_maps_into_array_maps(spin_maps: Spin_maps) -> np.ndarray | en
     and they will be assumed to contain two spatial dimensions.
     """
 
+    assert isinstance(spin_maps, Spin_maps), "The input spin_maps must be of type Spin_maps"
+
     n_stokes = 0
     if 0 in spin_maps:
         n_stokes += 1
         first_spin = 0
-    if -2 in spin_maps and 2 in spin_maps:
+    if -2 in spin_maps or 2 in spin_maps:
         n_stokes += 2
-        first_spin = -2
+        first_spin = 2
     assert n_stokes in [1, 2, 3], (
         "The number of Stokes parameters must be 1 (only temperature), 2 (only polarization) or 3 (both temperature and polarization)"
     )
