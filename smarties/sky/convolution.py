@@ -95,16 +95,6 @@ def gaussian_circular_beam_blms(
     return blms
 
 
-# --- optimised implementation -------------------------------------------------------------
-
-# The stage is three steps around the ducc0 synthesis: the beam convolution of the alms, the
-# +/- basis conversion that produces the ducc0 input, and the assembly of the complex maps from
-# the two real maps ducc0 returns. Left as numpy, each of them is single-threaded and allocates
-# map-sized temporaries. The first two are fused into one kernel per (spin pair, detector) that
-# reads the sky alms once and writes the ducc0 input directly, so the only large arrays alive are
-# one (2, nalm) buffer and the returned maps; the assembly runs in place.
-
-
 @njit(parallel=True, cache=True)
 def _numba_spin_pair_to_ducc(
     alm0,
