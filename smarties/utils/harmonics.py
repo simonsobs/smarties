@@ -99,7 +99,7 @@ def _map2alm_ducc0(
     nthreads: int = -1
 ) -> np.ndarray:
     """
-    Perform spherical harmonic analysis using ducc0, from healpix maps. 
+    Perform spherical harmonic analysis using ducc0, from healpix maps.
     """
 
     nside = hp.npix2nside(maps.shape[-1])
@@ -249,9 +249,9 @@ def alm2map_anypix(
         Output map to which the pixel map will be written, only used for CAR maps and
         need to be provided if the output pixelization is CAR, otherwise it should be None.
     lmax: int | None
-        Maximum multipole moment 
+        Maximum multipole moment
     mmax: int | None
-        Maximum order of the spherical harmonics 
+        Maximum order of the spherical harmonics
 
     Returns
     -------
@@ -291,20 +291,6 @@ def alm2map_anypix(
             lmax=lmax,
             mmax=mmax,
         )
-
-def _complex_scalar_types(dtype: np.dtype) -> tuple[complex, type]:
-    """Imaginary unit and real scalar type matching a complex output dtype.
-
-    ``1j`` and ``-1.0`` as Python literals are complex128/float64 to numba, which would
-    make the whole kernel expression double precision and cast the result back. The typed
-    scalars keep a complex64 calculation in single precision, bit for bit.
-    """
-    if dtype == np.complex64:
-        return np.complex64(1j), np.float32
-    if dtype == np.complex128:
-        return np.complex128(1j), np.float64
-    raise TypeError(f"Output alms must be complex64 or complex128, got {dtype}")
-
 
 @njit(parallel=True, cache=True)
 def _convert_plusminus_to_spin_prange(alm_plus, alm_minus, out_pos, out_neg, unit, sign):
@@ -364,7 +350,10 @@ def convert_alm_plusminus_to_spin(
         return alms_pos_spin, alms_neg_spin
 
     out_pos, out_neg = out
-    unit, real_dtype = _complex_scalar_types(out_pos.dtype)
+    # Typed scalars: Python literals would make the kernel double precision
+    single_precision = out_pos.dtype == np.complex64
+    unit = np.complex64(1j) if single_precision else np.complex128(1j)
+    real_dtype = np.float32 if single_precision else np.float64
     _convert_plusminus_to_spin_prange(
         alm_plus, alm_minus, out_pos, out_neg, unit,
         real_dtype((-1.0) ** (-1 - spin)),
@@ -427,7 +416,7 @@ def almxfl(alm:np.ndarray, fl:np.ndarray, mmax:int|None=None, out:np.ndarray|Non
     -------
     array_like
         Output alm array after multiplication.
-    
+
     Notes
     -----
     This function mimics the behavior of healpy's almxfl, but uses numba for parallel processing,

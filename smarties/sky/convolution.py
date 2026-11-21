@@ -129,8 +129,7 @@ def _numba_spin_pair_to_ducc(
     ``factor_pos``/``factor_neg`` the beam factors applied to them. Rows ``row_pos`` and
     ``row_neg`` are the ones of the spin-``+s`` and spin-``-s`` output alms
     ``z_s = a_0 f_0 + 0.5 (a_+ f_+ + a_- f_-)``. ``out_plus``/``out_minus`` are the two alms
-    of the E/B (``+``/``-``) basis that ducc0 synthesises: they become the real and the
-    imaginary part of the spin-``+s`` map.
+    of the E/B (``+``/``-``) basis that ducc0 synthesises. The ``flip`` factor is ``(-1)**s``. The ``half_unit`` factor is ``0.5j``.
     """
     for m in prange(lmax + 1):
         offset = m * (2 * lmax + 1 - m) // 2
