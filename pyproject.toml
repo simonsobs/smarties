@@ -10,10 +10,16 @@ requires = [
 name = 'smarties'
 authors = [
     {name = 'Magdy Morshed', email = 'magdy.morshed@fe.infn.it'},
-    {name = 'Camille Demay', email = 'camille.demay@unife.it'}
+    {name = 'Camille Demay', email = 'camille.demay@unife.it'},
+    {name = 'Alexandre E. Adler', email = 'aeadler@berkeley.edu'},
+    {name = 'Adriaan J. Duivenvoorden', email = 'adriaand@mpa-garching.mpg.de'},
+    {name = 'Giulio Fabbian', email = 'giulio.fabbian@universite-paris-saclay.fr'},
 ]
 maintainers = [
-    {name = 'Magdy Morshed', email = 'magdy.morshed@fe.infn.it'}
+    {name = 'Magdy Morshed', email = 'magdy.morshed@fe.infn.it'},
+    {name = 'Camille Demay', email = 'camille.demay@unife.it'},
+    {name = 'Adriaan J. Duivenvoorden', email = 'adriaand@mpa-garching.mpg.de'},
+    {name = 'Giulio Fabbian', email = 'giulio.fabbian@universite-paris-saclay.fr'},
 ]
 description = 'Map-based systematics simulation package for CMB experiments'
 readme = 'README.md'
