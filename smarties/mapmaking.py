@@ -222,7 +222,7 @@ class FrameworkSystematics(object):
             )
             if npix is not None:
                 assert spin_sky_maps[spin].size == npix, (
-                    f'The sky maps must be 1D arrays of shape (n_pix), where n_pix={npix}'
+                    f'The sky maps of spin {spin} must be 1D arrays of shape (n_pix), where n_pix={npix}, but are size {spin_sky_maps[spin].size}'
                 )
 
             if ((spin in spin_sky_maps) and (-spin in spin_sky_maps)) and (spin != 0):
@@ -238,7 +238,7 @@ class FrameworkSystematics(object):
             )
             if npix is not None:
                 assert spin_systematics_maps[spin].shape[-1] == npix, (
-                    f'The systematics maps must be 2D arrays of shape (n_det, n_pix), where n_pix={npix}'
+                    f'The systematics maps of spin {spin} must be 2D arrays of shape (n_det, n_pix), where n_pix={npix} but are shape {spin_systematics_maps[spin].shape}'
                 )
 
             if ((spin in spin_systematics_maps) and (-spin in spin_systematics_maps)) and (spin != 0):
@@ -440,20 +440,23 @@ class FrameworkSystematics(object):
                 spin_to_pass_hmaps = -tuple_spins[0] if conjugate_h_maps else tuple_spins[0]
 
                 conjugate_systematics_maps = tuple_spins[1] not in spin_systematics_maps
-                if -tuple_spins[1] in spin_systematics_maps:
+                if tuple_spins[1] in spin_systematics_maps or -tuple_spins[1] in spin_systematics_maps:
                     spin_to_pass_systematics = (
                         -tuple_spins[1] if conjugate_systematics_maps else tuple_spins[1]
                     )
-                    sky_maps_to_use = spin_systematics_maps[spin_to_pass_systematics]
+                    systematics_maps_to_use = spin_systematics_maps[spin_to_pass_systematics]
+                else:
+                    systematics_maps_to_use = None
+
+                conjugate_sky_maps = tuple_spins[1] not in spin_sky_maps
+                if tuple_spins[1] in spin_sky_maps or -tuple_spins[1] in spin_sky_maps:
+                    spin_to_pass_sky = -tuple_spins[1] if conjugate_sky_maps else tuple_spins[1]
+                    sky_maps_to_use = spin_sky_maps[spin_to_pass_sky]
                 else:
                     sky_maps_to_use = None
 
-                conjugate_sky_maps = tuple_spins[1] not in spin_sky_maps
-                if -tuple_spins[1] in spin_sky_maps:
-                    spin_to_pass_sky = -tuple_spins[1] if conjugate_sky_maps else tuple_spins[1]
-                    systematics_maps_to_use = spin_sky_maps[spin_to_pass_systematics]
-                else:
-                    systematics_maps_to_use = None
+                if systematics_maps_to_use is None and sky_maps_to_use is None:
+                    continue  # no signal of spin k'
 
                 _numba_spin_convolution_contract(
                     h_maps = h_n_spin_dict[spin_to_pass_hmaps],
@@ -1247,7 +1250,7 @@ class FrameworkSystematicsChunks(FrameworkSystematics):
             set(dict_utils_template_systematics_maps['template_spin_systematics_maps'].spins) if dict_utils_template_systematics_maps is not None else set()
         )
 
-        check_spin_or_conj = lambda spin, spin_maps_to_check: (
+        _check_spin_or_conj = lambda spin, spin_maps_to_check: (
             spin in spin_maps_to_check or -spin in spin_maps_to_check
         )
 
@@ -1256,22 +1259,28 @@ class FrameworkSystematicsChunks(FrameworkSystematics):
             if spin < 0:
                 continue
             
-            contribution_from_spin_systematics = np.empty(0, dtype=dtype)
-            if spin_systematics_maps is not None and check_spin_or_conj(spin, spin_systematics_maps):
-                contribution_from_spin_systematics = spin_systematics_maps[spin][..., slice_1d_final_map]
-            
-            contribution_from_template_systematics = contribution_from_spin_systematics
-            if dict_utils_template_systematics_maps is not None and check_spin_or_conj(spin, dict_utils_template_systematics_maps['template_spin_systematics_maps']):
+            # Systematics map of the spin on the pixels of the chunk: the map given, plus the
+            # systematics built from the templates; not stored when there is neither
+            systematics_map = None
+            if spin_systematics_maps is not None and _check_spin_or_conj(spin, spin_systematics_maps):
+                systematics_map = spin_systematics_maps[spin][..., slice_1d_final_map]
+
+            if dict_utils_template_systematics_maps is not None and _check_spin_or_conj(spin, dict_utils_template_systematics_maps['template_spin_systematics_maps']):
                 template = dict_utils_template_systematics_maps['template_spin_systematics_maps'][spin][..., slice_1d_final_map]
                 parameters = dict_utils_template_systematics_maps['parameters_template_systematics'][spin] if spin in dict_utils_template_systematics_maps['parameters_template_systematics'] else np.conj(dict_utils_template_systematics_maps['parameters_template_systematics'][-spin])
-                contribution_from_template_systematics = systematics_maps_chunk[spin] + contract(
+                # contribution_from_template_systematics = systematics_maps_chunk[spin] + contract(
+                systematics_from_templates = contract(
                     '...d,...p->dp',
                     parameters,
                     np.asarray(template),
-                ) + contribution_from_spin_systematics
+                ) #+ contribution_from_spin_systematics
             
-            if contribution_from_template_systematics.size > 0:
-                systematics_maps_chunk[spin] = contribution_from_template_systematics
+            # if contribution_from_template_systematics.size > 0:
+            #     systematics_maps_chunk[spin] = contribution_from_template_systematics
+            systematics_map = systematics_from_templates if systematics_map is None else systematics_map + systematics_from_templates
+
+            if systematics_map is not None:
+                systematics_maps_chunk[spin] = systematics_map
         return systematics_maps_chunk
 
     def get_interpolated_h_maps_chunk(
