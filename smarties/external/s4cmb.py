@@ -761,6 +761,7 @@ def get_second_spherical_derivatives_from_spin_derivatives(
     shape_pixels_output: tuple,
     input_spin: int,
     lmax: int,
+    input_alm_to_use: np.ndarray = None,
     zbounds: tuple[float, float] = (-1.0, 1.0),
     spherical_derivatives_dict: dict = dict(),
     niter: int =10,
@@ -817,9 +818,12 @@ def get_second_spherical_derivatives_from_spin_derivatives(
             input_spin + 1 not in spin_derivatives_dict
             or input_spin - 1 not in spin_derivatives_dict
         ):
-            input_alms = map2alm_anypix(
-                input_map, lmax=lmax, spin=0, niter=niter, shape_car=shape_pixels_output
-            )
+            if input_alm_to_use is not None:
+                input_alms = input_alm_to_use
+            else:
+                input_alms = map2alm_anypix(
+                    input_map, lmax=lmax, spin=0, niter=niter, shape_car=shape_pixels_output
+                )
 
             wcs = input_map.wcs if type(input_map) == enmap.ndmap else None
             spin_derivatives_dict_ = get_first_spin_derivative(
