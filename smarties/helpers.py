@@ -49,10 +49,15 @@ def get_all_spherical_derivatives_from_temperature_maps(
 
     """
 
-    intensity_full_map = input_map[0] if input_map.ndim > 1 else input_map
+    if type(input_map) == enmap.ndmap:
+        intensity_full_map = input_map[0] if input_map.ndim > 2 else input_map
+    else:
+        intensity_full_map = input_map[0] if input_map.ndim > 1 else input_map
     input_spin = 0
 
     shape_pixels_output = intensity_full_map.shape
+
+    logger.info(f"Computing spherical derivatives from input map with shape {shape_pixels_output} and lmax={lmax}")
 
     if input_alm_to_use is None:
         alms_I = map2alm_anypix(
@@ -77,7 +82,7 @@ def get_all_spherical_derivatives_from_temperature_maps(
     )
 
     return get_second_spherical_derivatives_from_spin_derivatives(
-        input_map=intensity_full_map,
+        input_map=intensity_full_map.ravel(),
         input_alm_to_use=alms_I,
         spin_derivatives_dict=intensity_spin_2_derivatives,
         shape_pixels_output=shape_pixels_output,
