@@ -85,7 +85,7 @@ Options worth knowing:
 | Argument | Effect |
 |----------|--------|
 | `format_file` | extension of the files, `"hdf"` (default), `"h5"`, `"hdf5"`, `"H5"` |
-| `reweight_by_hits=False` | $h^d_n = w_d \langle e^{in\psi}\rangle_d$ and $h^d_0 = w_d\,\mathrm{hits}_d$, without normalisation |
+| `reweight_by_hits=False` | $h^d_n = \langle e^{in\psi}\rangle_d$ and $h^d_0 = \mathrm{hits}_d$, without normalisation (`list_weights` is then not used) |
 | `single_precision=True` | `complex64` maps, halves the memory |
 | `return_only_positive_spins=False` | also store the negative spins, otherwise the negative spins are computed on-the-fly from the positive ones |
 

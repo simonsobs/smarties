@@ -70,7 +70,7 @@ h_maps, attributes = read_lbs_h_maps(
 # Sky: I, Q, U -> spin maps S_0 = I, S_{+-2} = (Q +- iU) / 2
 nside, lmax = hp.npix2nside(mask.size), 128
 framework = FrameworkSystematics(map_shape=(mask.size,), nstokes=3, lmax=lmax)
-sky = framework.get_CMB_spin_sky_maps(nside=nside, fwhm=np.deg2rad(2.0), seed=0)
+sky = framework.get_CMB_spin_sky_maps(nside=nside, fwhm=120.0, seed=0)  # FWHM in arcmin
 
 # Alternatively, one can provide a custom sky in I, Q, U format and convert it to spin maps:
 # iqu = hp.read_map('path/to/iqu_map.fits', field=(0, 1, 2))

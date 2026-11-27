@@ -32,13 +32,14 @@ I, Q, U = rng.standard_normal((3, 48))
 # From a dictionary
 sky = Spin_maps.from_dictionary({0: I, 2: (Q + 1j * U) / 2, -2: (Q - 1j * U) / 2})
 
-# From an (nstokes, npix) array of Stokes parameters: same result
+# From an (nstokes, npix) array of Stokes parameters: same maps, with the spins 0 and 2 only
+# (sky[-2] returns the conjugate of sky[2], see Negative Spins below)
 sky = transform_array_maps_into_spin_maps(np.array([I, Q, U]))
 
 # From a stack of maps and the list of their spins
 outputs = Spin_maps.from_list_maps(np.array([I, (Q - 1j * U) / 2, (Q + 1j * U) / 2]), [0, -2, 2])
 
-print(sky.spins, outputs.spins)
+print(sky.spins, outputs.spins)  # [0, 2] [0, -2, 2]
 ```
 
 `transform_array_maps_into_spin_maps` accepts 1 (I), 2 (Q, U) or 3 (I, Q, U) Stokes

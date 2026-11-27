@@ -60,7 +60,7 @@ from smarties import FrameworkSystematics, transform_spin_maps_into_array_maps
 
 nside, lmax = hp.npix2nside(mask.size), 128
 framework = FrameworkSystematics(map_shape=(mask.size,), nstokes=3, lmax=lmax)
-sky = framework.get_CMB_spin_sky_maps(nside=nside, fwhm=np.deg2rad(2.0), seed=0)
+sky = framework.get_CMB_spin_sky_maps(nside=nside, fwhm=120.0, seed=0)  # FWHM in arcmin
 ```
 
 With CAMB installed, a lensed ΛCDM realisation is one call away:

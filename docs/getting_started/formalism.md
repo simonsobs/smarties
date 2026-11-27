@@ -184,9 +184,8 @@ $k \in \{0, \pm 2\}$:
 
 All the fields above are real, so the negative-spin maps are the complex conjugates of the
 positive ones. [`Spin_maps`][smarties.hn.Spin_maps] uses this: a negative spin that is not
-stored is returned as the conjugate of the positive one, and the mapmaker
-(`optimize_computations=True`) only computes the non-negative spins of the data vector and
-of the solution. Storing only $n \ge 0$ halves the memory taken by the $h$-maps and the
+stored is returned as the conjugate of the positive one, and the mapmaker only computes the
+non-negative spins of the data vector and of the solution. Storing only $n \ge 0$ halves the memory taken by the $h$-maps and the
 systematics maps.
 
 ## Further Reading

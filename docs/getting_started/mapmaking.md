@@ -54,7 +54,7 @@ h_maps, attributes = read_lbs_h_maps(
 )
 npix = mask.size
 lmax = 2 * hp.npix2nside(npix)
-sky = framework.get_CMB_spin_sky_maps(nside=hp.npix2nside(npix), fwhm=np.deg2rad(2.0), seed=0)
+sky = framework.get_CMB_spin_sky_maps(nside=hp.npix2nside(npix), fwhm=120.0, seed=0)  # FWHM in arcmin
 
 
 rng = np.random.default_rng(4)
