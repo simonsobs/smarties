@@ -194,6 +194,10 @@ def create_beamwidth_spin_leakage_map_BICEP(
         beam
     delta_sigma: np.ndarray | float
         Angular fwhm mismatch for each detector in radians
+    sigma_fwhm: float
+        Full width at half maximum of the beam in arcmin, assumed to have been used to compute 
+        the circularly-symmetric beam smoothing the intensity_sky_map map, and around which the 
+        Taylor expansion of the beamwidth mismatch is performed in the BICEP formalism. 
     lmax: int (optional)
         Maximum multipole for the computation of the spin derivatives of the 
         intensity sky map if spherical_derivatives is not provided

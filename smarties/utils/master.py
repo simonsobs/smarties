@@ -570,6 +570,16 @@ def uncouple_spectra_pspy(
         Width of the bins for the power spectrum.
     input_map_2 : enmap.ndmap, optional
         Second input map.
+    niter : int, optional
+        Number of iterations of the map to alm transforms of pspy. Default is 0.
+    spectra_ordering_output : list, optional
+        Spectra returned, in this order, among "TT", "TE", "TB", "ET", "BT", "EE", "EB",
+        "BE", "BB" (default: all of them).
+    type_output : str, optional
+        Type of the spectra, "Cl" (default) or "Dl", as in pspy.
+    return_dictionary : bool, optional
+        If True, return the output of ``pspy.so_spectra.bin_spectra``, the bin centres and a
+        dictionary of the spectra. Default is False.
 
     Returns
     -------

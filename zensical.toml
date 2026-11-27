@@ -19,14 +19,16 @@ nav = [
       "getting_started/h_maps.md",
       "getting_started/systematics.md",
       "getting_started/mapmaking.md",
+      "getting_started/mapmaking_chunks.md",
+      "getting_started/logs.md",
   ] },
+  # Filled by the api-autonav plugin (nav_section_title below), declared here to come before
+  # the changelog
+  { "API reference" = [] },
+  { "Changelog" = "changelog.md" },
   # { "Tutorials" = [
   #     "tutorials/litebird_healpix_tutorial.md",
   #     "tutorials/sotodlib_car_tutorial.md",
-  # ] },
-  # { "Development" = [
-  #     "development/contributing.md",
-  #     "development/changelog.md",
   # ] },
 ]
 
@@ -44,7 +46,7 @@ modules = ["smarties"]
 nav_section_title = "API reference"
 api_root_uri = "api"
 # Work-in-progress modules that are not part of the public API yet.
-exclude = ["smarties.maps", "smarties.systematics.gain", "smarties.mapmaking_chunks", "smarties.utils.resolution_proposed"]
+exclude = ["smarties.systematics.gain", "smarties.systematics.templates"]
 
 [project.plugins.mkdocstrings.handlers.python]
 inventories = [

@@ -2,9 +2,11 @@
 # Copyright (C) 2024-2026 Members of the Simons Observatory collaboration.
 # Please refer to the LICENSE file in the root of this repository.
 
+from copy import deepcopy
 import logging
 import numpy as np
 from opt_einsum import contract
+from numba import jit, prange
 from pixell import enmap
 
 from smarties.hn import Spin_maps, Spin_nm
@@ -12,6 +14,8 @@ from smarties.hn import Spin_maps, Spin_nm
 logger = logging.getLogger(__name__)
 
 __all__ = [
+    "_numba_spin_convolution_contract",
+    "_numba_apply_pixel_matrix",
     "get_coupled_spin",
     "get_row_mapmaking_matrix",
     "get_rotation_matrix",
@@ -30,6 +34,103 @@ list_conventions = [
     "Modified second flattening",
     "Plus-Cross ellipticity",
 ]
+
+
+@jit(nopython=True, parallel=True, cache=True)
+def _numba_spin_convolution_contract(
+    h_maps,
+    systematics_maps,
+    sky_maps,
+    polar_efficiency_coeff,
+    polar_angle_coeff_sky,
+    polar_angle_coeff_mapmaker,
+    prefactor,
+    zero,
+    output,
+    projector_h_n,
+    conjugate_h_maps,
+    conjugate_systematics_maps,
+    conjugate_sky_maps,
+):
+    """
+    Replaces the call to contract: accumulates ``prefactor * sum_j ...`` into ``output``
+
+    zero must be a zero of the same type as the output, e.g. 0.0 for float, 0.0j for complex,
+    as if zero is double precision and the other inputs are provided as single precision,
+    the output might be cast to double precision
+
+    The h-map of the output pixel i is the column projector_h_n[i] of h_maps, conjugated if
+    conjugate_h_maps: the h-maps are read through their indices, never copied.
+
+    The systematics and sky maps are conjugated on the fly when conjugate_systematics_maps
+    or conjugate_sky_maps is set, i.e. when the caller only has the positive spin and would
+    otherwise have to build a full conjugated copy of the map for every coupled pair.
+    """
+
+    npix = output.shape[0]
+    ndet = h_maps.shape[0]
+
+    has_systematics = systematics_maps is not None
+    sky_is_zero = sky_maps is None
+
+    for i in prange(npix):
+        column = projector_h_n[i]
+        acc = zero
+        for j in range(ndet):
+            h_map = h_maps[j, column]
+            if conjugate_h_maps:
+                    h_map = np.conj(h_map)
+            elem = (
+                polar_efficiency_coeff[j]
+                * polar_angle_coeff_mapmaker[j]
+                * h_map
+            )
+            spin_map = zero
+            if has_systematics:
+                if conjugate_systematics_maps:
+                    spin_map += np.conj(systematics_maps[j, i])
+                else:
+                    spin_map += systematics_maps[j, i]
+            if not sky_is_zero:
+                if conjugate_sky_maps:
+                    spin_map += polar_angle_coeff_sky[j] * np.conj(sky_maps[i])
+                else:
+                    spin_map += polar_angle_coeff_sky[j] * sky_maps[i]
+
+            acc += elem * spin_map
+        output[i] += prefactor * acc
+
+@jit(nopython=True, parallel=True, cache=True)
+def _numba_apply_pixel_matrix(
+    matrix_line: np.ndarray,
+    vector: np.ndarray,
+    output: np.ndarray,
+    zero: float | complex = 0.0
+):
+    """
+    Apply a matrix to a vector and accumulate the result into an output vector.
+
+    Parameters
+    ----------
+    matrix_line: np.ndarray
+        Matrix line of shape (n_cols,)
+    vector: np.ndarray
+        Vector of shape (n_cols,)
+    output: np.ndarray
+        Output vector of shape (n_rows,)
+
+    Notes
+    -----
+    The output vector is modified in place.
+    """
+    npix = matrix_line.shape[0]
+    n_cols = matrix_line.shape[1]
+
+    for i in prange(npix):
+        acc = zero
+        for j in range(n_cols):
+            acc += matrix_line[i,j] * vector[i,j]
+        output[i] += acc
 
 
 def get_coupled_spin(reference_spin: int, available_h_n_spin: list[int], available_signal_spins: list[int]) -> list[tuple]:
@@ -132,22 +233,29 @@ def get_row_mapmaking_matrix(
     if polar_efficiency_coeff is None:
         polar_efficiency_coeff = np.ones(h_n_spin_dict[0].shape[0])
 
-    mapmaking_matrix_row = np.zeros(
-        tuple(h_n_spin_dict[2][slice_to_apply].shape[1:]) + (len(list_spin_input),),
-        dtype=dtype,
-    )
+    def get_h_map(spin):
+        # Sliced before being conjugated when only -spin is stored: only the sliced pixels are copied
+        if spin in h_n_spin_dict:
+            return h_n_spin_dict[spin][slice_to_apply]
+        return np.conj(h_n_spin_dict[-spin][slice_to_apply])
+
+    mapmaking_matrix_row = None
     for i, spin_name in enumerate(list_spin_input):
-        mapmaking_matrix_row[:, i] = (
+        row = (
             factor_func(reference_spin)
             * factor_func(spin_name)
             * contract(
                 "d...,d...,d...->...",
                 polar_angle_coeff[spin_name - reference_spin],
-                h_n_spin_dict[spin_name - reference_spin][slice_to_apply],
+                # h_n_spin_dict[spin_name - reference_spin][slice_to_apply],
+                get_h_map(spin_name - reference_spin),
                 polar_efficiency_func(spin_name)
                 * polar_efficiency_func(reference_spin),
             )
         )
+        if mapmaking_matrix_row is None:
+            mapmaking_matrix_row = np.zeros(np.shape(row) + (len(list_spin_input),), dtype=dtype)
+        mapmaking_matrix_row[:, i] = row
 
     return mapmaking_matrix_row
 
@@ -189,18 +297,24 @@ def transform_array_maps_into_spin_maps(
     inheriting from the dictionary structure as
       {key:element} being the spin and the corresponding map, respectively.
     The transformation is done as follows:
-        * The spin 0 field is assumed to be the first Stokes parameter (temperature) if n_stokes = 1 or 3.
-        * The spin -2 field is assumed to be given by $0.5 * (Q - iU)$
-        * The spin 2 field is assumed to be given by $0.5 * (Q + iU)$
-    where Q and U are the second and third Stokes parameters, respectively, if n_stokes = 2 or 3.
+        * The spin 0 field is the first Stokes parameter (temperature) if n_stokes = 1 or 3.
+        * The spin 2 field is $0.5 (Q + iU)$, where Q and U are the last two Stokes
+          parameters, if n_stokes = 2 or 3.
+    The spin -2 field, $0.5 (Q - iU)$, is not stored: the Spin_maps returns it as the
+    conjugate of the spin 2 field.
 
     Parameters
     ----------
     array_maps: np.ndarray | enmap.ndmap
         Array of maps of shape (..., n_stokes, n_pix) with
-        * if n_stokes = 1, the temperature field [T] is assumed to be provided (spin=0)
-        * if n_stokes = 2, the polarization field [Q,U] is assumed to be provided (spin=2, -2)
-        * if n_stokes = 3, the full Stokes parameters [T,Q,U] are assumed to be provided (spin=0, 2, -2)
+        * if n_stokes = 1, the temperature field [T] is assumed to be provided (spin 0)
+        * if n_stokes = 2, the polarization field [Q,U] is assumed to be provided (spin 2)
+        * if n_stokes = 3, the full Stokes parameters [T,Q,U] are assumed to be provided (spins 0, 2)
+    n_stokes_output: int, optional
+        Number of Stokes parameters of the output, 1, 2 or 3: the missing fields are set to
+        zero (temperature only to polarization is not possible). Default: n_stokes of the input.
+    dtype: type, optional
+        Data type of the zero fields added for n_stokes_output. Default is complex.
 
     Returns
     -------
@@ -238,10 +352,10 @@ def transform_array_maps_into_spin_maps(
         output_spin_maps[0] = array_maps[*index_T]  # [spin=0]
 
     if n_stokes >= 2:
-        output_spin_maps[-2] = 0.5 * (
-            array_maps[..., dimension_stokes, :]
-            - 1j * array_maps[..., dimension_stokes + 1, :]
-        )  # [spin=-2]
+        # output_spin_maps[-2] = 0.5 * (
+        #     array_maps[..., dimension_stokes, :]
+        #     - 1j * array_maps[..., dimension_stokes + 1, :]
+        # )  # [spin=-2]
         output_spin_maps[2] = 0.5 * (
             array_maps[..., dimension_stokes, :]
             + 1j * array_maps[..., dimension_stokes + 1, :]
@@ -250,9 +364,9 @@ def transform_array_maps_into_spin_maps(
     if n_stokes_output != n_stokes:
         if n_stokes == 1:
             output_spin_maps[2] = np.zeros_like(output_spin_maps[0], dtype=dtype)
-            output_spin_maps[-2] = np.zeros_like(output_spin_maps[0], dtype=dtype)
+            # output_spin_maps[-2] = np.zeros_like(output_spin_maps[0], dtype=dtype)
         elif n_stokes == 2:
-            output_spin_maps[0] = np.zeros_like(output_spin_maps[-2], dtype=dtype)
+            output_spin_maps[0] = np.zeros_like(output_spin_maps[2], dtype=dtype)
 
     if type(array_maps) == enmap.ndmap:
         for spin in output_spin_maps.spins:
@@ -271,6 +385,7 @@ def transform_spin_maps_into_array_maps(spin_maps: Spin_maps) -> np.ndarray | en
         * the spin -2 field is assumed to be given by $0.5 * (Q - iU)$
         * the spin 2 field is assumed to be given by $0.5 * (Q + iU)$
     where Q and U are the second and third Stokes parameters, respectively, if n_stokes = 2 or 3.
+    One of the spins 2 and -2 is enough, the other being its conjugate.
 
     Parameters
     ----------
@@ -289,13 +404,15 @@ def transform_spin_maps_into_array_maps(spin_maps: Spin_maps) -> np.ndarray | en
     and they will be assumed to contain two spatial dimensions.
     """
 
+    assert isinstance(spin_maps, Spin_maps), "The input spin_maps must be of type Spin_maps"
+
     n_stokes = 0
     if 0 in spin_maps:
         n_stokes += 1
         first_spin = 0
-    if -2 in spin_maps and 2 in spin_maps:
+    if -2 in spin_maps or 2 in spin_maps:
         n_stokes += 2
-        first_spin = -2
+        first_spin = 2
     assert n_stokes in [1, 2, 3], (
         "The number of Stokes parameters must be 1 (only temperature), 2 (only polarization) or 3 (both temperature and polarization)"
     )
@@ -314,8 +431,8 @@ def transform_spin_maps_into_array_maps(spin_maps: Spin_maps) -> np.ndarray | en
         # Only temperature field is provided
         array_maps[..., 0, :] = spin_maps[0]
     if n_stokes >= 2:
-        array_maps[..., 1, :] = spin_maps[-2] + spin_maps[2]  # [Q, U] -> spin -2 and 2
-        array_maps[..., 2, :] = -1j * (spin_maps[2] - spin_maps[-2])
+        array_maps[..., -2, :] = spin_maps[-2] + spin_maps[2]  # [Q, U] -> spin -2 and 2
+        array_maps[..., -1, :] = -1j * (spin_maps[2] - spin_maps[-2])
 
     if boolean_car_pixelization:
         array_maps = enmap.ndmap(array_maps.reshape(-1, *array_maps.shape[-2:]), wcs=spin_maps[first_spin].wcs)
@@ -502,6 +619,16 @@ def convert_ellipticities_conventions(
 def flatten_CAR_maps(maps_CAR: enmap.ndmap) -> enmap.ndmap:
     """
     Flatten a CAR map of shape (..., ny, nx) into a 1D map of shape (..., ny*nx).
+
+    Parameters
+    ----------
+    maps_CAR: enmap.ndmap
+        CAR maps of shape ``(..., ny, nx)``; a leading dimension of size 1 is dropped.
+
+    Returns
+    -------
+    enmap.ndmap
+        Maps of shape ``(..., ny*nx)``.
     """
     first_dimensions = maps_CAR.shape[:-2] if maps_CAR.shape[:-2] != (1,) else tuple()
     return maps_CAR.reshape(first_dimensions + (np.prod(maps_CAR.shape[-2:]),))
@@ -511,107 +638,103 @@ def flatten_CAR_maps(maps_CAR: enmap.ndmap) -> enmap.ndmap:
 def unflatten_CAR_maps(maps_CAR_flatten: enmap.ndmap, original_shape_pixels: tuple[int, int]) -> enmap.ndmap:
     """
     Unflatten a CAR map of shape (..., ny*nx) into a 2D map of shape (..., ny, nx).
+
+    Parameters
+    ----------
+    maps_CAR_flatten: enmap.ndmap
+        Flattened CAR maps of shape ``(..., ny*nx)``.
+    original_shape_pixels: tuple[int, int]
+        Shape ``(ny, nx)`` of the CAR maps.
+
+    Returns
+    -------
+    enmap.ndmap
+        Maps of shape ``(..., ny, nx)``.
     """
     return maps_CAR_flatten.reshape(maps_CAR_flatten.shape[:-1] + original_shape_pixels)
 
 
 def reweight_hmaps_by_hits(
-        h_dictionary: dict| Spin_maps,
-        list_weights: np.ndarray,
-        list_spin: list[int],
-        error_precision: float = None,
-        in_place: bool = False
+        h_dictionary: Spin_maps,
+        in_place: bool = False,
+        spin_0: int | Spin_nm = 0,
+        list_weights: np.ndarray = None
 ) -> None| dict| Spin_maps:
-    """
-    Reweight the h-maps in the dictionary by the number of hits per pixel, given a list of weights for each detector or not.
+    r"""
+    Normalise the $h$-maps by the hits of the detectors.
+
+    The spin-0 maps hold the hits of the detectors, and the maps of spin $n \ne 0$ the averages
+    $\langle e^{in\psi}\rangle_d$. With the weights $w_d$ of ``list_weights``, they become
+    $h^d_0 = w_d\,\mathrm{hits}_d / \sum_{d'} w_{d'}\,\mathrm{hits}_{d'}$ and
+    $h^d_n = h^d_0 \langle e^{in\psi}\rangle_d$ (zero where the detector has no hits), and
+    ``total_hits_map`` is set to $\sum_d w_d\,\mathrm{hits}_d$.
 
     Parameters
     ----------
-    h_dictionary: dict| Spin_maps
-        Dictionary of h-maps with keys being the spins and values being the corresponding maps for each detector.
-    list_weights: np.ndarray
-        List of weights for each detector, of shape (n_det,) or (n_det,n_pix) if the weights are pixel-dependent.
-    list_spin: list[int]
-        List of spins to consider for the reweighting.
-    error_precision: float, optional
-        Precision threshold to consider a pixel as observed by a detector. If None, a default value of 1e-8 is used.
+    h_dictionary: Spin_maps
+        $h$-maps ``spin -> (n_det, n_pix)``, the spin 0 holding the hits. Modified in place.
     in_place: bool, optional
-        If True, the h_dictionary is modified in place. If False, a new dictionary is returned. Default is False.
+        If False (default), ``h_dictionary`` is also returned; it is modified in place in
+        both cases.
+    spin_0: int | Spin_nm, optional
+        Key of the hits, ``0`` or ``Spin_nm((0, 0))``. A ValueError is raised if the
+        $h$-maps do not contain it. Default is 0.
+    list_weights: np.ndarray, optional
+        Weights of the detectors, shape ``(n_det,)``, normalised to a sum of 1. Default: 1 for
+        every detector.
+
+    Returns
+    -------
+    Spin_maps or None
+        ``h_dictionary`` if ``in_place`` is False, None otherwise.
     """
-    if 0 not in h_dictionary.spins and Spin_nm((0, 0)) not in h_dictionary.spins:
-        error_precision = 1e-8 if error_precision is None else error_precision
-        spin_0 = Spin_nm((0, 0)) if np.size((h_dictionary.spins)[0]) == 2 else 0
+    assert isinstance(h_dictionary, Spin_maps), (
+        "h_dictionary must be a Spin_maps object, with keys being the spins and values being the corresponding maps for each detector."
+    )
 
-        h_dictionary[spin_0] = (
-            list_weights[..., np.newaxis] if list_weights.ndim == 1 else list_weights
-        )
-
-        logger.info("--Applying new weighting to h_n dictionary...")
-
-        array_hits_detector_pixel = np.int64(
-            np.logical_or(
-                np.abs(h_dictionary[list_spin[0]]) > 10 * error_precision,
-                np.abs(h_dictionary[-list_spin[0]]) > 10 * error_precision,
-            )
-        )
-        pixel_map_weighting_array = (array_hits_detector_pixel).sum(axis=0)
-        if isinstance(h_dictionary, Spin_maps):
-            h_dictionary.total_hits_map = pixel_map_weighting_array
-
-        if 0 in pixel_map_weighting_array:
-            logger.warning(
-                "--Some pixels are not observed by any detector, they will have their h maps values set to zero",
-            )
-            logger.info(
-                "--Number of unobserved pixels: {}".format(
-                    np.sum(pixel_map_weighting_array == 0)
-                ),
-            )
-            logger.info(
-                "--Total number of pixels: {}".format(pixel_map_weighting_array.size),
-            )
-            logger.info(
-                "--Fraction of unobserved pixels: {:.2e}".format(
-                    np.sum(pixel_map_weighting_array == 0)
-                    / pixel_map_weighting_array.size
-                ),
-            )
-
-        for spin in h_dictionary.spins:
-            if spin != spin_0:
-                h_dictionary[spin][..., pixel_map_weighting_array != 0] = contract(
-                    "d...,d...,...->d...",
-                    h_dictionary[spin],
-                    list_weights,
-                    1 / pixel_map_weighting_array[pixel_map_weighting_array != 0],
-                )
-
-        h_dictionary[spin_0] = np.where(
-            array_hits_detector_pixel == 0,
-            0,
-            array_hits_detector_pixel / pixel_map_weighting_array,
-        )
+    n_det = h_dictionary[spin_0].shape[0]
+    if list_weights is None:
+        list_weights = np.ones(n_det, dtype=float) 
     else:
-        spin_0 = 0 if 0 in h_dictionary.spins else Spin_nm((0, 0))
-        logger.info("--Spin 0 in h maps dictionary, re-weighting applied.")
-        cond_non_zero = h_dictionary[spin_0] != 0
-        inverse_weights = (
-            1 / list_weights[..., None]
-            if list_weights.ndim == 1
-            else np.where(cond_non_zero, 1 / list_weights[..., cond_non_zero], 0)
+        list_weights = np.asarray(list_weights, dtype=float)
+        assert list_weights.shape[0] == n_det, (
+            "list_weights must be a 1D array of size n_det"
         )
+        if np.sum(list_weights) != 1:
+            list_weights = list_weights / np.sum(list_weights)
 
-        sum_hits = h_dictionary[spin_0].sum(axis=0)
+    
+    if spin_0 not in h_dictionary.spins:
+        raise ValueError(
+            "Spin 0 is not present in the h-maps dictionary, re-weighting cannot be applied."
+        )
+    
+    if not in_place:
+        h_dictionary_output = deepcopy(h_dictionary)
+    else:
+        h_dictionary_output = h_dictionary
 
-        if isinstance(h_dictionary, Spin_maps):
-            h_dictionary.total_hits_map = sum_hits * inverse_weights
 
-        for spin in h_dictionary.spins:
-            if spin != spin_0:
-                h_dictionary[spin][cond_non_zero] *= (
-                    inverse_weights * h_dictionary[spin_0] / sum_hits
-                )[cond_non_zero]
+    spin_0 = 0 if 0 in h_dictionary.spins else Spin_nm((0, 0))
+    logger.info("--Spin 0 in h maps dictionary, re-weighting applied.")
+    cond_non_zero = h_dictionary[spin_0] != 0
 
-        h_dictionary[spin_0] = np.where(cond_non_zero, h_dictionary[spin_0] / sum_hits, 0)
+
+    weighted_h_0 = h_dictionary[spin_0] * list_weights[..., None]
+    sum_hits = weighted_h_0.sum(axis=0) 
+
+    h_dictionary_output.total_hits_map = sum_hits
+
+    for spin in h_dictionary.spins:
+        if spin != spin_0:
+            h_dictionary_output[spin][cond_non_zero] *= (
+                weighted_h_0 / sum_hits 
+            )[cond_non_zero]
+
+    h_dictionary_output[spin_0] = np.where(
+        cond_non_zero, 
+        weighted_h_0 / sum_hits, 
+        0
+    )
     if not in_place:  
-        return h_dictionary
+        return h_dictionary_output

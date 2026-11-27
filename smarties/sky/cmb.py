@@ -170,8 +170,9 @@ def create_CMB_spin_maps(nside: int, nstokes: int, lmax: int, fwhm: float = 0.0,
 
     Returns
     -------
-    spin_maps: dictionary of spin maps
-        dictionary of spin maps, each of shape (n_spin, npix), with n_spin being 1 if nstokes=1 (spin=0), 2 if nstokes=2 (spin=2, -2) and 3 if nstokes=3 (spin=0, 2, -2)
+    spin_maps: Spin_maps
+        Spin maps, each of shape (npix,), with the spins 0 if nstokes=1, 2 and -2 if nstokes=2,
+        0, 2 and -2 if nstokes=3
 
     """
     npix = 12 * nside**2

@@ -177,7 +177,7 @@ def map2alm_anypix(
     of the input pixelization (either CAR or HEALPIX).
 
     Parameters
-    __________
+    ----------
     maps: np.ndarray | enmap.ndmap
         Pixel map from which the SHT coefficients will be computed, can be either 
         a CAR map (enmap.ndmap) or a HEALPIX map (np.ndarray).
@@ -235,7 +235,7 @@ def alm2map_anypix(
     of the expected output pixelization (either CAR or HEALPIX).
 
     Parameters
-    __________
+    ----------
     alms: np.ndarray
         Spherical harmonics coefficients from which the pixel map will be
         computed

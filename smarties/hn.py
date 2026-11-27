@@ -44,43 +44,52 @@ class Spin_maps(dict):
     _projection_pixel = None
     _shape_fullsky = None
     _wcs_car = None
+    _total_hits_map = None
 
     def __missing__(self, key):
-        if (isinstance(key, int) or isinstance(key, Spin_nm)) and -key in self: 
+        if (isinstance(key, int) or isinstance(key, Spin_nm) or isinstance(key, np.integer)) and -key in self: 
             return np.conj(super().__getitem__(-key))
         raise  KeyError(key)
 
     def set_projection_pixel(self, projection_pixel=None):
+        """Set the pixelisation of the maps, ``'car'`` or ``'healpix'``."""
         assert projection_pixel in ["car", "healpix"], (
             f"Projection pixel must be either 'car' or 'healpix', got {projection_pixel}"
         )
         self._projection_pixel = projection_pixel
 
     def get_projection_pixel(self):
+        """Pixelisation of the maps, ``'car'`` or ``'healpix'`` (None if not set)."""
         return self._projection_pixel
 
     projection_pixel = property(get_projection_pixel, set_projection_pixel)
 
     def set_shape_fullsky(self, shape=None):
+        """Set the shape of the full (unmasked) map, ``(npix,)`` or ``(ny, nx)``."""
         self._shape_fullsky = shape
 
     def get_shape_fullsky(self):
+        """Shape of the full (unmasked) map, ``(npix,)`` or ``(ny, nx)`` (None if not set)."""
         return self._shape_fullsky
 
     shape_fullsky = property(get_shape_fullsky, set_shape_fullsky)
 
     def set_wcs_car(self, wcs=None):
+        """Set the WCS of the CAR maps."""
         self._wcs_car = wcs
 
     def get_wcs_car(self):
+        """WCS of the CAR maps (None for HEALPix maps or if not set)."""
         return self._wcs_car
 
     wcs_car = property(get_wcs_car, set_wcs_car)
 
     def set_total_hits_map(self, total_hits_map=None):
+        """Set the total hits per pixel, summed over the detectors."""
         self._total_hits_map = total_hits_map
 
     def get_total_hits_map(self):
+        """Total hits per pixel, summed over the detectors, set by the $h$-map readers (None if not set)."""
         return self._total_hits_map
 
     total_hits_map = property(get_total_hits_map, set_total_hits_map)
@@ -100,6 +109,16 @@ class Spin_maps(dict):
     def from_dictionary(cls, dictionary):
         """
         Create a Spin_maps object from a dictionary
+
+        Parameters
+        ----------
+        dictionary: dict
+            ``spin -> map``; the maps are not copied, nor the metadata.
+
+        Returns
+        -------
+        Spin_maps
+            A new Spin_maps object holding the same maps.
         """
 
         result = cls()
@@ -112,6 +131,19 @@ class Spin_maps(dict):
     def from_list_maps(cls, maps, list_spin):
         """
         Create a Spin_maps object from a list of maps and a list of spins
+
+        Parameters
+        ----------
+        maps: np.ndarray | enmap.ndmap | list
+            Maps, the first dimension running over the spins; for an ``enmap.ndmap``, the
+            maps of the result are ``enmap.ndmap`` with the same WCS.
+        list_spin: Iterable
+            Spin of each map.
+
+        Returns
+        -------
+        Spin_maps
+            ``spin -> map``.
         """
         assert isinstance(list_spin, Iterable)
         result = cls()
@@ -146,6 +178,12 @@ class Spin_maps(dict):
     def add_inplace(self, other):
         """
         Add another Spin_maps object to this one in place
+
+        Parameters
+        ----------
+        other: Spin_maps
+            Spin maps to add: the maps of the spins present in both are added, the others are
+            added to this object.
         """
         for key, value in other.items():
             if key in self:
@@ -164,6 +202,10 @@ class Spin_maps(dict):
         subscripts: str
             Einstein summation subscripts for the multiplication operation.
             Default is 'd...,d...->d...' which multiplies each `spin` map by the corresponding `spin` map of the other Spin_maps object for each detector.
+
+        Notes
+        -----
+        The spin 0 maps are left unchanged.
         """
         assert isinstance(other, Spin_maps) or np.all(
             [key in other for key in self.keys() if key != 0]
@@ -186,6 +228,13 @@ class Spin_maps(dict):
         ----------
         other: Spin_maps
             Another Spin_maps object to extract `-spin` maps from for multiplication.
+        subscripts: str
+            Einstein summation subscripts for the multiplication operation. Default is
+            'd...,d...->d...'.
+
+        Notes
+        -----
+        The spin 0 maps are left unchanged.
         """
         assert isinstance(other, Spin_maps) or np.all(
             [key in other for key in self.keys() if key != 0]
@@ -204,11 +253,40 @@ class Spin_maps(dict):
         """
         Extend the first dimension of the spin maps to a new shape
 
+        Parameters
+        ----------
+        new_shape_first_dimension: int
+            Size of the new first dimension, e.g. the number of detectors.
+
         Notes
         -----
-        A broadcast is performed to extend the first dimension of each element of the dictionary.
+        A broadcast is performed to add a first dimension to each element of the dictionary:
+        a map of shape ``(npix,)`` becomes ``(new_shape_first_dimension, npix)``, without copy.
         """
         for key in self.keys():
             self[key] = np.broadcast_to(
                 self[key], (new_shape_first_dimension,) + np.asarray(self[key]).shape
             )
+
+    def copy_sliced(self, slice_1d):
+        """
+        Copy the spin maps with a slice on the last (pixel) dimension
+
+        Parameters
+        ----------
+        slice_1d: slice | np.ndarray
+            Slice or indices to apply on the last dimension of each element of the dictionary;
+            the maps of size 1 are kept as they are. The metadata are not copied.
+
+        Returns
+        -------
+        Spin_maps
+            A new Spin_maps object with the sliced elements.
+        """
+        result = Spin_maps()
+        for key in self.keys():
+            if self[key].size != 1:
+                result[key] = self[key][...,slice_1d]
+            else:
+                result[key] = self[key]
+        return result

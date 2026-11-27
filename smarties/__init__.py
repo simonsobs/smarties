@@ -19,9 +19,16 @@ logger = logging.getLogger("smarties")
 
 if not logging.getLogger().handlers:
 
-    logging.basicConfig(
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-        datefmt="%d-%b-%y %H:%M:%S",
+    handler = logging.StreamHandler()
+    handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s %(levelname)s %(name)s: %(message)s",
+            datefmt="%d-%b-%y %H:%M:%S",
+        )
     )
+    logger.addHandler(handler)
 
-logger.setLevel(os.environ.get("LOGLEVEL", "INFO").upper())
+    logger.propagate = False 
+    # printed by this handler only, not again by handlers added to the root logger later
+
+logger.setLevel(os.environ.get("smarties_LOGLEVEL", "INFO").upper())

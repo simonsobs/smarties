@@ -101,19 +101,13 @@ Optional packages enable specific features:
 ## Logging
 
 SMARTIES reports its progress through the standard `logging` module, under the `smarties`
-logger. The level is read from the `LOGLEVEL` environment variable (default `INFO`):
+logger. The level is read from the `smarties_LOGLEVEL` environment variable (default `INFO`):
 
 ```bash
-LOGLEVEL=WARNING python my_simulation.py
+smarties_LOGLEVEL=WARNING python my_simulation.py
 ```
 
-or set from Python, after importing the package:
-
-```python
-import logging
-
-logging.getLogger("smarties").setLevel(logging.WARNING)
-```
+See [Logs](logs.md) to change it from Python, silence the messages or write them to a file.
 
 ## Building the Documentation
 

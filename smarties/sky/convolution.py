@@ -110,7 +110,7 @@ def get_beam_convolution_spins_maps(
     single_precision: bool = False,
     return_only_positive_spins: bool = True
 ) -> Spin_maps:
-    """Compute systematic spin maps from sky and beam harmonic coefficents.
+    r"""Compute systematic spin maps from sky and beam harmonic coefficents.
 
     For each detector, this subtracts a symmetric Gaussian beam (computed from
     ``fwhm``) from the provided beam coefficients and then constructs the
@@ -143,6 +143,9 @@ def get_beam_convolution_spins_maps(
         Wether to substract a gaussian beam or not, default to False.
     single_precision: bool
         If True, return single-precision coefficients. Default is False (double precision).
+    return_only_positive_spins: bool
+        If True (default), only the spins $k \ge 0$ are stored, the negative ones being
+        their conjugates; otherwise both signs are stored.
     Returns
     -------
     dict[int, np.ndarray]

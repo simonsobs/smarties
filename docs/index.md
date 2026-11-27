@@ -21,9 +21,9 @@ The numerical cost scales with the number of pixels observed, rather than with t
 🔭 **Exact $4\pi$ beam convolution from $b_{\ell m}$.** The harmonic coefficients $b_{\ell m}$ of each detector beam can be ingested to replicate a full $4\pi$ beam convolution, again without
 TOD operation ([Demay et al. 2026](https://arxiv.org/abs/2610.20231)). Template-based instrumental systematics à la BICEP replicating elliptical beam, beam pointing offset and beamwidth mismatch are also available.
 
-🔍 **On-the-fly adaptive resolution.** The $h$-maps can be provided at a lower resolution than the output maps: routines are implemented to changes their resolution on the fly during the mapmaking stage, without needing to store them at the output resolution.
+🔍 **On-the-fly adaptive resolution.** The $h$-maps can be provided at a lower resolution than the output maps: routines are implemented to changes their resolution on the fly during the mapmaking stage, without needing to store them at the output resolution ([Mapmaking per chunk](getting_started/mapmaking_chunks.md)).
 
-📡 **Detector-wise interpolation.** On a given focal plane, one can provide $h$-maps coming from a subset of detectors, and these can be used to interpolate the missing ones over the full focal plane on-the-fly during the mapmaking stage.
+📡 **Detector-wise interpolation.** On a given focal plane, one can provide $h$-maps coming from a subset of detectors, and these can be used to interpolate the missing ones over the full focal plane on-the-fly during the mapmaking stage ([Mapmaking per chunk](getting_started/mapmaking_chunks.md#detector-wise-interpolation)).
 
 🛰️**Simulation interfaces.** Interfaces are built to ingest the $h$-maps produced by TOAST / sotodlib and litebird_sim. 
 
@@ -63,15 +63,14 @@ from smarties.io import build_mask_from_lbs_h_maps
 files = sorted(name[: -len(".h5")] for name in glob.glob("tests/data/lbs_examples/h_maps_det_*.h5"))
 angles = np.deg2rad([float(name.split("_")[-1]) for name in files])  # polarisation angles
 mask = build_mask_from_lbs_h_maps(files)
-h_maps = read_lbs_h_maps(
-    files, prefix="", list_spin=[np.array([n, 0]) for n in range(0, 5)],
-    mask=mask, list_weights=np.ones(len(files)),
+h_maps, attributes = read_lbs_h_maps(
+    files, prefix="", list_spin=[np.array([n, 0]) for n in range(0, 5)], mask=mask,
 )
 
 # Sky: I, Q, U -> spin maps S_0 = I, S_{+-2} = (Q +- iU) / 2
 nside, lmax = hp.npix2nside(mask.size), 128
 framework = FrameworkSystematics(map_shape=(mask.size,), nstokes=3, lmax=lmax)
-sky = framework.get_CMB_spin_sky_maps(nside=nside, fwhm=np.deg2rad(2.0), seed=0)
+sky = framework.get_CMB_spin_sky_maps(nside=nside, fwhm=120.0, seed=0)  # FWHM in arcmin
 
 # Alternatively, one can provide a custom sky in I, Q, U format and convert it to spin maps:
 # iqu = hp.read_map('path/to/iqu_map.fits', field=(0, 1, 2))
@@ -94,11 +93,13 @@ print("rms of the T -> P leakage in Q, U:", (initial_iqu.real - final_iqu)[1:].s
 - **Getting Started**: [Installation](getting_started/installation.md),
   [Quickstart](getting_started/quickstart.md), [Spin formalism](getting_started/formalism.md),
   [Spin maps](getting_started/spin_maps.md), [$h$-maps](getting_started/h_maps.md),
-  [Systematics](getting_started/systematics.md), [Mapmaking](getting_started/mapmaking.md)
+  [Systematics](getting_started/systematics.md), [Mapmaking](getting_started/mapmaking.md),
+  [Mapmaking per chunk](getting_started/mapmaking_chunks.md), [Logs](getting_started/logs.md)
 <!-- - **Tutorials**: [LiteBIRD-like scan on HEALPix maps](tutorials/litebird_healpix_tutorial.md),
   [Simons Observatory scan on CAR maps](tutorials/sotodlib_car_tutorial.md) -->
 - **API Reference**: generated from the [`smarties`](api/smarties/index.md) source tree, one page
   per module
+- **Changelog**: the [notable changes](changelog.md) of SMARTIES
 
 ## Packages Built on SMARTIES
 
