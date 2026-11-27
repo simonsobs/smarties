@@ -1292,7 +1292,7 @@ class FrameworkSystematicsChunks(FrameworkSystematics):
     ) -> Spin_maps:
         r"""
         $h$-maps of all the detectors on some pixels, the $h$-maps of the detectors without
-        simulated $h$-maps being interpolated over the focal plane.
+        provided $h$-maps being interpolated over the focal plane.
 
         The hits and the averages $h_n / h_0$ ($n \ge 1$) of the known detectors are
         interpolated, wafer by wafer, with
@@ -1475,7 +1475,7 @@ class FrameworkSystematicsChunks(FrameworkSystematics):
             Inverse of the mapmaking matrix on the observed output pixels, shape
             ``(npix, nstokes, nstokes)``. If None, it is computed from the $h$-maps.
         perform_det_interpolation: bool (optional)
-            If True, interpolate the $h$-maps of the detectors without simulated $h$-maps
+            If True, interpolate the $h$-maps of the detectors without provided $h$-maps
             from those of the known detectors (see :meth:`get_interpolated_h_maps_chunk`).
         dict_utils_interpolation_det: dict (optional)
             Information for the interpolation, see :meth:`get_interpolated_h_maps_chunk`.
