@@ -231,10 +231,6 @@ def get_slice_1d_from_2d(
     enmap.ndmap
         1D array of indices corresponding to the sliced 2D map.
 
-    Notes
-    -----
-    This function builds a full-size index map at each call;
-    :func:`get_projector_chunk` obtains the same indices without it.
     """
     if slice_y is ... or slice_x is ...:
         return slice_x if slice_x is not ... else slice_y
@@ -531,8 +527,8 @@ def get_pixels_chunk(
         'car' or 'healpix'.
     chunk : np.ndarray
         CAR: block ``(start_x, stop_x, start_y, stop_y)`` of the $h$-map grid, as given by
-        :func:`get_chunks_from_shape`. HEALPix: $h$-map pixels of the chunk, as given by
-        :func:`get_chunks_healpix`.
+        [`get_chunks_from_shape`][smarties.utils.resolution.get_chunks_from_shape]. HEALPix: $h$-map pixels of the chunk, as given by
+        [`get_chunks_healpix`][smarties.utils.resolution.get_chunks_healpix].
     shape_final_map : tuple
         Shape of the full output map.
     shape_h_maps : tuple
@@ -578,7 +574,7 @@ def get_projector_chunk(
     projection_pixel : str
         'car' or 'healpix'.
     pixels_chunk : np.ndarray
-        Output pixels of the chunk in the full output map (:func:`get_pixels_chunk`),
+        Output pixels of the chunk in the full output map ([`get_pixels_chunk`][smarties.utils.resolution.get_pixels_chunk]),
         observed or not.
     observed_pixels_final_map : np.ndarray
         Sorted indices, in the full output map, of the observed output pixels: the pixels
@@ -634,7 +630,7 @@ def upgrade_h_maps(
     """
     $h$-maps at the output resolution, through indexation of coarser $h$-maps.
 
-    Useful to run :meth:`smarties.mapmaking.FrameworkSystematics.compute_total_maps` with
+    Useful to run [`compute_total_maps`][smarties.mapmaking.FrameworkSystematics.compute_total_maps] with
     $h$-maps computed at a coarser resolution, when the $h$-maps at the output resolution
     fit in memory; the mapmaking per chunk does the same operation chunk by chunk.
 

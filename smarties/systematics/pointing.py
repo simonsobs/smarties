@@ -168,6 +168,12 @@ def create_pointing_spin_leakage_map(
         Mask to apply to the maps, of the same dimension as the intensity_sky_map map
     spherical_derivatives: dict, optional
         Dictionary of the spherical derivatives of the intensity sky map, with keys 'phi' for the first derivative with respect to phi, including the factor 1/sin(theta) for the derivatives with respect to phi, and 'theta' for the first derivative with respect to theta. If not provided, the spherical derivatives will be computed from the intensity sky map using the spin-derivative formalism.
+    shape_car: tuple, optional
+        Shape of the cut masked CAR maps if the provided intensity_sky_map map is 
+        in CAR pixelization
+    shape_fullsky_car: tuple, optional
+        Shape of the full sky CAR maps if the provided intensity_sky_map map is 
+        in CAR pixelization, needed to compute the spherical derivatives
 
     Returns
     -------

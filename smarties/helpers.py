@@ -23,7 +23,7 @@ def get_all_spherical_derivatives_from_temperature_maps(
     n_iter: int = 10,
 ):
     """
-    Helper function to obain spherical derivatives from temperature maps. 
+    Helper function to obtain spherical derivatives from temperature maps. 
 
     Parameters
     ----------
@@ -34,7 +34,7 @@ def get_all_spherical_derivatives_from_temperature_maps(
         Maximum multipole moment.
     input_alm_to_use : np.ndarray, optional
         Pre-computed alms to use for the spherical derivatives. If not provided, they will be computed from the input map.
-    niter : int, optional
+    n_iter : int, optional
         Number of iterations for the map2alm function (default is 10, only relevant for healpix).
 
     Returns

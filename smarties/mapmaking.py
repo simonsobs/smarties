@@ -94,8 +94,9 @@ class FrameworkSystematics(object):
 
         Returns
         -------
-        spin_sky_maps: dictionary of spin sky maps (CMB, ...)
-            dictionary of spin sky maps, each of shape (n_spin, npix), with n_spin being 1 if nstokes=1 (spin=0), 2 if nstokes=2 (spin=-2, 2) and 3 if nstokes=3 (spin=0, -2, 2)
+        spin_sky_maps: Spin_maps
+            Spin sky maps, each of shape (npix,), with the spins 0 if nstokes=1, -2 and 2 if
+            nstokes=2, 0, -2 and 2 if nstokes=3
         """
 
         return create_CMB_spin_maps(
@@ -187,8 +188,8 @@ class FrameworkSystematics(object):
         npix: int = None
     ):
         """
-        Check the consistency of the spin sky maps and the spin systematics maps,
-        and add zero maps for the spins that are not provided in the input dictionaries.
+        Check the consistency of the spin sky maps and the spin systematics maps: shapes,
+        number of pixels, and real fields (spin 0 real, spins k and -k conjugate).
 
         Parameters
         ----------
@@ -348,23 +349,30 @@ class FrameworkSystematics(object):
         projector_h_n: np.ndarray = None,
         return_array: bool = False,
     ) -> dict | np.ndarray:
-        """
-        Compute the spin convolution of the h_n maps with the spin sky maps and the spin systematics maps.
+        r"""
+        Compute the spin convolution of the h_n maps with the spin sky maps and the spin
+        systematics maps: the data vector of the mapmaking, for the output spins.
+
+        A spin $k$ of the sky or systematics maps may be given for one sign only, the other
+        being its conjugate possibly computed on-the-fly; 
+        a spin given in neither the sky nor the systematics maps does not contribute.
 
         Parameters
         ----------
-        spin_sky_maps: dict | Spin_maps
-            Dictionary (Spin_maps object) of spin sky maps
-        spin_systematics_maps: dict | Spin_maps
-            Dictionary (Spin_maps object) of spin systematics maps
-        h_n_spin_dict: dict | Spin_maps
-            Dictionary (Spin_maps object) of h_n maps
+        spin_sky_maps: Spin_maps
+            Spin sky maps, ``spin -> (npix,)``
+        spin_systematics_maps: Spin_maps
+            Spin systematics maps, ``spin -> (n_det, npix)``
+        h_n_spin_dict: Spin_maps
+            $h$-maps, ``n -> (n_det, n_h_map_pixels)``; the spins $n \ge 0$ are enough
         npix: int
-            Number of pixels in the maps
-        polar_angle_coeff: np.ndarray
-            The polar angle coefficients to use for the mapmaking, if None, they will be set to 1.
+            Number of pixels of the output maps
+        polar_angle_coeff: dict
+            Polarisation angle coefficients, ``spin -> (n_det,)`` array of
+            $e^{i \, \mathrm{spin} \, \gamma_d}$, for all the spins of the maps, the $h$-maps
+            and the output
         polar_efficiency_coeff: np.ndarray
-            The polar efficiency coefficients to use for the mapmaking, if None, they will be set to 1.
+            Polarisation efficiencies of the detectors, shape ``(n_det,)``, applied to the output spins -2 and 2
         dtype: np.dtype = np.complex128
             The data type to use for the output arrays.
         projector_h_n: np.ndarray (optional)
@@ -376,8 +384,10 @@ class FrameworkSystematics(object):
 
         Returns
         -------
-        dict | np.ndarray
-            The coupled maps as a dictionary or a single array.
+        Spin_maps | np.ndarray
+            The coupled maps, as a Spin_maps of the output spins $\ge 0$ (the negative ones
+            being their conjugates), or with ``return_array`` an array of shape
+            ``(npix, nstokes)`` in the order of ``list_spin_output``.
         """
 
         base_spins = list(np.unique(spin_sky_maps.spins + spin_systematics_maps.spins))
@@ -502,22 +512,27 @@ class FrameworkSystematics(object):
             geometry_dictionary: dict = dict(),
             single_precision: bool = False,
         ) -> np.ndarray | Spin_maps | tuple[np.ndarray | Spin_maps, np.ndarray]:
-        """
+        r"""
         Compute the total estimated maps from the $h$-maps, the spin sky maps and the spin systematics maps
 
         Parameters
         ----------
-        h_n_spin_dict: dict or Spin_maps
-            Dictionary of the summed $h$-maps, with the keys being the spins and the values the $h$-maps
-        spin_sky_maps: dict or Spin_maps
-            Dictionary of the spin sky maps (detector-independent), with the keys being the spins and the values the spin sly maps
-            (e.g. if nstokes=3, the keys are 0, -2, 2 and the fields (I, (Q-iU)/2., (Q+iU)/2))
-        spin_systematics_maps: dict or Spin_maps (optional)
-            Dictionary of the spin systematics maps (detector-dependent), with the keys being the spins and the values the spin systematics maps,
-            of shape (n_det, npix), with n_det being the number of detectors and npix the number of pixels.
+        h_n_spin_dict: Spin_maps
+            $h$-maps ``n -> (n_det, npix)`` on the observed pixels, normalised
+            ($\sum_d h^d_0 = 1$); the spins $n \ge 0$ are enough, the negative ones being
+            their conjugates
+        spin_sky_maps: Spin_maps
+            Spin sky maps (detector-independent) on the observed pixels, ``spin -> (npix,)``
+            (e.g. if nstokes=3, the spins 0, 2 and -2, the fields I, (Q+iU)/2 and (Q-iU)/2; one
+            of the spins 2 and -2 is enough)
+        spin_systematics_maps: Spin_maps (optional)
+            Spin systematics maps (detector-dependent) on the observed pixels,
+            ``spin -> (n_det, npix)``; for each spin, one sign is enough.
             If None, no systematics are considered (default is None).
-        mask: np.ndarray
-            Mask of the maps, only the pixels in the observed area will be considered for the inversion
+        mask: np.ndarray (optional)
+            Mask of the full map (shape ``map_shape``): the observed pixels are those where it
+            is non-zero, and the inputs are given on these pixels only, in increasing order of
+            the pixel index. Default: all the pixels
         inverse_mapmaking_matrix: np.ndarray (optional)
             The inverse of the mapmaking matrix to use, with the shape (npix, nstokes, nstokes), with npix being the number of pixels
             in the observed area of the provided mask. If None, the inverse mapmaking matrix will be computed from the provided h_n maps.
@@ -532,7 +547,9 @@ class FrameworkSystematics(object):
         polar_efficiency_coeff: np.ndarray (optional)
             The detector polarization efficiency coefficients to use for the mapmaking, if None, they will be set to 1. Default is None.
         projector_h_n: np.ndarray (optional)
-            The projector to apply to the h-maps (applied as indices), if None, no projector is applied. Default is None.
+            Column of the $h$-maps (and row of ``inverse_mapmaking_matrix``) of each observed
+            pixel, applied as indices. If
+            None, the $h$-maps are used directly.Default is None.
         geometry_dictionary: dict (optional)
             A dictionary containing the geometry information for the mapmaking process. Must contain 'wcs_car' if the maps are in CAR format.
             Default is an empty dictionary.
@@ -542,8 +559,11 @@ class FrameworkSystematics(object):
 
         Returns
         -------
-        final_sky_fields: np.ndarray
-            The final sky fields, with the shape (npix, nstokes) if return_Q_U is False, (npix, 3) otherwise
+        Spin_maps or np.ndarray
+            Output spin maps on the observed pixels, ``spin -> (npix,)`` for the output spins
+            $\ge 0$ (I and Q + iU; Q - iU being returned as the conjugate of the spin 2), or
+            with ``return_Q_U`` the I, Q, U maps, shape ``(nstokes, npix)``; with
+            ``return_inverse_mapmaking_matrix``, a tuple ``(maps, inverse_mapmaking_matrix)``.
         """
 
         dtype = np.complex64 if single_precision else np.complex128
@@ -650,6 +670,7 @@ class FrameworkSystematics(object):
                 vector=spin_coupled_maps,
                 output=dict_final_sky_fields[spin]
             )
+            dict_final_sky_fields[spin] = get_final_map(dict_final_sky_fields[spin])
 
         logger.info(f"Final maps computed in {time.time() - time_final_maps:.2f} seconds...")
 
@@ -671,7 +692,7 @@ class FrameworkSystematics(object):
 
 class FrameworkSystematicsChunks(FrameworkSystematics):
     """
-    :class:`smarties.mapmaking.FrameworkSystematics` with a mapmaking per chunk working on
+    [`FrameworkSystematics`][smarties.mapmaking.FrameworkSystematics] with a mapmaking per chunk working on
     CAR and HEALPix maps, with $h$-maps interpolated over the focal plane and upgraded to the
     output resolution on the fly.
     """
@@ -798,10 +819,9 @@ class FrameworkSystematicsChunks(FrameworkSystematics):
                     parameters,
                     np.asarray(template),
                 ) #+ contribution_from_spin_systematics
-            
+                systematics_map = systematics_from_templates if systematics_map is None else systematics_map + systematics_from_templates
             # if contribution_from_template_systematics.size > 0:
             #     systematics_maps_chunk[spin] = contribution_from_template_systematics
-            systematics_map = systematics_from_templates if systematics_map is None else systematics_map + systematics_from_templates
 
             if systematics_map is not None:
                 systematics_maps_chunk[spin] = systematics_map
@@ -820,10 +840,10 @@ class FrameworkSystematicsChunks(FrameworkSystematics):
 
         The hits and the averages $h_n / h_0$ ($n \ge 1$) of the known detectors are
         interpolated, wafer by wafer, with
-        :func:`~smarties.utils.interpolation.perform_interpolation_scipy` (linear
+        [`perform_interpolation_scipy`][smarties.utils.interpolation.perform_interpolation_scipy] (linear
         interpolation, nearest known detector outside their convex hull) and stacked after
         the known ones. The $h$-maps of all the detectors are then reweighted by the hits
-        with :func:`~smarties.utils.tools.reweight_hmaps_by_hits`: $h^d_0 = $ hits$_d /
+        with [`reweight_hmaps_by_hits`][smarties.utils.tools.reweight_hmaps_by_hits]: $h^d_0 = $ hits$_d /
         \sum_{d'}$ hits$_{d'}$ and $h^d_n = h^d_0 \times$ average$^d_n$.
 
         Parameters
@@ -847,7 +867,7 @@ class FrameworkSystematicsChunks(FrameworkSystematics):
               of the known detectors are interpolated. If False, the $h$-maps given 
               must be the hits and the averages themselves (as read with ``reweight_by_hits=False``), 
               and are interpolated as they are. In both cases, the $h$-maps of 
-              all the detectors are then reweighted by the hits with :func:`~smarties.utils.tools.reweight_hmaps_by_hits`.
+              all the detectors are then reweighted by the hits with [`reweight_hmaps_by_hits`][smarties.utils.tools.reweight_hmaps_by_hits].
             * ``'wafer_list_detector_known'`` (optional): list of the wafers of the known detectors, shape ``(n_known,)``. The ordering must be the same as in ``dict_positions_detector_known``. If provided, the interpolation is performed separately for each wafer.
             * ``'wafer_list_detector_unknown'`` (optional): list of the wafers of the detectors to interpolate, shape ``(n_unknown,)``. The ordering must be the same as in ``dict_positions_detector_unknown``. If provided, the interpolation is performed separately for each wafer.
 
@@ -964,7 +984,7 @@ class FrameworkSystematicsChunks(FrameworkSystematics):
         resolution than the output maps and possibly interpolated to more detectors.
 
         The result is the one of
-        :meth:`~smarties.mapmaking.FrameworkSystematics.compute_total_maps` with the $h$-maps
+        [`compute_total_maps`][smarties.mapmaking.FrameworkSystematics.compute_total_maps] with the $h$-maps
         of all the detectors (known and interpolated) projected to the output pixels.
 
         Parameters
@@ -974,7 +994,7 @@ class FrameworkSystematicsChunks(FrameworkSystematics):
 
             * CAR: ``'shape_car'``, shape of the full output map (default: ``map_shape``);
               ``'wcs_car'``, WCS of the output map, the output maps being ``enmap.ndmap``.
-            * HEALPix: ``'nside'`` (default from the mask or ``map_shape``);
+            * HEALPix: ``'nside'``, nside of the output maps (required);
               ``'nest'`` (optional), ordering of both maps, NESTED if True,
               RING otherwise (default).
 
@@ -987,11 +1007,12 @@ class FrameworkSystematicsChunks(FrameworkSystematics):
             ``perform_det_interpolation``). Only $n \ge 0$ is needed. Never copied.
         spin_sky_maps: dict or Spin_maps
             Dictionary of the spin sky maps on the observed output pixels, ``spin -> (npix,)``
-            (e.g. if nstokes=3, the keys are 0, -2, 2 and the fields (I, (Q-iU)/2, (Q+iU)/2)).
+            (e.g. if nstokes=3, the keys are 0, 2, -2 and the fields (I, (Q+iU)/2, (Q-iU)/2);
+            one of the spins 2 and -2 is enough).
         spin_systematics_maps: dict or Spin_maps (optional)
             Dictionary of the spin systematics maps on the observed output pixels,
-            ``spin -> (n_det, npix)``, for all the detectors (known first). If None, no
-            systematics maps are considered.
+            ``spin -> (n_det, npix)``, for all the detectors (known first); for each spin, one
+            sign is enough. If None, no systematics maps are considered.
         mask: np.ndarray (optional)
             Mask of the full output map; only the pixels where it is non-zero are computed.
             Default: all the pixels.
@@ -1000,9 +1021,11 @@ class FrameworkSystematicsChunks(FrameworkSystematics):
             ``(npix, nstokes, nstokes)``. If None, it is computed from the $h$-maps.
         perform_det_interpolation: bool (optional)
             If True, interpolate the $h$-maps of the detectors without provided $h$-maps
-            from those of the known detectors (see :meth:`get_interpolated_h_maps_chunk`).
+            from those of the known detectors (see
+            [`get_interpolated_h_maps_chunk`][smarties.mapmaking.FrameworkSystematicsChunks.get_interpolated_h_maps_chunk]).
         dict_utils_interpolation_det: dict (optional)
-            Information for the interpolation, see :meth:`get_interpolated_h_maps_chunk`.
+            Information for the interpolation, see
+            [`get_interpolated_h_maps_chunk`][smarties.mapmaking.FrameworkSystematicsChunks.get_interpolated_h_maps_chunk].
         return_Q_U: bool (optional)
             If True, return I, Q, U maps instead of spin maps. Default is False.
         return_inverse_mapmaking_matrix: bool (optional)
@@ -1021,9 +1044,8 @@ class FrameworkSystematicsChunks(FrameworkSystematics):
             ``'template_spin_systematics_maps'``: Spin_maps of the templates on the observed
             output pixels, ``spin -> (npix,)`` or ``(n_templates, npix)``;
             ``'parameters_template_systematics'``: dictionary of the detector parameters,
-            ``spin -> (n_det,)`` or ``(n_templates, n_det)``. See
-            :class:`smarties.systematics.templates.TemplateSystematics`, which combines several
-            systematics in this format.
+            ``spin -> (n_det,)`` or ``(n_templates, n_det)``, as returned by the
+            ``create_dict_template_*`` functions of [`smarties.systematics`][smarties.systematics].
         single_precision: bool (optional)
             If True, compute in single precision. Default is False.
         polar_efficiency_coeff: np.ndarray (optional)
@@ -1082,8 +1104,8 @@ class FrameworkSystematicsChunks(FrameworkSystematics):
         list_spin_h_maps = sorted({abs(int(spin)) for spin in h_n_spin_dict.keys()})
         assert 0 in list_spin_h_maps, 'The h_0 maps must be provided'
 
-        if spin_systematics_maps is None and dict_utils_template_systematics_maps is None:
-            logger.warning("No systematics maps provided, assuming no systematics")
+        if dict_utils_template_systematics_maps is None:
+            logger.warning("No systematics templates provided, assuming no systematics from templates")
 
         if spin_systematics_maps is None:
             logger.warning("No systematics maps provided, assuming no systematics")

@@ -367,6 +367,17 @@ def get_detector_names_from_yaml_file(
 ) -> list[str]:
     """
     Get the detector names as ordered by sotodlib from a YAML file containing detector information.
+
+    Parameters
+    ----------
+    path_yaml: str
+        Path of the YAML file describing the detectors, read as in
+        [`get_detector_names_from_dictionary_detector`][smarties.instrument.detectors.get_detector_names_from_dictionary_detector].
+
+    Returns
+    -------
+    list[str]
+        Names of the detectors.
     """
     with open(path_yaml) as file:
         dictionary_detector = yaml.safe_load(file)

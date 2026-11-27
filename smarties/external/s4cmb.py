@@ -465,6 +465,8 @@ def get_first_spin_derivative(
         Pixel shape of the output pixel map.
     input_spin : int
         Input spin of the spherical harmonic coefficients grad_curl_alms.
+    wcs : WCS, optional
+        WCS of the output CAR maps (``enmap.ndmap``); if None (default), HEALPix maps.
 
     Returns
     -------
@@ -787,6 +789,9 @@ def get_second_spherical_derivatives_from_spin_derivatives(
         Input spin of the spherical harmonic coefficients grad_curl_alms.
     lmax : int
         Maximum multipole moment.
+    input_alm_to_use : np.ndarray, optional
+        Precomputed harmonic coefficients of ``input_map`` (healpy ordering, up to ``lmax``);
+        if None (default), they are computed from ``input_map``.
     zbounds : tuple[float, float], optional
         The bounds for the z-coordinate (cosine of the polar angle) to consider (default to full sky).
     spherical_derivatives_dict : dict, optional

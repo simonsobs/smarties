@@ -2,6 +2,7 @@
 # Copyright (C) 2024-2026 Members of the Simons Observatory collaboration.
 # Please refer to the LICENSE file in the root of this repository.
 
+from copy import deepcopy
 import logging
 import numpy as np
 from opt_einsum import contract
@@ -296,18 +297,24 @@ def transform_array_maps_into_spin_maps(
     inheriting from the dictionary structure as
       {key:element} being the spin and the corresponding map, respectively.
     The transformation is done as follows:
-        * The spin 0 field is assumed to be the first Stokes parameter (temperature) if n_stokes = 1 or 3.
-        * The spin -2 field is assumed to be given by $0.5 * (Q - iU)$
-        * The spin 2 field is assumed to be given by $0.5 * (Q + iU)$
-    where Q and U are the second and third Stokes parameters, respectively, if n_stokes = 2 or 3.
+        * The spin 0 field is the first Stokes parameter (temperature) if n_stokes = 1 or 3.
+        * The spin 2 field is $0.5 (Q + iU)$, where Q and U are the last two Stokes
+          parameters, if n_stokes = 2 or 3.
+    The spin -2 field, $0.5 (Q - iU)$, is not stored: the Spin_maps returns it as the
+    conjugate of the spin 2 field.
 
     Parameters
     ----------
     array_maps: np.ndarray | enmap.ndmap
         Array of maps of shape (..., n_stokes, n_pix) with
-        * if n_stokes = 1, the temperature field [T] is assumed to be provided (spin=0)
-        * if n_stokes = 2, the polarization field [Q,U] is assumed to be provided (spin=2, -2)
-        * if n_stokes = 3, the full Stokes parameters [T,Q,U] are assumed to be provided (spin=0, 2, -2)
+        * if n_stokes = 1, the temperature field [T] is assumed to be provided (spin 0)
+        * if n_stokes = 2, the polarization field [Q,U] is assumed to be provided (spin 2)
+        * if n_stokes = 3, the full Stokes parameters [T,Q,U] are assumed to be provided (spins 0, 2)
+    n_stokes_output: int, optional
+        Number of Stokes parameters of the output, 1, 2 or 3: the missing fields are set to
+        zero (temperature only to polarization is not possible). Default: n_stokes of the input.
+    dtype: type, optional
+        Data type of the zero fields added for n_stokes_output. Default is complex.
 
     Returns
     -------
@@ -378,6 +385,7 @@ def transform_spin_maps_into_array_maps(spin_maps: Spin_maps) -> np.ndarray | en
         * the spin -2 field is assumed to be given by $0.5 * (Q - iU)$
         * the spin 2 field is assumed to be given by $0.5 * (Q + iU)$
     where Q and U are the second and third Stokes parameters, respectively, if n_stokes = 2 or 3.
+    One of the spins 2 and -2 is enough, the other being its conjugate.
 
     Parameters
     ----------
@@ -423,8 +431,8 @@ def transform_spin_maps_into_array_maps(spin_maps: Spin_maps) -> np.ndarray | en
         # Only temperature field is provided
         array_maps[..., 0, :] = spin_maps[0]
     if n_stokes >= 2:
-        array_maps[..., 1, :] = spin_maps[-2] + spin_maps[2]  # [Q, U] -> spin -2 and 2
-        array_maps[..., 2, :] = -1j * (spin_maps[2] - spin_maps[-2])
+        array_maps[..., -2, :] = spin_maps[-2] + spin_maps[2]  # [Q, U] -> spin -2 and 2
+        array_maps[..., -1, :] = -1j * (spin_maps[2] - spin_maps[-2])
 
     if boolean_car_pixelization:
         array_maps = enmap.ndmap(array_maps.reshape(-1, *array_maps.shape[-2:]), wcs=spin_maps[first_spin].wcs)
@@ -611,6 +619,16 @@ def convert_ellipticities_conventions(
 def flatten_CAR_maps(maps_CAR: enmap.ndmap) -> enmap.ndmap:
     """
     Flatten a CAR map of shape (..., ny, nx) into a 1D map of shape (..., ny*nx).
+
+    Parameters
+    ----------
+    maps_CAR: enmap.ndmap
+        CAR maps of shape ``(..., ny, nx)``; a leading dimension of size 1 is dropped.
+
+    Returns
+    -------
+    enmap.ndmap
+        Maps of shape ``(..., ny*nx)``.
     """
     first_dimensions = maps_CAR.shape[:-2] if maps_CAR.shape[:-2] != (1,) else tuple()
     return maps_CAR.reshape(first_dimensions + (np.prod(maps_CAR.shape[-2:]),))
@@ -620,6 +638,18 @@ def flatten_CAR_maps(maps_CAR: enmap.ndmap) -> enmap.ndmap:
 def unflatten_CAR_maps(maps_CAR_flatten: enmap.ndmap, original_shape_pixels: tuple[int, int]) -> enmap.ndmap:
     """
     Unflatten a CAR map of shape (..., ny*nx) into a 2D map of shape (..., ny, nx).
+
+    Parameters
+    ----------
+    maps_CAR_flatten: enmap.ndmap
+        Flattened CAR maps of shape ``(..., ny*nx)``.
+    original_shape_pixels: tuple[int, int]
+        Shape ``(ny, nx)`` of the CAR maps.
+
+    Returns
+    -------
+    enmap.ndmap
+        Maps of shape ``(..., ny, nx)``.
     """
     return maps_CAR_flatten.reshape(maps_CAR_flatten.shape[:-1] + original_shape_pixels)
 
@@ -630,17 +660,33 @@ def reweight_hmaps_by_hits(
         spin_0: int | Spin_nm = 0,
         list_weights: np.ndarray = None
 ) -> None| dict| Spin_maps:
-    """
-    Reweight the h-maps in the dictionary by the number of hits per pixel, given a list of weights for each detector or not.
+    r"""
+    Normalise the $h$-maps by the hits of the detectors.
+
+    The spin-0 maps hold the hits of the detectors, and the maps of spin $n \ne 0$ the averages
+    $\langle e^{in\psi}\rangle_d$. With the weights $w_d$ of ``list_weights``, they become
+    $h^d_0 = w_d\,\mathrm{hits}_d / \sum_{d'} w_{d'}\,\mathrm{hits}_{d'}$ and
+    $h^d_n = h^d_0 \langle e^{in\psi}\rangle_d$ (zero where the detector has no hits), and
+    ``total_hits_map`` is set to $\sum_d w_d\,\mathrm{hits}_d$.
 
     Parameters
     ----------
-    h_dictionary: dict| Spin_maps
-        Dictionary of h-maps with keys being the spins and values being the corresponding maps for each detector.
+    h_dictionary: Spin_maps
+        $h$-maps ``spin -> (n_det, n_pix)``, the spin 0 holding the hits. Modified in place.
     in_place: bool, optional
-        If True, the h_dictionary is modified in place. If False, a new dictionary is returned. Default is False.
-    spin_0: int | Spin_nm = 0
-        Spin 0 can be either an integer or a Spin_nm object. If the spin 0 is not present in the h-maps dictionary, a ValueError is raised.
+        If False (default), ``h_dictionary`` is also returned; it is modified in place in
+        both cases.
+    spin_0: int | Spin_nm, optional
+        Key of the hits, ``0`` or ``Spin_nm((0, 0))``. A ValueError is raised if the
+        $h$-maps do not contain it. Default is 0.
+    list_weights: np.ndarray, optional
+        Weights of the detectors, shape ``(n_det,)``, normalised to a sum of 1. Default: 1 for
+        every detector.
+
+    Returns
+    -------
+    Spin_maps or None
+        ``h_dictionary`` if ``in_place`` is False, None otherwise.
     """
     assert isinstance(h_dictionary, Spin_maps), (
         "h_dictionary must be a Spin_maps object, with keys being the spins and values being the corresponding maps for each detector."
@@ -662,6 +708,12 @@ def reweight_hmaps_by_hits(
         raise ValueError(
             "Spin 0 is not present in the h-maps dictionary, re-weighting cannot be applied."
         )
+    
+    if not in_place:
+        h_dictionary_output = deepcopy(h_dictionary)
+    else:
+        h_dictionary_output = h_dictionary
+
 
     spin_0 = 0 if 0 in h_dictionary.spins else Spin_nm((0, 0))
     logger.info("--Spin 0 in h maps dictionary, re-weighting applied.")
@@ -671,18 +723,18 @@ def reweight_hmaps_by_hits(
     weighted_h_0 = h_dictionary[spin_0] * list_weights[..., None]
     sum_hits = weighted_h_0.sum(axis=0) 
 
-    h_dictionary.total_hits_map = sum_hits
+    h_dictionary_output.total_hits_map = sum_hits
 
     for spin in h_dictionary.spins:
         if spin != spin_0:
-            h_dictionary[spin][cond_non_zero] *= (
+            h_dictionary_output[spin][cond_non_zero] *= (
                 weighted_h_0 / sum_hits 
             )[cond_non_zero]
 
-    h_dictionary[spin_0] = np.where(
+    h_dictionary_output[spin_0] = np.where(
         cond_non_zero, 
         weighted_h_0 / sum_hits, 
         0
     )
     if not in_place:  
-        return h_dictionary
+        return h_dictionary_output
